@@ -1,4 +1,4 @@
-# USP (Unified Software Protocol)
+# Unified Software Platform (USP)
 
 > **⚠️ ALPHA RELEASE v0.5.1** - Not all samples have been fully validated. Version 1.0.0 coming soon.
 
