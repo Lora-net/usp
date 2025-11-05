@@ -162,7 +162,9 @@ void ral_lr11xx_convert_lr_fhss_params_from_ral( const ral_lr_fhss_params_t* ral
 
 bool ral_lr11xx_handles_part( const char* part_number )
 {
-    return ( strcmp( "lr1110", part_number ) == 0 ) || ( strcmp( "lr1120", part_number ) == 0 );
+    return (strcmp("lr1110", part_number) == 0) ||
+           (strcmp("lr1120", part_number) == 0) ||
+           (strcmp("lr1121", part_number) == 0);
 }
 
 ral_status_t ral_lr11xx_reset( const void* context )
