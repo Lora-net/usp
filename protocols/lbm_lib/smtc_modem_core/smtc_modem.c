@@ -188,8 +188,6 @@ typedef struct modem_key_ctx_s
  */
 
 radio_planner_t *  modem_radio_planner = NULL;
-ralf_t * modem_radio;
-/*
 #if defined( SX128X )
 ralf_t modem_radio = RALF_SX128X_INSTANTIATE( NULL );
 #elif defined( SX126X )
@@ -205,7 +203,6 @@ ralf_t          modem_radio = RALF_SX127X_INSTANTIATE( &sx127x );
 #else
 #error "Please select radio board.."
 #endif
-*/
 struct
 {
     uint8_t  modem_appkey_status;
@@ -291,19 +288,19 @@ void smtc_modem_set_radio_context( const void* radio_ctx )
 {
 #if defined( SX1272 ) || defined( SX1276 )
     // update modem_radio context with provided one
-    ( ( sx127x_t* ) modem_radio->ral.context )->hal_context = radio_ctx;
+    ( ( sx127x_t* ) modem_radio.ral.context )->hal_context = radio_ctx;
 #else
     // update modem_radio context with provided one
-    modem_radio->ral.context = radio_ctx;
+    modem_radio.ral.context = radio_ctx;
 #endif
     // Save modem radio context in case of direct access to radio by the modem
-    modem_set_radio_ctx( modem_radio->ral.context );
+    modem_set_radio_ctx( modem_radio.ral.context );
 }
 
 const void* smtc_modem_get_radio_context( void )
 {
     // Get radio context
-    return modem_radio->ral.context;
+    return modem_radio.ral.context;
 }
 
 bool smtc_modem_is_irq_flag_pending( void )
