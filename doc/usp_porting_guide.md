@@ -169,9 +169,9 @@ A brief description of the necessary steps for this implementation follows.
 The HAL implementation must provide platform-specific read, write, reset, and wake-up implementations.
 
 - Radio driver API functions call the HAL implementation to perform the actual reset, wake, and communication operations needed by the driver.
-- For the `LR20xx`, these functions are documented in [lr20xx_hal.h](smtc_rac_lib/radio_drivers/lr20xx_driver/inc/lr20xx_hal.h).
-- For the `LR11xx`, these functions are documented in [lr11xx_hal.h](smtc_rac_lib/radio_drivers/lr11xx_driver/src/lr11xx_hal.h).
-- For the `SX126x`, these functions are documented in [sx126x_hal.h](smtc_rac_lib/radio_drivers/sx126x_driver/src/sx126x_hal.h).
+- For the `LR20xx`, these functions are documented in [lr20xx_hal.h](/smtc_rac_lib/radio_drivers/lr20xx_driver/inc/lr20xx_hal.h).
+- For the `LR11xx`, these functions are documented in [lr11xx_hal.h](/smtc_rac_lib/radio_drivers/lr11xx_driver/src/lr11xx_hal.h).
+- For the `SX126x`, these functions are documented in [sx126x_hal.h](/smtc_rac_lib/radio_drivers/sx126x_driver/src/sx126x_hal.h).
 
 All radio driver API functions take a 'const void* context' argument:
 
@@ -183,9 +183,9 @@ The USP software imposes a specific requirement on the radio driver HAL implemen
 
 - If a radio driver API function is called while the transceiver is in sleep mode, the HAL implementation must properly wake the transceiver and wait until it is ready before initiating any SPI communication.
 - This typically requires that the HAL keeps track of whether the radio is awake or asleep, potentially by monitoring any commands sent to the transceiver to detect the SetSleep command.
-- For a concrete LR20xx example, see the file: [lr20xx_hal.c](examples/radio_hal/lr20xx_hal.c).
-- For a concrete LR11xx example, see the file: [lr11xx_hal.c](examples/radio_hal/lr11xx_hal.c).
-- For a concrete SX126x example, see the file: [sx126x_hal.c](examples/radio_hal/sx126x_hal.c).
+- For a concrete LR20xx example, see the file: [lr20xx_hal.c](/examples/radio_hal/lr20xx_hal.c).
+- For a concrete LR11xx example, see the file: [lr11xx_hal.c](/examples/radio_hal/lr11xx_hal.c).
+- For a concrete SX126x example, see the file: [sx126x_hal.c](/examples/radio_hal/sx126x_hal.c).
 
 When compiling the radio driver HAL implementation, it is necessary to add the radio driver source directory to the include path.
 For example, for LR11xx:
@@ -202,18 +202,18 @@ A brief description of the necessary steps follows.
 The RAL provides radio-independent API functions that are similar to those provided by each radio driver.
 The RAL, and a complementary layer called the RALF, are described in the following header functions:
 
-- [ral.h](smtc_rac_lib/smtc_ral/src/ral.h)
-- [ralf.h](smtc_rac_lib/smtc_ralf/src/ralf.h)
+- [ral.h](/smtc_rac_lib/smtc_ral/src/ral.h)
+- [ralf.h](/smtc_rac_lib/smtc_ralf/src/ralf.h)
 
 The RAL requires the implementer to define a few BSP API functions for the selected transceiver, by providing platform or radio-specific information to the RAL.
 
-- For the `LR20xx`, these functions are described in [ral_lr20xx_bsp.h](smtc_rac_lib/smtc_ral/src/ral_lr20xx_bsp.h).
-- For the `LR11xx`, these functions are described in [ral_lr11xx_bsp.h](smtc_rac_lib/smtc_ral/src/ral_lr11xx_bsp.h).
-- For the `SX126x`, these functions are described in [ral_sx126x_bsp.h](smtc_rac_lib/smtc_ral/src/ral_sx126x_bsp.h).
+- For the `LR20xx`, these functions are described in [ral_lr20xx_bsp.h](/smtc_rac_lib/smtc_ral/src/ral_lr20xx_bsp.h).
+- For the `LR11xx`, these functions are described in [ral_lr11xx_bsp.h](/smtc_rac_lib/smtc_ral/src/ral_lr11xx_bsp.h).
+- For the `SX126x`, these functions are described in [ral_sx126x_bsp.h](/smtc_rac_lib/smtc_ral/src/ral_sx126x_bsp.h).
 
-- An LR20xx sample implementation is in the file [ral_lr20xx_bsp.c](examples/radio_hal/ral_lr20xx_bsp.c).
-- An LR11xx sample implementation is in the file [ral_lr11xx_bsp.c](examples/radio_hal/ral_lr11xx_bsp.c).
-- An SX126x sample implementation is in the file [ral_sx126x_bsp.c](examples/radio_hal/ral_sx126x_bsp.c).
+- An LR20xx sample implementation is in the file [ral_lr20xx_bsp.c](/examples/radio_hal/ral_lr20xx_bsp.c).
+- An LR11xx sample implementation is in the file [ral_lr11xx_bsp.c](/examples/radio_hal/ral_lr11xx_bsp.c).
+- An SX126x sample implementation is in the file [ral_sx126x_bsp.c](/examples/radio_hal/ral_sx126x_bsp.c).
 
 The role of the 'const void* context' variable is described in previous section. It is typically used to store radio-specific information, but depending on the radio driver BSP implementation, it may be NULL if a single transceiver is used.
 When compiling the RAL BSP implementation, it is necessary to add the radio driver source directory and the RAL source directory to the include path. For example, for LR11xx:
@@ -225,12 +225,12 @@ When compiling the RAL BSP implementation, it is necessary to add the radio driv
 
 ### SMTC Modem HAL Implementation
 
-Porting the USP software to a new MCU architecture requires implementing the modem Hardware Abstraction Layer (HAL) API commands described by the prototypes in the header file [smtc_modem_hal.h](protocols/lbm_lib/smtc_modem_hal/smtc_modem_hal.h).
+Porting the USP software to a new MCU architecture requires implementing the modem Hardware Abstraction Layer (HAL) API commands described by the prototypes in the header file [smtc_modem_hal.h](/protocols/lbm_lib/smtc_modem_hal/smtc_modem_hal.h).
 Among other things, these API implementations define how timing information is provided to the USP, how random numbers are generated, and how data is stored in non-volatile memory.
 If a TCXO is used on the radio part, its startup timing behavior should be specified in the RAL BSP implementation, and the documentation of the smtc_modem_hal_start_radio_tcxo(), smtc_modem_hal_stop_radio_tcxo(), and smtc_modem_hal_get_radio_tcxo_startup_delay_ms() functions, should be consulted.
-Logging macros are defined in [smtc_modem_hal_dbg_trace.h](protocols/lbm_lib/smtc_modem_core/logging/smtc_modem_hal_dbg_trace.h). In case the OS has a macro-based logging implementation, the HAL can provide its own header, by removing the `logging` directory from the include list.
+Logging macros are defined in [smtc_modem_hal_dbg_trace.h](/protocols/lbm_lib/smtc_modem_core/logging/smtc_modem_hal_dbg_trace.h). In case the OS has a macro-based logging implementation, the HAL can provide its own header, by removing the `logging` directory from the include list.
 
-An example of implementation on STM32L476 and STM32L073 can be found in [smtc_modem_hal.c](examples/smtc_modem_hal/smtc_modem_hal.c)
+An example of implementation on STM32L476 and STM32L073 can be found in [smtc_modem_hal.c](/examples/smtc_modem_hal/smtc_modem_hal.c)
 
 The following sections provide the list and more details on the different modem HAL APIs.
 
@@ -459,7 +459,7 @@ The board delay, in milliseconds.
 The HAL can provide its own trace macros by:
 
 - removing the `smtc_modem_core/logging` from the include list
-- writing its own `smtc_modem_hal_dbg_trace.h` header, based on the content of the existing[smtc_modem_hal_dbg_trace.h](protocols/lbm_lib/smtc_modem_core/logging/smtc_modem_hal_dbg_trace.h).
+- writing its own `smtc_modem_hal_dbg_trace.h` header, based on the content of the existing[smtc_modem_hal_dbg_trace.h](/protocols/lbm_lib/smtc_modem_core/logging/smtc_modem_hal_dbg_trace.h).
 
 #### `void smtc_modem_hal_print_trace( const char* fmt, ... )`
 
