@@ -1,0 +1,169 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+        {
+            "label": "clean",
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder:USP}"
+            },
+            "command": "rm -Rf ./build/",
+            "windows": {
+                "command": "cmd /c \"if exist build rmdir /S /Q build\""
+            },
+            "hide": true
+        },
+        {
+            "label": "Config rttof manager",
+            "type": "shell",
+            "dependsOn": ["clean"],
+            "options": {
+                "cwd": "${workspaceFolder:USP}"
+            },
+            "command": "cmake",
+            "args": [
+                "-L",
+                "-S ./examples",
+                "-B build",
+                "-DAPP=RTTOF",
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DBOARD=NUCLEO_L476",
+                "-DRAC_RADIO=${input:racRadio}",
+                "-DRANGING_DEVICE_MODE=MANAGER",
+                "-DCONTINUOUS_RANGING=false",
+                "-DPERIODIC_UPLINK_ENABLED=false",
+                "-G Ninja"
+            ],
+            "windows": {
+                "args": [
+                    "-L",
+                    "-S .\\examples",
+                    "-B build",
+                    "-DAPP=RTTOF",
+                    "-DCMAKE_BUILD_TYPE=Debug",
+                    "-DBOARD=NUCLEO_L476",
+                    "-DRAC_RADIO=${input:racRadio}",
+                    "-DRANGING_DEVICE_MODE=MANAGER",
+                    "-DCONTINUOUS_RANGING=false",
+                    "-DPERIODIC_UPLINK_ENABLED=false",
+                    "-G Ninja"
+                ],
+            },
+            "problemMatcher": [],
+            "hide": true
+        },
+        {
+            "label": "Config rttof subordinate",
+            "type": "shell",
+            "dependsOn": ["clean"],
+            "options": {
+                "cwd": "${workspaceFolder:USP}"
+            },
+            
+            "command": "cmake",
+            "args": [
+                "-L",
+                "-S ./examples",
+                "-B build",
+                "-DAPP=RTTOF",
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DBOARD=NUCLEO_L476",
+                "-DRAC_RADIO=${input:racRadio}",
+                "-DRANGING_DEVICE_MODE=SUBORDINATE",
+                "-DCONTINUOUS_RANGING=false",
+                "-DPERIODIC_UPLINK_ENABLED=false",
+                "-G Ninja"
+            ],
+            "windows": {
+                "args": [
+                "-L",
+                "-S .\\examples",
+                "-B build",
+                "-DAPP=RTTOF",
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DBOARD=NUCLEO_L476",
+                "-DRAC_RADIO=${input:racRadio}",
+                "-DRANGING_DEVICE_MODE=SUBORDINATE",
+                "-DCONTINUOUS_RANGING=false",
+                "-DPERIODIC_UPLINK_ENABLED=false",
+                "-G Ninja"
+                ],
+            },
+            "problemMatcher": [],
+            "hide": true
+        },
+        {
+            "label": "Build rttof manager",
+            "type": "shell",
+            "dependsOn": ["Config rttof manager"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder:USP}"
+            },
+            
+            "command": "cmake --build build --target example",
+            "problemMatcher": [],
+            "hide": false
+        },
+        {
+            "label": "Build rttof subordinate",
+            "type": "shell",
+            "dependsOn": ["Config rttof subordinate"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder:USP}"
+            },
+
+            "command": "cmake --build build --target example",
+            "problemMatcher": [],
+            "hide": false
+        }
+    ],
+    "inputs": [
+		{
+			"id": "racRadio",
+			"type": "pickString",
+			"description": "Select rac",
+			"options": [
+				{
+					"label": "sx1261",
+					"value": "sx1261"
+				},
+                {
+					"label": "sx1262",
+					"value": "sx1262"
+				},
+                {
+					"label": "sx1268",
+					"value": "sx1268"
+				},
+                {
+					"label": "lr1110",
+					"value": "lr1110"
+				},
+                {
+					"label": "lr1120",
+					"value": "lr1120"
+				},
+                {
+					"label": "lr1121",
+					"value": "lr1121"
+				},
+                {
+                    "label": "lr2021",
+                    "value": "lr2021"
+                },
+                {
+                    "label": "lr2022",
+                    "value": "lr2022"
+                }
+			]
+		}
+    ]
+}

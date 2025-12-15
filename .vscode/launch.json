@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "STM32L476RG with openocd",
+            "type": "cortex-debug",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/example",
+            "device": "STM32L476RG",
+            "runToEntryPoint": "main",
+            "servertype": "openocd",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32l4x.cfg"
+            ],
+            // "openOCDLaunchCommands": [
+            //     "hla_serial  066FFF555185754867183436"
+            // ],
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            },
+            "svdFile": "${workspaceFolder}/examples/mcu_drivers/core/STM32L4xx/STM32L4x6.svd",
+            "showDevDebugOutput": "raw",
+            // "preLaunchTask": "build",
+        }
+    ]
+}
