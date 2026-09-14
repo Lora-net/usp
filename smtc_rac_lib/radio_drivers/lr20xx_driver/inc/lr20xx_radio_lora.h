@@ -74,19 +74,12 @@ extern "C" {
  * @param[in] context Chip implementation context
  * @param[in] mod_params Structure of LoRa modulation configuration
  *
- * The workaround @ref lr20xx_workarounds_dcdc_configure must be called for Rx sub-GHz operations with regulator
- * @ref LR20XX_SYSTEM_REG_MODE_DCDC after this function to avoid possible RF sensitivity degradation.
- *
- * @note This function automatically applies the workaround @ref lr20xx_workarounds_dcdc_configure unless the macro @p
- * LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_DCDC_CONFIGURE is defined at compile time.
- *
  * @note For RTToF operations with fractional bandwidth, the workaround @ref lr20xx_workarounds_rttof_results_deviation
  * shall be applied. Refer to its documentation for details.
  *
  * @return lr20xx_status_t Operation status
  *
- * @see lr20xx_radio_lora_get_recommended_ppm_offset, lr20xx_workarounds_dcdc_configure,
- * lr20xx_workarounds_rttof_results_deviation
+ * @see lr20xx_radio_lora_get_recommended_ppm_offset, lr20xx_workarounds_rttof_results_deviation
  */
 lr20xx_status_t lr20xx_radio_lora_set_modulation_params( const void*                           context,
                                                          const lr20xx_radio_lora_mod_params_t* mod_params );

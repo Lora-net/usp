@@ -80,18 +80,19 @@ typedef struct ralf_params_lora_s
     uint32_t              rf_freq_in_hz;
     int8_t                output_pwr_in_dbm;
     uint8_t               sync_word;
-    uint8_t               symb_nb_timeout;  //! Rx only parameters
+    uint16_t              symb_nb_timeout;  //! Rx only parameters
 } ralf_params_lora_t;
 
 typedef struct ralf_params_flrc_s
 {
     ral_flrc_mod_params_t mod_params;
     ral_flrc_pkt_params_t pkt_params;
-    const uint8_t*        sync_word;
+    const uint8_t*        sync_word[3];
     uint32_t              rf_freq_in_hz;
-    uint32_t              crc_seed;  // TODO not implemented in LR20XX
+    uint32_t              crc_seed;
     uint32_t              crc_polynomial;
     int8_t                output_pwr_in_dbm;
+    bool                  is_tx;
 } ralf_params_flrc_t;
 
 typedef struct ralf_params_lr_fhss_s

@@ -234,9 +234,6 @@ lr20xx_status_t lr20xx_radio_common_set_rx_tx_fallback_mode( const void*        
  *
  * @remark This command has to be sent prior to any modulation related configuration command
  *
- * @note This function automatically applies the workaround @ref lr20xx_workarounds_dcdc_reset unless the macro @p
- * LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_DCDC_RESET is defined at compile time.
- *
  * @param [in] context Chip implementation context
  * @param [in] pkt_type Packet type to be configured
  *

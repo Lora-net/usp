@@ -47,7 +47,7 @@ install(EXPORT SmtcRalTargets
 )
 
 export(
-    TARGETS smtc_ral_llcc68 smtc_ral_lr11xx smtc_ral_lr20xx smtc_ral_sx126x smtc_ral_sx127x smtc_ral_sx128x
+    TARGETS smtc_ral_llcc68 smtc_ral_lr11xx smtc_ral_lr20xx smtc_ral_sx126x smtc_ral_sx127x smtc_ral_sx128x smtc_ral_udp_pf
     NAMESPACE smtc_ral::
     FILE SmtcRalTargets.cmake
 )

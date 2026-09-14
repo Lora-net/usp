@@ -30,16 +30,55 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-foreach(radio llcc68 lr11xx lr20xx sx126x sx127x sx128x)
+foreach(radio llcc68 lr11xx lr20xx sx126x sx127x sx128x udp_pf)
     set(library_name smtc_ral_${radio})
-    add_library(${library_name} STATIC EXCLUDE_FROM_ALL
-        ${CMAKE_CURRENT_SOURCE_DIR}/ral_${radio}.c
-    )
+
+    # For udp_pf, add base64.c for packet encoding
+    if(${radio} STREQUAL "udp_pf")
+        add_library(${library_name} STATIC EXCLUDE_FROM_ALL
+            ${CMAKE_CURRENT_SOURCE_DIR}/ral_${radio}.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/base64.c
+        )
+    else()
+        add_library(${library_name} STATIC EXCLUDE_FROM_ALL
+            ${CMAKE_CURRENT_SOURCE_DIR}/ral_${radio}.c
+        )
+    endif()
+
     target_include_directories(${library_name} PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<INSTALL_INTERFACE:>
     )
-
+    
+    # Add radio-specific defines
+    if(radio STREQUAL "lr11xx")
+        if(DEFINED RAC_RADIO)
+            if(RAC_RADIO STREQUAL "lr1110")
+                target_compile_definitions(${library_name} PUBLIC LR1110)
+            elseif(RAC_RADIO STREQUAL "lr1120")
+                target_compile_definitions(${library_name} PUBLIC LR1120)
+            elseif(RAC_RADIO STREQUAL "lr1121")
+                target_compile_definitions(${library_name} PUBLIC LR1121)
+            endif()
+        endif()
+    elseif(radio STREQUAL "lr20xx")
+        if(DEFINED RAC_RADIO AND RAC_RADIO STREQUAL "lr2021")
+            target_compile_definitions(${library_name} PUBLIC LR2021)
+        elseif(DEFINED RAC_RADIO AND RAC_RADIO STREQUAL "lr2012")
+            target_compile_definitions(${library_name} PUBLIC LR2012)
+        elseif(DEFINED RAC_RADIO AND RAC_RADIO STREQUAL "lr2022")
+            target_compile_definitions(${library_name} PUBLIC LR2022)
+        endif()
+    elseif(radio STREQUAL "sx126x")
+        if(DEFINED RAC_RADIO AND RAC_RADIO STREQUAL "sx1261")
+            target_compile_definitions(${library_name} PUBLIC SX1261)
+        elseif(DEFINED RAC_RADIO AND RAC_RADIO STREQUAL "sx1262")
+            target_compile_definitions(${library_name} PUBLIC SX1262)
+        elseif(DEFINED RAC_RADIO AND RAC_RADIO STREQUAL "sx1268")
+            target_compile_definitions(${library_name} PUBLIC SX1268)
+        endif()
+    endif()
+    
     install(TARGETS ${library_name} OPTIONAL
         EXPORT SmtcRalTargets
         LIBRARY DESTINATION lib

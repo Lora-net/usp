@@ -37,8 +37,9 @@
  * --- DEPENDENCIES ------------------------------------------------------------
  */
 
-#include <stdint.h>   // C99 types
-#include <stdbool.h>  // bool type
+#include <stdint.h>    // C99 types
+#include <inttypes.h>  // PRIu32
+#include <stdbool.h>   // bool type
 
 #include "smtc_modem_hal.h"
 #include "smtc_hal_dbg_trace.h"
@@ -49,13 +50,15 @@
 #include "smtc_hal_rng.h"
 #include "smtc_hal_rtc.h"
 #include "smtc_hal_trace.h"
+#if !defined( LINUX_PLATFORM )
 #include "smtc_hal_uart.h"
+#endif
 #include "smtc_hal_watchdog.h"
 
 #if defined( STM32L073xx )
 #include "smtc_hal_eeprom.h"
 #endif
-#if defined( STM32L476xx )
+#if defined( STM32L476xx ) || defined( LINUX_PLATFORM ) || defined( FPB_RA0E2 )
 #include "smtc_hal_flash.h"
 #endif
 
@@ -69,8 +72,13 @@
 #include <string.h>
 
 #if defined( SX1272 ) || defined( SX1276 )
+#define SX127X
 #include "smtc_modem_utilities.h"
 #include "sx127x.h"
+#endif
+
+#if defined( UDP_PF )
+#include "ral_udp_pf.h"
 #endif
 
 /*
@@ -93,6 +101,32 @@
 #define ADDR_FLASH_MODEM_CONTEXT ADDR_FLASH_PAGE_358
 #define ADDR_FLASH_LORAWAN_CONTEXT ADDR_FLASH_PAGE_359
 #define ADDR_FLASH_MODEM_KEY_CONTEXT ADDR_FLASH_PAGE_360
+#elif defined( LINUX_PLATFORM )
+// Flash page size is 2048 bytes, total size is 256KB (128 pages)
+// Define page addresses for different contexts
+#define ADDR_FLASH_FUOTA ( 0 * 2048 )                    // Pages 0-50 (102KB for FUOTA)
+#define ADDR_FLASH_STORE_AND_FORWARD ( 51 * 2048 )       // Pages 51-60 (20KB for Store&Forward, 10 pages)
+#define ADDR_FLASH_SECURE_ELEMENT_CONTEXT ( 61 * 2048 )  // Page 61
+#define ADDR_FLASH_MODEM_CONTEXT ( 62 * 2048 )           // Page 62
+#define ADDR_FLASH_LORAWAN_CONTEXT ( 63 * 2048 )         // Page 63
+#define ADDR_FLASH_MODEM_KEY_CONTEXT ( 64 * 2048 )       // Page 64
+#endif
+
+#if defined( FPB_RA0E2 )
+/* RA0E2 Data Flash: 2KB at 0x40100000
+ * - Block size: 256 bytes (erase unit)
+ * - Total: 8 blocks
+ * Context layout (using 4 blocks = 1KB):
+ *   Block 0 (0x40100000): CONTEXT_LORAWAN_STACK (256 bytes)
+ *   Block 1 (0x40100100): CONTEXT_KEY_MODEM (256 bytes)
+ *   Block 2 (0x40100200): CONTEXT_MODEM (256 bytes)
+ *   Block 3 (0x40100300): CONTEXT_SECURE_ELEMENT (256 bytes)
+ *   Blocks 4-7: Reserved for future use
+ */
+#define ADDR_FLASH_RA0E2_LORAWAN_CONTEXT 0x40100000
+#define ADDR_FLASH_RA0E2_MODEM_KEY_CONTEXT 0x40100100
+#define ADDR_FLASH_RA0E2_MODEM_CONTEXT 0x40100200
+#define ADDR_FLASH_RA0E2_SECURE_ELEMENT_CONTEXT 0x40100300
 #endif
 
 #if defined( STM32L073xx )
@@ -114,7 +148,7 @@
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
 
-#if !defined( SX127X )
+#if !defined( SX127X ) && !defined( UDP_PF )
 static hal_gpio_irq_t radio_dio_irq;
 #endif
 
@@ -222,7 +256,7 @@ void smtc_modem_hal_context_restore( const modem_context_type_t ctx_type, uint32
     case CONTEXT_SECURE_ELEMENT:
         hal_eeprom_read_buffer( ADDR_EEPROM_SECURE_ELEMENT_CONTEXT_OFFSET, buffer, size );
         break;
-#elif defined( STM32L476xx )
+#elif defined( STM32L476xx ) || defined( LINUX_PLATFORM )
     case CONTEXT_MODEM:
         hal_flash_read_buffer( ADDR_FLASH_MODEM_CONTEXT, buffer, size );
         break;
@@ -240,6 +274,25 @@ void smtc_modem_hal_context_restore( const modem_context_type_t ctx_type, uint32
         break;
     case CONTEXT_STORE_AND_FORWARD:
         hal_flash_read_buffer( ADDR_FLASH_STORE_AND_FORWARD + offset, buffer, size );
+        break;
+#elif defined( FPB_RA0E2 )
+    case CONTEXT_MODEM:
+        hal_flash_read_buffer( ADDR_FLASH_RA0E2_MODEM_CONTEXT, buffer, size );
+        break;
+    case CONTEXT_KEY_MODEM:
+        hal_flash_read_buffer( ADDR_FLASH_RA0E2_MODEM_KEY_CONTEXT, buffer, size );
+        break;
+    case CONTEXT_LORAWAN_STACK:
+        hal_flash_read_buffer( ADDR_FLASH_RA0E2_LORAWAN_CONTEXT + offset, buffer, size );
+        break;
+    case CONTEXT_FUOTA:
+        // no fuota example on RA0E2 (limited data flash)
+        break;
+    case CONTEXT_STORE_AND_FORWARD:
+        // no store and fw example on RA0E2 (limited data flash)
+        break;
+    case CONTEXT_SECURE_ELEMENT:
+        hal_flash_read_buffer( ADDR_FLASH_RA0E2_SECURE_ELEMENT_CONTEXT, buffer, size );
         break;
 #endif
     default:
@@ -274,7 +327,7 @@ void smtc_modem_hal_context_store( const modem_context_type_t ctx_type, uint32_t
     case CONTEXT_SECURE_ELEMENT:
         hal_eeprom_write_buffer( ADDR_EEPROM_SECURE_ELEMENT_CONTEXT_OFFSET, buffer, size );
         break;
-#elif defined( STM32L476xx )
+#elif defined( STM32L476xx ) || defined( LINUX_PLATFORM )
     case CONTEXT_MODEM:
         hal_flash_erase_page( ADDR_FLASH_MODEM_CONTEXT, 1 );
         hal_flash_write_buffer( ADDR_FLASH_MODEM_CONTEXT, buffer, size );
@@ -309,6 +362,29 @@ void smtc_modem_hal_context_store( const modem_context_type_t ctx_type, uint32_t
     case CONTEXT_STORE_AND_FORWARD:
         hal_flash_write_buffer( ADDR_FLASH_STORE_AND_FORWARD + offset, buffer, size );
         break;
+#elif defined( FPB_RA0E2 )
+    case CONTEXT_MODEM:
+        hal_flash_erase_page( ADDR_FLASH_RA0E2_MODEM_CONTEXT, 1 );
+        hal_flash_write_buffer( ADDR_FLASH_RA0E2_MODEM_CONTEXT, buffer, size );
+        break;
+    case CONTEXT_KEY_MODEM:
+        hal_flash_erase_page( ADDR_FLASH_RA0E2_MODEM_KEY_CONTEXT, 1 );
+        hal_flash_write_buffer( ADDR_FLASH_RA0E2_MODEM_KEY_CONTEXT, buffer, size );
+        break;
+    case CONTEXT_LORAWAN_STACK:
+        hal_flash_erase_page( ADDR_FLASH_RA0E2_LORAWAN_CONTEXT, 1 );
+        hal_flash_write_buffer( ADDR_FLASH_RA0E2_LORAWAN_CONTEXT, buffer, size );
+        break;
+    case CONTEXT_FUOTA:
+        // no fuota example on RA0E2 (limited data flash)
+        break;
+    case CONTEXT_STORE_AND_FORWARD:
+        // no store and fw example on RA0E2 (limited data flash)
+        break;
+    case CONTEXT_SECURE_ELEMENT:
+        hal_flash_erase_page( ADDR_FLASH_RA0E2_SECURE_ELEMENT_CONTEXT, 1 );
+        hal_flash_write_buffer( ADDR_FLASH_RA0E2_SECURE_ELEMENT_CONTEXT, buffer, size );
+        break;
 #endif
     default:
         mcu_panic( );
@@ -320,9 +396,13 @@ void smtc_modem_hal_context_flash_pages_erase( const modem_context_type_t ctx_ty
 {
     switch( ctx_type )
     {
-#if defined( STM32L476xx )
+#if defined( STM32L476xx ) || defined( LINUX_PLATFORM )
     case CONTEXT_STORE_AND_FORWARD:
         hal_flash_erase_page( ADDR_FLASH_STORE_AND_FORWARD + offset, nb_page );
+        break;
+#elif defined( FPB_RA0E2 )
+    case CONTEXT_STORE_AND_FORWARD:
+        // no store and fw on RA0E2 (limited data flash)
         break;
 #endif
     default:
@@ -363,7 +443,7 @@ bool                 smtc_modem_hal_crashlog_get_status( void )
 void smtc_modem_hal_on_panic( uint8_t* func, uint32_t line, const char* fmt, ... )
 {
     uint8_t out_buff[255] = { 0 };
-    uint8_t out_len       = snprintf( ( char* ) out_buff, sizeof( out_buff ), "%s:%lu ", func, line );
+    uint8_t out_len       = snprintf( ( char* ) out_buff, sizeof( out_buff ), "%s:%" PRIu32 " ", func, line );
 
     va_list args;
     va_start( args, fmt );
@@ -387,12 +467,15 @@ uint32_t smtc_modem_hal_get_random_nb_in_range( const uint32_t val_1, const uint
 
 void smtc_modem_hal_irq_config_radio_irq( void ( *callback )( void* context ), void* context )
 {
-#if defined( SX1272 ) || defined( SX1276 )
+#if defined( UDP_PF )
+    // UDP virtual radio - call implementation directly (context unused by UDP_PF)
+    ral_udp_pf_set_fake_irq_callback( NULL, callback, context );
+#elif defined( SX1272 ) || defined( SX1276 )
     sx127x_t* radio = ( sx127x_t* ) smtc_modem_get_radio_context( );
 
     sx127x_irq_attach( radio, callback, context );
 #else
-    radio_dio_irq.pin      = RADIO_DIOX;
+    radio_dio_irq.pin      = RADIO_DIO_MAIN;
     radio_dio_irq.callback = callback;
     radio_dio_irq.context  = context;
 
@@ -532,7 +615,7 @@ uint16_t smtc_modem_hal_get_voltage_mv( void )
 }
 
 /* ------------ Needed for Store and Forward service  ------------*/
-#if defined( USE_STORE_AND_FORWARD )
+#if defined( ADD_SMTC_STORE_AND_FORWARD )
 uint16_t smtc_modem_hal_store_and_forward_get_number_of_pages( void )
 {
     return 10;

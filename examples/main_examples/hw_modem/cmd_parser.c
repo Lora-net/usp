@@ -38,9 +38,11 @@
 #include <inttypes.h>
 
 #include "cmd_parser.h"
+#include "hw_modem.h"
 
 #include "smtc_modem_test_api.h"
 #include "smtc_modem_api.h"
+#include "smtc_sw_platform_helper.h"
 #include <smtc_rac_api.h>
 
 // Protobuf includes for RAC Context serialization
@@ -57,22 +59,39 @@
 #include "smtc_modem_hal.h"
 #include "smtc_hal_dbg_trace.h"
 
-#include "modem_pinout.h"
-#include "smtc_hal_gpio.h"
-#include "smtc_hal_mcu.h"
-
-#include "radio_utilities.h"
-
 #if defined( USE_RELAY_TX )
 #include "smtc_modem_relay_api.h"
 #endif
 
+#if defined( USE_FLRC_PROTOCOL )
+#include "smtc_flrp_api.h"
+#include "smtc_flrp_api_tests.h"
+#include "smtc_flrp_core.h"
+
+#ifndef USER_FLRP_SELF_DEVICE_EUI
+#define USER_FLRP_SELF_DEVICE_EUI                      \
+    {                                                  \
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 \
+    }
+#endif
+
+/* Default slave DevEUI for CMD_FLRC_BURST initiator modes when bytes 2..9 are omitted */
+#ifndef USER_FLRP_TARGET_DEVICE_EUI
+#define USER_FLRP_TARGET_DEVICE_EUI                    \
+    {                                                  \
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 \
+    }
+#endif
+#endif
+
 #define STACK_ID 0
+#if defined( ADD_SMTC_LFU )
 #if defined( STM32L073xx )
 #define FILE_UPLOAD_MAX_SIZE 4096
 #else
 #define FILE_UPLOAD_MAX_SIZE 8192
 #endif
+#endif /* ADD_SMTC_LFU */
 
 #define MODEM_MAX_INFO_FIELD_SIZE 19
 /*
@@ -100,6 +119,7 @@ typedef enum cmd_length_valid_e
     CMD_LENGTH_NOT_VALID,
 } cmd_length_valid_t;
 
+#if defined( ADD_SMTC_LFU )
 typedef enum upload_status_e
 {
     UPLOAD_NOT_INIT,
@@ -107,6 +127,7 @@ typedef enum upload_status_e
     UPLOAD_DATA_ON_GOING,
     UPLOAD_STARTED,
 } upload_status_t;
+#endif /* ADD_SMTC_LFU */
 
 /*
  * -----------------------------------------------------------------------------
@@ -118,11 +139,13 @@ static void* transceiver_context;
 static bool                     modem_in_test_mode = false;
 static smtc_modem_dl_metadata_t last_dl_metadata   = { 0 };
 
+#if defined( ADD_SMTC_LFU )
 /* LFU handling */
 static uint8_t         file_store[FILE_UPLOAD_MAX_SIZE] = { 0 };
 static uint16_t        file_size                        = 0;
 static uint16_t        upload_current_size              = 0;
 static upload_status_t upload_status                    = UPLOAD_NOT_INIT;
+#endif /* ADD_SMTC_LFU */
 
 #if defined( ADD_APP_GEOLOCATION )
 /* Geolocation handling */
@@ -130,24 +153,66 @@ static smtc_modem_gnss_event_data_scan_done_t gnss_scan_data    = { 0 };
 static cmd_serial_rc_code_t                   gnss_scan_done_rc = CMD_RC_FAIL;
 #endif /* ADD_APP_GEOLOCATION */
 
+#if defined( USE_FLRC_PROTOCOL )
+#define FLRP_BURST_SIZE ( 20 * 1024 + sizeof( uint16_t ) )
+#define FLRP_BUFFER_SIZE ( FLRP_BURST_SIZE + 64 )
+
+static uint8_t                    flrp_buffer[FLRP_BUFFER_SIZE] = { 0 };
+static smtc_flrp_burst_rx_stats_t flrp_last_rx_stats            = { 0 };
+static smtc_flrp_wor_rx_stats_t   flrp_last_rx_wor_stats        = { 0 };
+
+/* Snapshots for CMD_FLRP_GET_STATS (flrp_stats_pb_t), updated from FLRP callbacks */
+static bool                    flrp_last_tx_valid = false;
+static smtc_flrp_return_code_t flrp_last_tx_rc    = SMTC_FLRP_RC_OK;
+static bool                    flrp_last_tx_send_successful;
+static uint8_t                 flrp_last_tx_dest[SMTC_FLRP_EUI_LENGTH];
+
+static bool                    flrp_last_rx_valid = false;
+static smtc_flrp_return_code_t flrp_last_rx_rc    = SMTC_FLRP_RC_OK;
+static uint32_t                flrp_last_rx_payload_size;
+static uint8_t                 flrp_last_rx_src[SMTC_FLRP_EUI_LENGTH];
+
+static void flrp_fill_tx_test_pattern( uint32_t length );
+static void flrp_tx_done_callback( const void* context, smtc_flrp_return_code_t status, bool send_successful,
+                                   uint8_t* dest_addr );
+static void flrp_rx_done_callback( const void* context, smtc_flrp_return_code_t status, uint32_t payload_size,
+                                   uint8_t* src_addr, smtc_flrp_rx_stats_t flrp_stats );
+
+static bool flrc_protocol_initialized = false;
+static bool flrc_protocol_host_ensure_initialized( cmd_response_t* cmd_output );
+static void flrc_protocol_fill_tx_test_pattern( void );
+static bool flrc_protocol_extract_cmd_flags( uint32_t length, const uint8_t* buf, bool* is_initiator_out,
+                                             bool* is_tx_out );
+static void flrc_protocol_copy_slave_dev_eui( uint32_t length, const uint8_t* buf,
+                                              uint8_t slave_dev_eui[SMTC_FLRP_EUI_LENGTH] );
+static void flrc_protocol_apply_initiator_stream_com_config( smtc_flrp_com_config_t* com_cfg,
+                                                             const uint8_t slave_dev_eui[SMTC_FLRP_EUI_LENGTH] );
+static void flrp_display_mask( bit_mask_t mask );
+
+//
+
+#endif  // USE_FLRC_PROTOCOL
+
 /* ============================================================================ */
 /* RAC CONTEXT                                                                  */
 /* ============================================================================ */
 typedef struct rac_context_data_s
 {
-    smtc_rac_context_t*    rac_context;
-    uint8_t                radio_handle;
-    uint8_t                payload[255];
+    uint8_t                payload[NHM_REASSEMBLY_BUFFER_SIZE];
     rp_status_t            status;
     bool                   pending_rac_event;
     smtc_rac_return_code_t last_rac_return_code;
-    void ( *post_callback )( rp_status_t status );
 } rac_context_data_t;
-typedef struct rac_contexts_s
+
+static rac_context_data_t rac_contexts[RP_HOOK_ID_MAX] = { 0 };
+
+static void raz_rac_context_data( rac_context_data_t* rac_context_data )
 {
-    smtc_rac_priority_t priority;
-    rac_context_data_t  data;
-} rac_contexts_t;
+    memset( rac_context_data->payload, 0, sizeof( rac_context_data->payload ) );
+    rac_context_data->status               = RP_STATUS_TASK_INIT;
+    rac_context_data->pending_rac_event    = false;
+    rac_context_data->last_rac_return_code = SMTC_RAC_SUCCESS;
+}
 
 static void rac_post_callback( rp_status_t status, smtc_rac_priority_t priority );
 
@@ -172,62 +237,126 @@ static void rac_post_callback_very_low_priority( rp_status_t status )
     rac_post_callback( status, RAC_VERY_LOW_PRIORITY );
 }
 
-static rac_contexts_t rac_contexts[] = {
-    { RAC_VERY_HIGH_PRIORITY,
-      { NULL, 0, { 0 }, RP_STATUS_TASK_INIT, false, SMTC_RAC_SUCCESS, rac_post_callback_very_high_priority } },
-    { RAC_HIGH_PRIORITY,
-      { NULL, 0, { 0 }, RP_STATUS_TASK_INIT, false, SMTC_RAC_SUCCESS, rac_post_callback_high_priority } },
-    { RAC_MEDIUM_PRIORITY,
-      { NULL, 0, { 0 }, RP_STATUS_TASK_INIT, false, SMTC_RAC_SUCCESS, rac_post_callback_medium_priority } },
-    { RAC_LOW_PRIORITY,
-      { NULL, 0, { 0 }, RP_STATUS_TASK_INIT, false, SMTC_RAC_SUCCESS, rac_post_callback_low_priority } },
-    { RAC_VERY_LOW_PRIORITY,
-      { NULL, 0, { 0 }, RP_STATUS_TASK_INIT, false, SMTC_RAC_SUCCESS, rac_post_callback_very_low_priority } },
-};
-
-rac_context_data_t* get_rac_context_data_from_priority( smtc_rac_priority_t priority )
+/**
+ * @brief Print decoded RAC request parameters based on modulation type
+ *
+ * @param [in] pb_request Pointer to the decoded protobuf request
+ */
+static void print_rac_request_params( const smtc_rac_request_pb_t* pb_request )
 {
-    for( size_t i = 0; i < sizeof( rac_contexts ) / sizeof( rac_contexts[0] ); i++ )
+    SMTC_HAL_TRACE_INFO( "  Radio Id: %d\n", pb_request->radio_access_id );
+
+    switch( pb_request->rac_config.modulation_type )
     {
-        if( rac_contexts[i].priority == priority )
-        {
-            return &( rac_contexts[i].data );
-        }
+    case smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_LORA_PB:
+    {
+        const rac_radio_lora_params_pb_t* lora = &pb_request->rac_config.radio_params.lora_params;
+        SMTC_HAL_TRACE_INFO( "  Modulation: LoRa\n" );
+        SMTC_HAL_TRACE_INFO( "  TX mode: %s\n", lora->is_tx ? "true" : "false" );
+        SMTC_HAL_TRACE_INFO( "  Frequency: %u Hz\n", lora->frequency_in_hz );
+        SMTC_HAL_TRACE_INFO( "  TX Power: %u dBm\n", lora->tx_power_in_dbm );
+        SMTC_HAL_TRACE_INFO( "  SF: %u\n", lora->sf );
+        SMTC_HAL_TRACE_INFO( "  BW: %u\n", lora->bw );
+        SMTC_HAL_TRACE_INFO( "  CR: %u\n", lora->cr );
+        SMTC_HAL_TRACE_INFO( "  TX Payload size: %u bytes\n", lora->tx_size );
+        SMTC_HAL_TRACE_INFO( "  RX Max size: %u bytes\n", lora->max_rx_size );
+        SMTC_HAL_TRACE_INFO( "  RX Timeout: %u ms\n", lora->rx_timeout_ms );
+        break;
     }
-    return NULL;
+    case smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_FLRC_PB:
+    {
+        const rac_radio_flrc_params_pb_t* flrc = &pb_request->rac_config.radio_params.flrc_params;
+        SMTC_HAL_TRACE_INFO( "  Modulation: FLRC\n" );
+        SMTC_HAL_TRACE_INFO( "  TX mode: %s\n", flrc->is_tx ? "true" : "false" );
+        SMTC_HAL_TRACE_INFO( "  Frequency: %u Hz\n", flrc->frequency_in_hz );
+        SMTC_HAL_TRACE_INFO( "  RX Freq Offset: %d Hz\n", flrc->rx_frequency_offset_in_hz );
+        SMTC_HAL_TRACE_INFO( "  TX Power: %d dBm\n", flrc->tx_power_in_dbm );
+        SMTC_HAL_TRACE_INFO( "  Raw Bit Rate: %u\n", flrc->raw_bit_rate );
+        SMTC_HAL_TRACE_INFO( "  CR: %u\n", flrc->cr );
+        SMTC_HAL_TRACE_INFO( "  Pulse Shape: %u\n", flrc->pulse_shape );
+        SMTC_HAL_TRACE_INFO( "  Preamble Len: %u\n", flrc->preamble_len );
+        SMTC_HAL_TRACE_INFO( "  TX Payload size: %u bytes\n", flrc->tx_size );
+        SMTC_HAL_TRACE_INFO( "  RX Max size: %u bytes\n", flrc->max_rx_size );
+        SMTC_HAL_TRACE_INFO( "  RX Timeout: %u ms\n", flrc->rx_timeout_ms );
+        break;
+    }
+    case smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_FSK_PB:
+        SMTC_HAL_TRACE_INFO( "  Modulation: FSK (not supported yet)\n" );
+        break;
+    case smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_LRFHSS_PB:
+        SMTC_HAL_TRACE_INFO( "  Modulation: LR-FHSS (not supported yet)\n" );
+        break;
+    default:
+        SMTC_HAL_TRACE_INFO( "  Modulation: Unknown (%d)\n", pb_request->rac_config.modulation_type );
+        break;
+    }
 }
 
-rac_context_data_t* get_rac_context_data_from_handle( uint8_t radio_handle )
+#if defined( USE_FLRC_PROTOCOL )
+static void flrp_display_mask( bit_mask_t mask )
 {
-    for( size_t i = 0; i < sizeof( rac_contexts ) / sizeof( rac_contexts[0] ); i++ )
-    {
-        if( rac_contexts[i].data.radio_handle == radio_handle )
-        {
-            return &( rac_contexts[i].data );
-        }
-    }
-    return NULL;
-}
+    int                bit_is_present;
+    static const char* TEXT[2] = { "FAILURE", "SUCCESS" };
 
-void raz_rac_context_data( rac_context_data_t* rac_context_data )
+    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_WOR_TX_SUCCESS ) ) != 0;
+    SMTC_HAL_TRACE_INFO( "WOR_TX: %s\n", TEXT[bit_is_present] );
+    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_WOR_ACK_SUCCESS ) ) != 0;
+    SMTC_HAL_TRACE_INFO( "WOR_ACK: %s\n", TEXT[bit_is_present] );
+    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_ADAPTIVE_LINK_ACTIVE ) ) != 0;
+    SMTC_HAL_TRACE_INFO( "ADAPTIVE_LINK: %s\n", ( bit_is_present ? "yes" : "no" ) );
+    if( bit_is_present )
+    {
+        bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_ADAPTIVE_FLRC_REQ_SUCCESS ) ) != 0;
+        SMTC_HAL_TRACE_INFO( "ADAPTIVE_FLRC_REQ: %s\n", TEXT[bit_is_present] );
+        bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_ADAPTIVE_FLRC_ACK_SUCCESS ) ) != 0;
+        SMTC_HAL_TRACE_INFO( "ADAPTIVE_FLRC_ACK: %s\n", TEXT[bit_is_present] );
+    }
+    else
+    {
+        SMTC_HAL_TRACE_INFO( "ADAPTIVE_FLRC_REQ: N/A\n" );
+        SMTC_HAL_TRACE_INFO( "ADAPTIVE_FLRC_ACK: N/A\n" );
+    }
+
+    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_LAST_BURST_SUCCESS ) ) != 0;
+    SMTC_HAL_TRACE_INFO( "LAST_BURST: %s\n", TEXT[bit_is_present] );
+
+    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_LAST_BURST_ACK_SUCCESS ) ) != 0;
+    SMTC_HAL_TRACE_INFO( "LAST_BURST_ACK: %s\n", TEXT[bit_is_present] );
+}
+#endif
+
+// store the radio_id for each priority
+static uint8_t radio_ids[5] = { 0 };
+
+static uint8_t priority_to_index( smtc_rac_priority_t priority )
 {
-    rac_context_data->rac_context  = NULL;
-    rac_context_data->radio_handle = 0;
-    // rac_context_data->payload = {0};
-    rac_context_data->status               = RP_STATUS_TASK_INIT;
-    rac_context_data->pending_rac_event    = false;
-    rac_context_data->last_rac_return_code = SMTC_RAC_SUCCESS;
+    switch( priority )
+    {
+    case RAC_VERY_HIGH_PRIORITY:
+        return 0;
+    case RAC_HIGH_PRIORITY:
+        return 1;
+    case RAC_MEDIUM_PRIORITY:
+        return 2;
+    case RAC_LOW_PRIORITY:
+        return 3;
+    case RAC_VERY_LOW_PRIORITY:
+        return 4;
+    default:
+        SMTC_HAL_TRACE_ERROR( "Unknown priority (%d)\n", ( int ) priority );
+        return -1;
+    }
 }
 
 /* ============================================================================ */
-/* NHM (New Hw Modem) Protocol Variables                                       */
+/* NHM (New Hw Modem) Protocol Variables                                        */
 /* ============================================================================ */
 
 /* NHM segmentation buffer and state */
 static uint8_t                      nhm_reassembly_buffer[NHM_REASSEMBLY_BUFFER_SIZE];
 static nhm_segmentation_state_t     nhm_segmentation_state = { .cmd_id = 0, .current_pos = 0 };
 static uint8_t                      nhm_reassembly_rsp_buffer[NHM_REASSEMBLY_BUFFER_SIZE];
-static nhm_segmentation_rsp_state_t nhm_segmentation_rsp_state = { .cmd_id = 0, .current_pos = 0, .total_length = 0 };
+static nhm_segmentation_rsp_state_t nhm_segmentation_rsp_state = { 0 };
 
 /**
  * @brief Modem commands tab for availability, min length and max length
@@ -309,32 +438,34 @@ static const uint8_t host_cmd_tab[CMD_MAX][HOST_CMD_TAB_IDX_COUNT] = {
     [CMD_STREAM_INIT]                          = { 1, 3, 3 },
     [CMD_STREAM_ADD_DATA]                      = { 1, 1, 255 },
     [CMD_STREAM_STATUS]                        = { 1, 0, 0 },
-    [CMD_LFU_INIT]                             = { 1, 6, 6 },
-    [CMD_LFU_DATA]                             = { 1, 0, 255 },
-    [CMD_LFU_START]                            = { 1, 4, 4 },
-    [CMD_LFU_RESET]                            = { 1, 0, 0 },
-    [CMD_DM_ENABLE]                            = { 1, 1, 1 },
-    [CMD_DM_GET_PORT]                          = { 1, 0, 0 },
-    [CMD_DM_SET_PORT]                          = { 1, 1, 1 },
-    [CMD_DM_GET_INFO_INTERVAL]                 = { 1, 0, 0 },
-    [CMD_DM_SET_INFO_INTERVAL]                 = { 1, 1, 1 },
-    [CMD_DM_GET_PERIODIC_INFO_FIELDS]          = { 1, 0, 0 },
-    [CMD_DM_SET_PERIODIC_INFO_FIELDS]          = { 1, 0, MODEM_MAX_INFO_FIELD_SIZE },
-    [CMD_DM_REQUEST_IMMEDIATE_INFO_FIELDS]     = { 1, 0, MODEM_MAX_INFO_FIELD_SIZE },
-    [CMD_DM_SET_USER_DATA]                     = { 1, SMTC_MODEM_DM_USER_DATA_LENGTH, SMTC_MODEM_DM_USER_DATA_LENGTH },
-    [CMD_DM_GET_USER_DATA]                     = { 1, 0, 0 },
-    [CMD_GET_STATUS]                           = { 1, 0, 0 },
-    [CMD_SUSPEND_RADIO_COMMUNICATIONS]         = { 1, 1, 1 },
-    [CMD_GET_SUSPEND_RADIO_COMMUNICATIONS]     = { 1, 0, 0 },
-    [CMD_DM_HANDLE_ALCSYNC]                    = { 1, 1, 1 },
-    [CMD_SET_APPKEY]                           = { 1, 16, 16 },
-    [CMD_GET_ADR_PROFILE]                      = { 1, 0, 0 },
-    [CMD_GET_CERTIFICATION_MODE]               = { 1, 0, 0 },
-    [CMD_STORE_AND_FORWARD_SET_STATE]          = { 1, 1, 1 },
-    [CMD_STORE_AND_FORWARD_GET_STATE]          = { 1, 0, 0 },
-    [CMD_STORE_AND_FORWARD_ADD_DATA]           = { 1, 2, 244 },
-    [CMD_STORE_AND_FORWARD_CLEAR_DATA]         = { 1, 0, 0 },
-    [CMD_STORE_AND_FORWARD_GET_FREE_SLOT]      = { 1, 0, 0 },
+#if defined( ADD_SMTC_LFU )
+    [CMD_LFU_INIT]  = { 1, 6, 6 },
+    [CMD_LFU_DATA]  = { 1, 0, 255 },
+    [CMD_LFU_START] = { 1, 4, 4 },
+    [CMD_LFU_RESET] = { 1, 0, 0 },
+#endif
+    [CMD_DM_ENABLE]                        = { 1, 1, 1 },
+    [CMD_DM_GET_PORT]                      = { 1, 0, 0 },
+    [CMD_DM_SET_PORT]                      = { 1, 1, 1 },
+    [CMD_DM_GET_INFO_INTERVAL]             = { 1, 0, 0 },
+    [CMD_DM_SET_INFO_INTERVAL]             = { 1, 1, 1 },
+    [CMD_DM_GET_PERIODIC_INFO_FIELDS]      = { 1, 0, 0 },
+    [CMD_DM_SET_PERIODIC_INFO_FIELDS]      = { 1, 0, MODEM_MAX_INFO_FIELD_SIZE },
+    [CMD_DM_REQUEST_IMMEDIATE_INFO_FIELDS] = { 1, 0, MODEM_MAX_INFO_FIELD_SIZE },
+    [CMD_DM_SET_USER_DATA]                 = { 1, SMTC_MODEM_DM_USER_DATA_LENGTH, SMTC_MODEM_DM_USER_DATA_LENGTH },
+    [CMD_DM_GET_USER_DATA]                 = { 1, 0, 0 },
+    [CMD_GET_STATUS]                       = { 1, 0, 0 },
+    [CMD_SUSPEND_RADIO_COMMUNICATIONS]     = { 1, 1, 1 },
+    [CMD_GET_SUSPEND_RADIO_COMMUNICATIONS] = { 1, 0, 0 },
+    [CMD_DM_HANDLE_ALCSYNC]                = { 1, 1, 1 },
+    [CMD_SET_APPKEY]                       = { 1, 16, 16 },
+    [CMD_GET_ADR_PROFILE]                  = { 1, 0, 0 },
+    [CMD_GET_CERTIFICATION_MODE]           = { 1, 0, 0 },
+    [CMD_STORE_AND_FORWARD_SET_STATE]      = { 1, 1, 1 },
+    [CMD_STORE_AND_FORWARD_GET_STATE]      = { 1, 0, 0 },
+    [CMD_STORE_AND_FORWARD_ADD_DATA]       = { 1, 2, 244 },
+    [CMD_STORE_AND_FORWARD_CLEAR_DATA]     = { 1, 0, 0 },
+    [CMD_STORE_AND_FORWARD_GET_FREE_SLOT]  = { 1, 0, 0 },
 #if defined( ADD_APP_GEOLOCATION )
     [CMD_GNSS_SCAN]                             = { 1, 5, 5 },
     [CMD_GNSS_SCAN_CANCEL]                      = { 1, 0, 0 },
@@ -353,7 +484,7 @@ static const uint8_t host_cmd_tab[CMD_MAX][HOST_CMD_TAB_IDX_COUNT] = {
 #if defined( ADD_ALMANAC )
     [CMD_CLOUD_ALMANAC_START] = { 1, 0, 0 },
     [CMD_CLOUD_ALMANAC_STOP]  = { 1, 0, 0 },
-#endif
+#endif /* ADD_ALMANAC */
     [CMD_WIFI_SCAN_START]                = { 1, 4, 4 },
     [CMD_WIFI_SCAN_CANCEL]               = { 1, 0, 0 },
     [CMD_WIFI_GET_SCAN_DONE_SCAN_DATA]   = { 1, 0, 0 },
@@ -378,8 +509,7 @@ static const uint8_t host_cmd_tab[CMD_MAX][HOST_CMD_TAB_IDX_COUNT] = {
     [CMD_MODEM_GET_REPORT_ALL_DOWNLINKS_TO_USER] = { 1, 0, 0 },
     [CMD_MODEM_SET_REPORT_ALL_DOWNLINKS_TO_USER] = { 1, 1, 1 },
 
-    [CMD_USP_SUBMIT] = { 1, 1, 255 },  // Protobuf context: min 1 byte, max > 255 : SSA-TBD : how to manage
-    [CMD_USP_CAD]    = { 1, 1, 255 },  // Protobuf context: min 1 byte, max > 255 : SSA-TBD : how to manage
+    [CMD_USP_SUBMIT] = { 1, 1, 255 },  // Protobuf context: min 1 byte, max 255 (if > 255, use CMD_NHM_EXTENDED)
     [CMD_USP_OPEN]   = { 1, 1, 1 },    // Parameter : radio priority
     [CMD_USP_CLOSE]  = { 1, 1, 1 },    // Parameter : radio ID
     [CMD_USP_ABORT]  = { 1, 1, 1 },    // Parameter : radio ID
@@ -388,6 +518,22 @@ static const uint8_t host_cmd_tab[CMD_MAX][HOST_CMD_TAB_IDX_COUNT] = {
     /* NHM (New Hw Modem) Protocol */
     [CMD_NHM_EXTENDED] = { 1, 4, 255 },  // NHM header (4 bytes) + payload (up to 251 bytes)
 
+#if defined( USE_FLRC_PROTOCOL )
+    /* FLRC Burst commands (FLRP protocol) */
+    [CMD_FLRC_PROTOCOL_INIT]            = { 1, 2, 10 },   // byte0=is_initiator, byte1=is_tx; bytes2-9 optional EUI
+    [CMD_SET_FLRC_PROTOCOL_PARAMS]      = { 1, 1, 255 },  // Protobuf encoded flrp_radio_config_pb_t
+    [CMD_GET_FLRC_PROTOCOL_STATS]       = { 1, 0, 0 },    // No input parameters, returns stats only
+    [CMD_FLRP_INIT]                     = { 1, 1, 255 },  // Protobuf encoded flrp_api_config_pb_t
+    [CMD_FLRP_SET_PARAMS]               = { 1, 1, 255 },  // Protobuf encoded flrp_radio_config_pb_t
+    [CMD_FLRP_START_PERIODIC_LISTENING] = { 1, 0, 0 },    // No input parameters
+    [CMD_FLRP_STOP_PERIODIC_LISTENING]  = { 1, 0, 0 },    // No input parameters
+    [CMD_FLRP_SLAVE_DATA_TO_SEND]       = { 1, 4, 4 },    // uint32_t payload size, big-endian (data in flrp_buffer)
+    [CMD_FLRP_INITIATE_TRANSMISSION]    = { 1, 1, 255 },  // Protobuf flrp_initiate_transmission_pb_t
+    [CMD_FLRP_INITIATE_RECEPTION]       = { 1, 1, 255 },  // Protobuf flrp_com_config_pb_t
+    [CMD_FLRP_GET_PARAMS]               = { 1, 0, 0 },  // No input parameters, returns protobuf flrp_radio_config_pb_t
+    [CMD_FLRP_GET_STATS]                = { 1, 0, 0 },  // Returns protobuf flrp_stats_pb_t
+    [CMD_FLRP_SET_PARAMS_ADVANCED]      = { 1, 1, 255 },  // Protobuf encoded flrp_flrc_advanced_radio_config_pb_t
+#endif
 };
 
 /**
@@ -497,32 +643,34 @@ static const char* host_cmd_str[CMD_MAX] = {
     [CMD_STREAM_INIT]                          = "CMD_STREAM_INIT",
     [CMD_STREAM_ADD_DATA]                      = "CMD_STREAM_ADD_DATA",
     [CMD_STREAM_STATUS]                        = "CMD_STREAM_STATUS",
-    [CMD_LFU_INIT]                             = "CMD_LFU_INIT",
-    [CMD_LFU_DATA]                             = "CMD_LFU_DATA",
-    [CMD_LFU_START]                            = "CMD_LFU_START",
-    [CMD_LFU_RESET]                            = "CMD_LFU_RESET",
-    [CMD_DM_ENABLE]                            = "CMD_DM_ENABLE",
-    [CMD_DM_GET_PORT]                          = "CMD_DM_GET_PORT",
-    [CMD_DM_SET_PORT]                          = "CMD_DM_SET_PORT",
-    [CMD_DM_GET_INFO_INTERVAL]                 = "CMD_DM_GET_INFO_INTERVAL",
-    [CMD_DM_SET_INFO_INTERVAL]                 = "CMD_DM_SET_INFO_INTERVAL",
-    [CMD_DM_GET_PERIODIC_INFO_FIELDS]          = "CMD_DM_GET_PERIODIC_INFO_FIELDS",
-    [CMD_DM_SET_PERIODIC_INFO_FIELDS]          = "CMD_DM_SET_PERIODIC_INFO_FIELDS",
-    [CMD_DM_REQUEST_IMMEDIATE_INFO_FIELDS]     = "CMD_DM_REQUEST_IMMEDIATE_INFO_FIELDS",
-    [CMD_DM_SET_USER_DATA]                     = "CMD_DM_SET_USER_DATA",
-    [CMD_DM_GET_USER_DATA]                     = "CMD_DM_GET_USER_DATA",
-    [CMD_GET_STATUS]                           = "CMD_GET_STATUS",
-    [CMD_SUSPEND_RADIO_COMMUNICATIONS]         = "CMD_SUSPEND_RADIO_COMMUNICATIONS",
-    [CMD_GET_SUSPEND_RADIO_COMMUNICATIONS]     = "CMD_GET_SUSPEND_RADIO_COMMUNICATIONS",
-    [CMD_DM_HANDLE_ALCSYNC]                    = "CMD_DM_HANDLE_ALCSYNC",
-    [CMD_SET_APPKEY]                           = "CMD_SET_APPKEY",
-    [CMD_GET_ADR_PROFILE]                      = "CMD_GET_ADR_PROFILE",
-    [CMD_GET_CERTIFICATION_MODE]               = "CMD_GET_CERTIFICATION_MODE",
-    [CMD_STORE_AND_FORWARD_SET_STATE]          = "CMD_STORE_AND_FORWARD_SET_STATE",
-    [CMD_STORE_AND_FORWARD_GET_STATE]          = "CMD_STORE_AND_FORWARD_GET_STATE",
-    [CMD_STORE_AND_FORWARD_ADD_DATA]           = "CMD_STORE_AND_FORWARD_ADD_DATA",
-    [CMD_STORE_AND_FORWARD_CLEAR_DATA]         = "CMD_STORE_AND_FORWARD_CLEAR_DATA",
-    [CMD_STORE_AND_FORWARD_GET_FREE_SLOT]      = "CMD_STORE_AND_FORWARD_GET_FREE_SLOT",
+#if defined( ADD_SMTC_LFU )
+    [CMD_LFU_INIT]  = "CMD_LFU_INIT",
+    [CMD_LFU_DATA]  = "CMD_LFU_DATA",
+    [CMD_LFU_START] = "CMD_LFU_START",
+    [CMD_LFU_RESET] = "CMD_LFU_RESET",
+#endif
+    [CMD_DM_ENABLE]                        = "CMD_DM_ENABLE",
+    [CMD_DM_GET_PORT]                      = "CMD_DM_GET_PORT",
+    [CMD_DM_SET_PORT]                      = "CMD_DM_SET_PORT",
+    [CMD_DM_GET_INFO_INTERVAL]             = "CMD_DM_GET_INFO_INTERVAL",
+    [CMD_DM_SET_INFO_INTERVAL]             = "CMD_DM_SET_INFO_INTERVAL",
+    [CMD_DM_GET_PERIODIC_INFO_FIELDS]      = "CMD_DM_GET_PERIODIC_INFO_FIELDS",
+    [CMD_DM_SET_PERIODIC_INFO_FIELDS]      = "CMD_DM_SET_PERIODIC_INFO_FIELDS",
+    [CMD_DM_REQUEST_IMMEDIATE_INFO_FIELDS] = "CMD_DM_REQUEST_IMMEDIATE_INFO_FIELDS",
+    [CMD_DM_SET_USER_DATA]                 = "CMD_DM_SET_USER_DATA",
+    [CMD_DM_GET_USER_DATA]                 = "CMD_DM_GET_USER_DATA",
+    [CMD_GET_STATUS]                       = "CMD_GET_STATUS",
+    [CMD_SUSPEND_RADIO_COMMUNICATIONS]     = "CMD_SUSPEND_RADIO_COMMUNICATIONS",
+    [CMD_GET_SUSPEND_RADIO_COMMUNICATIONS] = "CMD_GET_SUSPEND_RADIO_COMMUNICATIONS",
+    [CMD_DM_HANDLE_ALCSYNC]                = "CMD_DM_HANDLE_ALCSYNC",
+    [CMD_SET_APPKEY]                       = "CMD_SET_APPKEY",
+    [CMD_GET_ADR_PROFILE]                  = "CMD_GET_ADR_PROFILE",
+    [CMD_GET_CERTIFICATION_MODE]           = "CMD_GET_CERTIFICATION_MODE",
+    [CMD_STORE_AND_FORWARD_SET_STATE]      = "CMD_STORE_AND_FORWARD_SET_STATE",
+    [CMD_STORE_AND_FORWARD_GET_STATE]      = "CMD_STORE_AND_FORWARD_GET_STATE",
+    [CMD_STORE_AND_FORWARD_ADD_DATA]       = "CMD_STORE_AND_FORWARD_ADD_DATA",
+    [CMD_STORE_AND_FORWARD_CLEAR_DATA]     = "CMD_STORE_AND_FORWARD_CLEAR_DATA",
+    [CMD_STORE_AND_FORWARD_GET_FREE_SLOT]  = "CMD_STORE_AND_FORWARD_GET_FREE_SLOT",
 #if defined( ADD_APP_GEOLOCATION )
     [CMD_GNSS_SCAN]                             = "CMD_GNSS_SCAN",
     [CMD_GNSS_SCAN_CANCEL]                      = "CMD_GNSS_SCAN_CANCEL",
@@ -541,7 +689,7 @@ static const char* host_cmd_str[CMD_MAX] = {
 #if defined( ADD_ALMANAC )
     [CMD_CLOUD_ALMANAC_START] = "CMD_CLOUD_ALMANAC_START",
     [CMD_CLOUD_ALMANAC_STOP]  = "CMD_CLOUD_ALMANAC_STOP",
-#endif
+#endif /* ADD_ALMANAC */
     [CMD_WIFI_SCAN_START]                = "CMD_MODEM_WIFI_SCAN_START",
     [CMD_WIFI_SCAN_CANCEL]               = "CMD_MODEM_WIFI_SCAN_CANCEL",
     [CMD_WIFI_GET_SCAN_DONE_SCAN_DATA]   = "CMD_MODEM_WIFI_GET_SCAN_DONE_SCAN_DATA",
@@ -564,13 +712,29 @@ static const char* host_cmd_str[CMD_MAX] = {
     [CMD_MODEM_SET_REPORT_ALL_DOWNLINKS_TO_USER] = "CMD_MODEM_SET_REPORT_ALL_DOWNLINKS_TO_USER",
 
     [CMD_USP_SUBMIT] = "CMD_USP_SUBMIT",
-    [CMD_USP_CAD]    = "CMD_USP_CAD",
     [CMD_USP_OPEN]   = "CMD_USP_OPEN",
     [CMD_USP_CLOSE]  = "CMD_USP_CLOSE",
     [CMD_USP_ABORT]  = "CMD_USP_ABORT",
     /* CMD_USP_GET_RESULTS removed */
 
     [CMD_NHM_EXTENDED] = "CMD_NHM_EXTENDED",
+
+#if defined( USE_FLRC_PROTOCOL )
+    /* FLRC Burst commands */
+    [CMD_FLRC_PROTOCOL_INIT]            = "CMD_FLRC_PROTOCOL_INIT",
+    [CMD_SET_FLRC_PROTOCOL_PARAMS]      = "CMD_SET_FLRC_PROTOCOL_PARAMS",
+    [CMD_GET_FLRC_PROTOCOL_STATS]       = "CMD_GET_FLRC_PROTOCOL_STATS",
+    [CMD_FLRP_INIT]                     = "CMD_FLRP_INIT",
+    [CMD_FLRP_SET_PARAMS]               = "CMD_FLRP_SET_PARAMS",
+    [CMD_FLRP_START_PERIODIC_LISTENING] = "CMD_FLRP_START_PERIODIC_LISTENING",
+    [CMD_FLRP_STOP_PERIODIC_LISTENING]  = "CMD_FLRP_STOP_PERIODIC_LISTENING",
+    [CMD_FLRP_SLAVE_DATA_TO_SEND]       = "CMD_FLRP_SLAVE_DATA_TO_SEND",
+    [CMD_FLRP_INITIATE_TRANSMISSION]    = "CMD_FLRP_INITIATE_TRANSMISSION",
+    [CMD_FLRP_INITIATE_RECEPTION]       = "CMD_FLRP_INITIATE_RECEPTION",
+    [CMD_FLRP_GET_PARAMS]               = "CMD_FLRP_GET_PARAMS",
+    [CMD_FLRP_GET_STATS]                = "CMD_FLRP_GET_STATS",
+    [CMD_FLRP_SET_PARAMS_ADVANCED]      = "CMD_FLRP_SET_PARAMS_ADVANCED",
+#endif
 };
 #endif
 
@@ -674,7 +838,7 @@ static const cmd_serial_rc_code_t rc_lut[] = {
  * @brief Initialize Command Parser
  *
  */
-void cmd_parser_update_rac_context( rac_context_data_t* rac_context_data );
+void cmd_parser_update_rac_context( rac_context_data_t* rac_context_data, smtc_rac_context_t* rac_context );
 
 /**
  * @brief Check command size
@@ -694,6 +858,7 @@ static cmd_length_valid_t cmd_parser_check_cmd_size( host_cmd_id_t cmd_id, uint8
  */
 static cmd_length_valid_t cmd_test_parser_check_cmd_size( host_cmd_test_id_t test_id, uint8_t length );
 
+#if defined( ADD_SMTC_LFU )
 /**
  * @brief Crc function used for LFU (Large File Upload)
  *
@@ -701,7 +866,8 @@ static cmd_length_valid_t cmd_test_parser_check_cmd_size( host_cmd_test_id_t tes
  * @param [in] len Length of the payload
  * @return uint32_t The calculated CRC
  */
-uint32_t cmd_parser_crc( const uint8_t* buf, int len );
+static uint32_t cmd_parser_crc( const uint8_t* buf, int len );
+#endif /* ADD_SMTC_LFU */
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
@@ -712,40 +878,16 @@ void cmd_parser_set_transceiver_context( void* context )
     transceiver_context = context;
 }
 
-void cmd_parser_update_rac_context( rac_context_data_t* rac_context_data )
+void cmd_parser_update_rac_context( rac_context_data_t* rac_context_data, smtc_rac_context_t* rac_context )
 {
+    memset( rac_context, 0, sizeof( smtc_rac_context_t ) );
+
     // Initialize global rac_context with pre-allocated buffers
     // Note: payload buffer will be assigned to tx_payload_buffer or rx_payload_buffer based on operation
-    rac_context_data->rac_context->smtc_rac_data_buffer_setup.tx_payload_buffer =
-        rac_context_data->payload;  // Default TX buffer
-    rac_context_data->rac_context->smtc_rac_data_buffer_setup.size_of_tx_payload_buffer =
-        sizeof( rac_context_data->payload );
-    rac_context_data->rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer =
-        rac_context_data->payload;  // Default RX buffer
-    rac_context_data->rac_context->smtc_rac_data_buffer_setup.size_of_rx_payload_buffer =
-        sizeof( rac_context_data->payload );
-
-    // Initialize data results
-    rac_context_data->rac_context->smtc_rac_data_result.rx_size                = 0;
-    rac_context_data->rac_context->smtc_rac_data_result.radio_end_timestamp_ms = 0;  // Direct value (no longer pointer)
-    rac_context_data->rac_context->smtc_rac_data_result.radio_start_timestamp_ms = 0;  // Direct value
-
-    // Set default modulation type to LoRa
-    rac_context_data->rac_context->modulation_type = SMTC_RAC_MODULATION_LORA;
-
-    // Initialize radio params union for LoRa
-    rac_context_data->rac_context->radio_params.lora.is_tx       = false;  // Default to RX
-    rac_context_data->rac_context->radio_params.lora.max_rx_size = 255;    // Default max RX size
-    rac_context_data->rac_context->radio_params.lora.tx_size     = 0;      // No TX data by default
-
-    // Initialize LBT context to disabled by default
-    rac_context_data->rac_context->lbt_context.lbt_enabled = false;
-
-    // Initialize CAD context to default values
-    memset( &rac_context_data->rac_context->cad_context, 0, sizeof( smtc_rac_cad_radio_params_t ) );
-
-    // Initialize CW context to disabled by default
-    rac_context_data->rac_context->cw_context.cw_enabled = false;
+    rac_context->smtc_rac_data_buffer_setup.tx_payload_buffer         = rac_context_data->payload;  // Default TX buffer
+    rac_context->smtc_rac_data_buffer_setup.size_of_tx_payload_buffer = sizeof( rac_context_data->payload );
+    rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer         = rac_context_data->payload;  // Default RX buffer
+    rac_context->smtc_rac_data_buffer_setup.size_of_rx_payload_buffer = sizeof( rac_context_data->payload );
 }
 
 cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output )
@@ -897,7 +1039,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             /* de-assert hw_modem irq line to indicate host that all events have been
              * retrieved
              */
-            hal_gpio_set_value( HW_MODEM_EVENT_PIN, 0 );
+            hw_modem_unset_event_pin( );
         }
         break;
     }
@@ -959,7 +1101,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_GET_TX_POWER_OFFSET:
     {
-        int8_t offset = radio_utilities_get_tx_power_offset( );
+        int8_t offset = hw_modem_get_tx_power_offset( transceiver_context );
 
         cmd_output->buffer[0]   = offset;
         cmd_output->length      = 1;
@@ -968,7 +1110,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_SET_TX_POWER_OFFSET:
     {
-        radio_utilities_set_tx_power_offset( cmd_input->buffer[0] );
+        hw_modem_set_tx_power_offset( transceiver_context, cmd_input->buffer[0] );
         cmd_output->return_code = CMD_RC_OK;
         break;
     }
@@ -1001,7 +1143,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_GET_PIN:
     {
-#if defined( CONFIG_LORA_BASICS_MODEM_CRYPTOGRAPHY_LR11XX_WITH_CREDENTIALS )
+#if defined( USE_LR11XX_CE )
         uint8_t chip_pin[4];
 
         cmd_output->return_code = rc_lut[smtc_modem_get_pin( STACK_ID, chip_pin )];
@@ -1021,7 +1163,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_GET_CHIP_EUI:
     {
-#if defined( CONFIG_LORA_BASICS_MODEM_CRYPTOGRAPHY_LR11XX_WITH_CREDENTIALS )
+#if defined( USE_LR11XX_CE )
         uint8_t chip_eui[8];
 
         cmd_output->return_code = rc_lut[smtc_modem_get_chip_eui( STACK_ID, chip_eui )];
@@ -1168,7 +1310,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_DERIVE_KEYS:
     {
-#if defined( CONFIG_LORA_BASICS_MODEM_CRYPTOGRAPHY_LR11XX_WITH_CREDENTIALS )
+#if defined( USE_LR11XX_CE )
         cmd_output->return_code = rc_lut[smtc_modem_derive_keys( STACK_ID )];
 #else
         cmd_output->return_code = CMD_RC_FAIL;
@@ -1704,7 +1846,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_CSMA_SET_STATE:
     {
-#if defined( LR11XX ) || defined( SX126X ) || defined( LR20XX )
+#if defined( LR11XX ) || defined( SX126X ) || defined( LR20XX ) || defined( UDP_PF )
         cmd_output->return_code = rc_lut[smtc_modem_csma_set_state( STACK_ID, cmd_input->buffer[0] )];
 #else
         cmd_output->return_code = CMD_RC_NOT_IMPLEMENTED;
@@ -1713,7 +1855,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_CSMA_GET_STATE:
     {
-#if defined( LR11XX ) || defined( SX126X ) || defined( LR20XX )
+#if defined( LR11XX ) || defined( SX126X ) || defined( LR20XX ) || defined( UDP_PF )
         bool enable = false;
 
         cmd_output->return_code = rc_lut[smtc_modem_csma_get_state( STACK_ID, &enable )];
@@ -1729,7 +1871,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_CSMA_SET_PARAMETERS:
     {
-#if defined( LR11XX ) || defined( SX126X ) || defined( LR20XX )
+#if defined( LR11XX ) || defined( SX126X ) || defined( LR20XX ) || defined( UDP_PF )
         if( cmd_input->buffer[1] > 1 )
         {
             /* bo_enabled is a bool */
@@ -1747,7 +1889,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
     case CMD_CSMA_GET_PARAMETERS:
     {
-#if defined( LR11XX ) || defined( SX126X ) || defined( LR20XX )
+#if defined( LR11XX ) || defined( SX126X ) || defined( LR20XX ) || defined( UDP_PF )
         uint8_t max_ch_change = 0;
         bool    bo_enabled    = false;
         uint8_t nb_bo_max     = 0;
@@ -1802,6 +1944,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         }
         break;
     }
+#if defined( ADD_SMTC_LFU )
     case CMD_LFU_INIT:
     {
         uint16_t size          = 0;
@@ -1906,6 +2049,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         cmd_output->return_code = rc_lut[smtc_modem_file_upload_reset( STACK_ID )];
         break;
     }
+#endif /* ADD_SMTC_LFU */
     case CMD_DM_ENABLE:
     {
         cmd_output->return_code = rc_lut[smtc_modem_dm_enable( STACK_ID, cmd_input->buffer[0] )];
@@ -2077,7 +2221,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
 
         break;
     }
-#if defined( CONFIG_LORA_BASICS_MODEM_STORE_AND_FORWARD )
+#if defined( ADD_SMTC_STORE_AND_FORWARD )
     case CMD_STORE_AND_FORWARD_SET_STATE:
     {
         cmd_output->return_code = rc_lut[smtc_modem_store_and_forward_set_state( STACK_ID, cmd_input->buffer[0] )];
@@ -2130,7 +2274,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         }
         break;
     }
-#endif /* CONFIG_LORA_BASICS_MODEM_STORE_AND_FORWARD */
+#endif /* ADD_SMTC_STORE_AND_FORWARD */
 
 #if defined( ADD_APP_GEOLOCATION )
     case CMD_GNSS_SCAN:
@@ -2392,7 +2536,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         cmd_output->return_code = rc_lut[smtc_modem_almanac_stop( STACK_ID )];
         break;
     }
-#endif
+#endif /* ADD_ALMANAC */
     case CMD_WIFI_SCAN_START:
     {
         uint32_t start_delay = 0;
@@ -2561,11 +2705,11 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             break;
         }
 
-        // unserialize pb context
-        smtc_rac_lora_request_pb_t pb_rac_lora_call = smtc_rac_lora_request_pb_t_init_zero;
-        pb_istream_t               stream           = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
+        // Deserialize protobuf request
+        smtc_rac_request_pb_t pb_rac_request = smtc_rac_request_pb_t_init_zero;
+        pb_istream_t          stream         = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
 
-        if( !pb_decode( &stream, smtc_rac_lora_request_pb_t_fields, &pb_rac_lora_call ) )
+        if( !pb_decode( &stream, smtc_rac_request_pb_t_fields, &pb_rac_request ) )
         {
             SMTC_HAL_TRACE_ERROR( "CMD_USP_SUBMIT: Failed to decode protobuf request\n" );
             cmd_output->return_code = CMD_RC_INVALID;
@@ -2574,25 +2718,25 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         }
 
         SMTC_HAL_TRACE_INFO( "CMD_USP_SUBMIT: Protobuf decoded successfully\n" );
-        SMTC_HAL_TRACE_INFO( "  Radio Id: %d\n", pb_rac_lora_call.radio_access_id );
-        SMTC_HAL_TRACE_INFO( "  TX mode: %s\n", pb_rac_lora_call.rac_config.radio_params.is_tx ? "true" : "false" );
-        SMTC_HAL_TRACE_INFO( "  Frequency: %u Hz\n", pb_rac_lora_call.rac_config.radio_params.frequency_in_hz );
-        SMTC_HAL_TRACE_INFO( "  TX Power: %u dBm\n", pb_rac_lora_call.rac_config.radio_params.tx_power_in_dbm );
-        SMTC_HAL_TRACE_INFO( "  TX Payload size: %u bytes\n",
-                             ( uint32_t ) pb_rac_lora_call.rac_config.radio_params.tx_size );
-        SMTC_HAL_TRACE_INFO( "  RX Max size: %u bytes\n", pb_rac_lora_call.rac_config.radio_params.max_rx_size );
 
-        rac_context_data_t* rac_context_data = get_rac_context_data_from_handle( pb_rac_lora_call.radio_access_id );
-        if( rac_context_data == NULL )
+        // Print decoded values
+        print_rac_request_params( &pb_rac_request );
+
+        // Check modulation type is supported
+        if( pb_rac_request.rac_config.modulation_type != smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_LORA_PB &&
+            pb_rac_request.rac_config.modulation_type != smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_FLRC_PB )
         {
-            SMTC_HAL_TRACE_ERROR( "CMD_USP_SUBMIT: Failed to get rac context data\n" );
-            cmd_output->return_code = CMD_RC_FAIL;
+            SMTC_HAL_TRACE_ERROR( "CMD_USP_SUBMIT: Unsupported modulation type: %d\n",
+                                  pb_rac_request.rac_config.modulation_type );
+            cmd_output->return_code = CMD_RC_INVALID;
             cmd_output->length      = 0;
             break;
         }
 
+        smtc_rac_context_t* rac_context = smtc_rac_get_context( pb_rac_request.radio_access_id );
+
         // Convert to native structure - use existing pre-allocated buffers
-        if( !rac_convert_context_from_pb( &( pb_rac_lora_call.rac_config ), rac_context_data->rac_context ) )
+        if( !rac_convert_context_from_pb( &( pb_rac_request.rac_config ), rac_context ) )
         {
             SMTC_HAL_TRACE_ERROR( "CMD_USP_SUBMIT: Failed to convert protobuf to native context\n" );
             cmd_output->return_code = CMD_RC_FAIL;
@@ -2604,90 +2748,107 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
 
         // The first time, the python script do not know embedded side absolute time so we set it to the current time +
         // processing time
-        if( rac_context_data->rac_context->scheduler_config.start_time_ms == 0 )
+        if( rac_context->scheduler_config.start_time_ms == 0 )
         {
-            if( rac_context_data->rac_context->scheduler_config.scheduling == SMTC_RAC_ASAP_TRANSACTION )
+            if( rac_context->scheduler_config.scheduling == SMTC_RAC_ASAP_TRANSACTION )
             {
-                rac_context_data->rac_context->scheduler_config.start_time_ms = smtc_modem_hal_get_time_in_ms( ) + 100;
+                rac_context->scheduler_config.start_time_ms = smtc_modem_hal_get_time_in_ms( ) + 100;
             }
             else
             {
-                rac_context_data->rac_context->scheduler_config.start_time_ms =
+                rac_context->scheduler_config.start_time_ms =
                     smtc_modem_hal_get_time_in_ms( ) + 100;  // 10 : processing time
             }
         }
+        // SMTC_HAL_TRACE_INFO("CMD_USP_SUBMIT: start_time_ms = %" PRIu32 " ms",
+        // rac_context->scheduler_config.start_time_ms);
 
-        // TODO: Use the native context with RAC API
         // This would require a radio_id - for now we just validate the conversion worked
-        rac_context_data->rac_context->scheduler_config.callback_pre_radio_transaction = NULL;
-        SMTC_HAL_TRACE_INFO(
-            "CMD_USP_SUBMIT: rac_context->scheduler_config.callback_post_radio_transaction (ret: 0x%p)\n",
-            rac_context_data->rac_context->scheduler_config.callback_post_radio_transaction );
-        smtc_rac_return_code_t ret = smtc_rac_submit_radio_transaction( pb_rac_lora_call.radio_access_id );
+        rac_context->scheduler_config.callback_pre_radio_transaction = NULL;
+        smtc_rac_return_code_t ret =
+            SMTC_SW_PLATFORM( smtc_rac_submit_radio_transaction( pb_rac_request.radio_access_id ) );
 
         // Store return code for CMD_USP_GET_RESULTS
+        rac_context_data_t* rac_context_data   = &rac_contexts[pb_rac_request.radio_access_id];
         rac_context_data->last_rac_return_code = ret;
 
-        SMTC_HAL_TRACE_INFO( "CMD_USP_SUBMIT: Context processing completed successfully (ret: %d)\n", ret );
-        cmd_output->return_code =
-            ( ret == SMTC_RAC_SUCCESS ) ? CMD_RC_OK : CMD_RC_FAIL;  // SSA-TBD : do this better : lut ?
-        cmd_output->length = 0;
-        break;
-    }
-    case CMD_USP_CAD:
-    {
-        // SSA-TBD
-        cmd_output->return_code = CMD_RC_OK;
+        SMTC_HAL_TRACE_INFO( "CMD_USP_SUBMIT: Context processing completed successfully" );
+        cmd_output->return_code = ( ret == SMTC_RAC_SUCCESS ) ? CMD_RC_OK : CMD_RC_FAIL;
         cmd_output->length      = 0;
         break;
     }
     case CMD_USP_OPEN:
     {
-        smtc_rac_priority_t priority         = ( smtc_rac_priority_t ) ( cmd_input->buffer[0] );
-        rac_context_data_t* rac_context_data = get_rac_context_data_from_priority( priority );
-        if( rac_context_data == NULL )
+        smtc_rac_priority_pb_t parsed_priority = ( smtc_rac_priority_pb_t ) ( cmd_input->buffer[0] );
+        smtc_rac_priority_t    priority;
+        if( !rac_convert_priority_from_pb( parsed_priority, &priority ) )
         {
             cmd_output->return_code = CMD_RC_FAIL;
-            cmd_output->buffer[0]   = priority;
-            cmd_output->length      = 1;
+            cmd_output->length      = 0;
             break;
         }
-        raz_rac_context_data( rac_context_data );
-        rac_context_data->radio_handle = smtc_rac_open_radio( priority );
-        if( rac_context_data->radio_handle == RAC_INVALID_RADIO_ID )
+        uint8_t radio_id = SMTC_SW_PLATFORM( smtc_rac_open_radio( priority ) );
+        if( radio_id == RAC_INVALID_RADIO_ID )
         {
             cmd_output->return_code = CMD_RC_FAIL;
             cmd_output->buffer[0]   = RAC_INVALID_RADIO_ID;
             cmd_output->length      = 1;
             break;
         }
-        rac_context_data->rac_context = smtc_rac_get_context( rac_context_data->radio_handle );
-        if( rac_context_data->rac_context == NULL )
+
+        const uint8_t radio_index = priority_to_index( priority );
+
+        if( radio_index == ( ( uint8_t ) -1 ) )
         {
+            SMTC_HAL_TRACE_ERROR( "Incorrect radio_index: %u. Notifying incorrect radio ID...\n", radio_index );
             cmd_output->return_code = CMD_RC_FAIL;
-            cmd_output->buffer[0]   = rac_context_data->radio_handle;
+            cmd_output->buffer[0]   = RAC_INVALID_RADIO_ID;
             cmd_output->length      = 1;
             break;
         }
-        rac_context_data->rac_context->scheduler_config.callback_post_radio_transaction =
-            rac_context_data->post_callback;
-        cmd_parser_update_rac_context( rac_context_data );
+        radio_ids[radio_index] = radio_id;
+
+        smtc_rac_context_t* rac_context      = SMTC_SW_PLATFORM( smtc_rac_get_context( radio_id ) );
+        rac_context_data_t* rac_context_data = &rac_contexts[radio_id];
+        raz_rac_context_data( rac_context_data );
+        cmd_parser_update_rac_context( rac_context_data, rac_context );
+
+        switch( priority )
+        {
+        case RAC_VERY_HIGH_PRIORITY:
+            rac_context->scheduler_config.callback_post_radio_transaction = rac_post_callback_very_high_priority;
+            break;
+        case RAC_HIGH_PRIORITY:
+            rac_context->scheduler_config.callback_post_radio_transaction = rac_post_callback_high_priority;
+            break;
+        case RAC_MEDIUM_PRIORITY:
+            rac_context->scheduler_config.callback_post_radio_transaction = rac_post_callback_medium_priority;
+            break;
+        case RAC_LOW_PRIORITY:
+            rac_context->scheduler_config.callback_post_radio_transaction = rac_post_callback_low_priority;
+            break;
+        case RAC_VERY_LOW_PRIORITY:
+            rac_context->scheduler_config.callback_post_radio_transaction = rac_post_callback_very_low_priority;
+            break;
+        }
+
         cmd_output->return_code = CMD_RC_OK;
-        cmd_output->buffer[0]   = rac_context_data->radio_handle;
+        cmd_output->buffer[0]   = radio_id;
         cmd_output->length      = 1;
         break;
     }
     case CMD_USP_CLOSE:
     {
         uint8_t                radio_id = ( uint8_t ) ( cmd_input->buffer[0] );
-        smtc_rac_return_code_t ret      = smtc_rac_close_radio( radio_id );
+        smtc_rac_return_code_t ret      = SMTC_SW_PLATFORM( smtc_rac_close_radio( radio_id ) );
         if( ret == SMTC_RAC_SUCCESS )
         {
+            raz_rac_context_data( &( rac_contexts[radio_id] ) );
             cmd_output->return_code = CMD_RC_OK;
         }
         else
         {
-            // SSA-TBD : check what to do with true error code
+            // In future releases, true error code should be sent to response
             cmd_output->return_code = CMD_RC_FAIL;
         }
         cmd_output->length = 0;
@@ -2696,14 +2857,15 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     case CMD_USP_ABORT:
     {
         uint8_t                radio_id = ( uint8_t ) ( cmd_input->buffer[0] );
-        smtc_rac_return_code_t ret      = smtc_rac_abort_radio_submit( radio_id );
+        smtc_rac_return_code_t ret      = SMTC_SW_PLATFORM( smtc_rac_abort_radio_submit( radio_id ) );
         if( ret == SMTC_RAC_SUCCESS )
         {
             cmd_output->return_code = CMD_RC_OK;
         }
         else
         {
-            // SSA-TBD : check what to do with true error code
+            // In future releases, true error code should be sent to response
+            // code
             cmd_output->return_code = CMD_RC_FAIL;
         }
         cmd_output->length = 0;
@@ -2725,6 +2887,675 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
 
         return parse_nhm_cmd( cmd_input, cmd_output );
     }
+
+#if defined( USE_FLRC_PROTOCOL )
+    case CMD_FLRC_PROTOCOL_INIT:
+    {
+        if( !flrc_protocol_host_ensure_initialized( cmd_output ) )
+        {
+            break;
+        }
+
+        bool                    is_initiator = false;
+        bool                    is_tx        = false;
+        smtc_flrp_return_code_t rc           = SMTC_FLRP_RC_ERROR;
+
+        if( !flrc_protocol_extract_cmd_flags( cmd_input->length, cmd_input->buffer, &is_initiator, &is_tx ) )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_FLRC_PROTOCOL: bad payload (len=%u); need 2 bytes (is_initiator,is_tx in {0,1}); "
+                "slave len=2; initiator len=2 or 10 (optional EUI)\n",
+                cmd_input->length );
+            cmd_output->return_code = ( cmd_input->length < 2U ) ? CMD_RC_BAD_SIZE : CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        if( is_initiator && is_tx )
+        {
+            uint8_t                slave_dev_eui[SMTC_FLRP_EUI_LENGTH];
+            smtc_flrp_com_config_t com_config;
+
+            flrc_protocol_copy_slave_dev_eui( cmd_input->length, cmd_input->buffer, slave_dev_eui );
+            flrc_protocol_apply_initiator_stream_com_config( &com_config, slave_dev_eui );
+            flrc_protocol_fill_tx_test_pattern( );
+
+            SMTC_HAL_TRACE_INFO( "CMD_FLRC_PROTOCOL: initiator tx, slave %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n",
+                                 slave_dev_eui[0], slave_dev_eui[1], slave_dev_eui[2], slave_dev_eui[3],
+                                 slave_dev_eui[4], slave_dev_eui[5], slave_dev_eui[6], slave_dev_eui[7] );
+
+            rc = smtc_flrp_initiate_transmission( flrp_buffer, FLRP_BURST_SIZE, com_config );
+            if( rc != SMTC_FLRP_RC_OK )
+            {
+                SMTC_HAL_TRACE_ERROR( "CMD_FLRC_PROTOCOL: smtc_flrp_initiate_transmission failed (rc=%u)\n", rc );
+            }
+        }
+        if( is_initiator && !is_tx )
+        {
+            uint8_t                slave_dev_eui[SMTC_FLRP_EUI_LENGTH];
+            smtc_flrp_com_config_t com_config;
+
+            flrc_protocol_copy_slave_dev_eui( cmd_input->length, cmd_input->buffer, slave_dev_eui );
+            flrc_protocol_apply_initiator_stream_com_config( &com_config, slave_dev_eui );
+
+            SMTC_HAL_TRACE_INFO( "CMD_FLRC_PROTOCOL: initiator rx, slave %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n",
+                                 slave_dev_eui[0], slave_dev_eui[1], slave_dev_eui[2], slave_dev_eui[3],
+                                 slave_dev_eui[4], slave_dev_eui[5], slave_dev_eui[6], slave_dev_eui[7] );
+
+            rc = smtc_flrp_initiate_reception( flrp_buffer, FLRP_BURST_SIZE, com_config );
+            if( rc != SMTC_FLRP_RC_OK )
+            {
+                SMTC_HAL_TRACE_ERROR( "CMD_FLRC_PROTOCOL: smtc_flrp_initiate_reception failed (rc=%u)\n", rc );
+            }
+        }
+        if( !is_initiator && is_tx )
+        {
+            flrc_protocol_fill_tx_test_pattern( );
+
+            rc = smtc_flrp_slave_prepare_data_to_send( flrp_buffer, FLRP_BURST_SIZE );
+            if( rc != SMTC_FLRP_RC_OK )
+            {
+                SMTC_HAL_TRACE_ERROR( "CMD_FLRC_PROTOCOL: smtc_flrp_slave_prepare_data_to_send failed (rc=%u)\n", rc );
+            }
+            else
+            {
+                SMTC_HAL_TRACE_INFO( "CMD_FLRC_PROTOCOL: slave tx, prepared payload, starting periodic listening\n" );
+                rc = smtc_flrp_start_periodic_listening( flrp_buffer, FLRP_BURST_SIZE );
+                if( rc != SMTC_FLRP_RC_OK )
+                {
+                    SMTC_HAL_TRACE_ERROR( "CMD_FLRC_PROTOCOL: smtc_flrp_start_periodic_listening failed (rc=%u)\n",
+                                          rc );
+                }
+            }
+        }
+        if( !is_initiator && !is_tx )
+        {
+            rc = smtc_flrp_slave_prepare_data_to_send( flrp_buffer, 0 );
+            if( rc != SMTC_FLRP_RC_OK )
+            {
+                SMTC_HAL_TRACE_ERROR( "CMD_FLRC_BURST: smtc_flrp_slave_prepare_data_to_send(0) failed (rc=%u)\n", rc );
+            }
+            else
+            {
+                SMTC_HAL_TRACE_INFO( "CMD_FLRC_BURST: slave rx, starting periodic listening\n" );
+                rc = smtc_flrp_start_periodic_listening( flrp_buffer, FLRP_BURST_SIZE );
+                if( rc != SMTC_FLRP_RC_OK )
+                {
+                    SMTC_HAL_TRACE_ERROR( "CMD_FLRC_BURST: smtc_flrp_start_periodic_listening failed (rc=%u)\n", rc );
+                }
+            }
+        }
+
+        if( cmd_output->return_code != CMD_RC_OK )
+        {
+            break;
+        }
+
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            cmd_output->return_code = CMD_RC_FAIL;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        cmd_output->buffer[0]   = smtc_flrp_core_get_mac_radio_access_id( );
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 1;
+
+        SMTC_HAL_TRACE_INFO( "CMD_FLRC_BURST: radio_access_id=%u\n", cmd_output->buffer[0] );
+        break;
+    }
+
+    case CMD_SET_FLRC_PROTOCOL_PARAMS:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_SET_FLRC_PROTOCOL_PARAMS: Received %d bytes\n", cmd_input->length );
+
+        if( !flrc_protocol_host_ensure_initialized( cmd_output ) )
+        {
+            break;
+        }
+
+        flrc_protocol_radio_config_pb_t pb_config = flrc_protocol_radio_config_pb_t_init_zero;
+        pb_istream_t                    stream    = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
+
+        if( !pb_decode( &stream, flrc_protocol_radio_config_pb_t_fields, &pb_config ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_SET_FLRC_PROTOCOL_PARAMS: Failed to decode protobuf message\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_radio_config_t config = smtc_flrp_get_current_radio_config( );
+        convert_pb_flrc_protocol_radio_config_to_native( &pb_config, &config );
+
+        smtc_flrp_return_code_t rc = smtc_flrp_set_new_radio_config( config );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_SET_FLRC_PROTOCOL_PARAMS: smtc_flrp_set_new_radio_config failed (rc=%u)\n", rc );
+            cmd_output->return_code = ( rc == SMTC_FLRP_RC_BUSY ) ? CMD_RC_BUSY : CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_flrc_advanced_radio_config_t advanced_config = { 0 };
+        convert_pb_flrc_protocol_radio_config_to_native_advanced( &pb_config, &advanced_config );
+        rc = smtc_flrp_set_new_advanced_flrc_radio_config( advanced_config );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_SET_FLRC_PROTOCOL_PARAMS: smtc_flrp_set_new_advanced_flrc_radio_config failed (rc=%u)\n", rc );
+            cmd_output->return_code = ( rc == SMTC_FLRP_RC_BUSY ) ? CMD_RC_BUSY : CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        SMTC_HAL_TRACE_INFO( "CMD_SET_FLRC_PROTOCOL_PARAMS: nb_channels=%" PRIu8 ", default_ch=%" PRIu8
+                             ", tx_pwr=%" PRId8 " dBm, bit_rate=%s\n",
+                             config.flrc.nb_channels, config.flrc.default_channel, config.flrc.tx_power_in_dbm,
+                             ral_flrc_raw_bit_rate_to_str( config.flrc.raw_bit_rate ) );
+
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 0;
+        break;
+    }
+
+    case CMD_GET_FLRC_PROTOCOL_STATS:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_GET_FLRC_PROTOCOL_STATS\n" );
+
+        if( !flrc_protocol_initialized )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_GET_FLRC_PROTOCOL_STATS: FLRP not initialized\n" );
+            cmd_output->return_code = CMD_RC_FAIL;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        flrc_burst_stats_pb_t pb_stats       = flrc_burst_stats_pb_t_init_zero;
+        pb_stats.rx_data_size                = flrp_last_rx_stats.payload_size_expected;
+        pb_stats.nb_packets_received         = flrp_last_rx_stats.nb_packets_received_ok;
+        pb_stats.nb_packets_crc_error        = flrp_last_rx_stats.nb_packets_check_error;
+        pb_stats.rssi_mean                   = flrp_last_rx_stats.rssi_mean;
+        pb_stats.radio_access_id             = smtc_flrp_core_get_mac_radio_access_id( );
+        pb_stats.exchange_phase_success_mask = flrp_last_rx_stats.exchange_phase_success_mask;
+
+        pb_ostream_t stream = pb_ostream_from_buffer( cmd_output->buffer, 255 );
+        if( !pb_encode( &stream, flrc_burst_stats_pb_t_fields, &pb_stats ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_GET_FLRC_PROTOCOL_STATS: Failed to encode protobuf message\n" );
+            cmd_output->return_code = CMD_RC_FAIL;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = stream.bytes_written;
+
+        SMTC_HAL_TRACE_INFO( "CMD_GET_FLRC_PROTOCOL_STATS: rx_size=%" PRIu32 ", packets_ok=%" PRIu32
+                             ", check_errors=%" PRIu32 ", rssi=%" PRId32 ", radio_id=%u\n",
+                             pb_stats.rx_data_size, pb_stats.nb_packets_received, pb_stats.nb_packets_crc_error,
+                             pb_stats.rssi_mean, pb_stats.radio_access_id );
+        flrp_display_mask( pb_stats.exchange_phase_success_mask );
+        break;
+    }
+    case CMD_FLRP_INIT:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_INIT: Received %d bytes\n", cmd_input->length );
+
+        flrp_api_config_pb_t pb_api = flrp_api_config_pb_t_init_zero;
+        pb_istream_t         stream = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
+
+        if( !pb_decode( &stream, flrp_api_config_pb_t_fields, &pb_api ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INIT: Failed to decode protobuf message\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_api_config_t flrp_api_config;
+        if( !convert_pb_flrp_api_config_to_native( &pb_api, &flrp_api_config ) )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_FLRP_INIT: Invalid fields (dev_eui must be 8 bytes, freq_plan must be a known value)\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_return_code_t rc =
+            smtc_flrp_init( flrp_api_config, flrp_tx_done_callback, flrp_rx_done_callback, NULL );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INIT: smtc_flrp_init failed (rc=%u)\n", rc );
+            cmd_output->return_code = ( rc == SMTC_FLRP_RC_UNSUPPORTED_FEATURE ) ? CMD_RC_INVALID : CMD_RC_FAIL;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 0;
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_INIT: protocol initialized\n" );
+        break;
+    }
+    case CMD_FLRP_SET_PARAMS:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_SET_PARAMS: Received %d bytes\n", cmd_input->length );
+
+        flrp_radio_config_pb_t pb_config = flrp_radio_config_pb_t_init_zero;
+        pb_istream_t           stream    = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
+
+        if( !pb_decode( &stream, flrp_radio_config_pb_t_fields, &pb_config ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_SET_PARAMS: Failed to decode protobuf message\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        // smtc_flrp_radio_config_t flrp_radio_config = smtc_flrp_get_current_radio_config( );
+        smtc_flrp_radio_config_t flrp_radio_config;
+        convert_pb_flrp_radio_config( &pb_config, &flrp_radio_config );
+
+        smtc_flrp_return_code_t rc = smtc_flrp_set_new_radio_config( flrp_radio_config );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_SET_PARAMS: smtc_flrp_set_new_radio_config failed (rc=%u)\n", rc );
+            if( rc == SMTC_FLRP_RC_NOT_INIT )
+            {
+                cmd_output->return_code = CMD_RC_NOT_INIT;
+            }
+            else if( rc == SMTC_FLRP_RC_BUSY )
+            {
+                cmd_output->return_code = CMD_RC_BUSY;
+            }
+            else if( rc == SMTC_FLRP_RC_INVALID_PARAMS )
+            {
+                cmd_output->return_code = CMD_RC_INVALID;
+            }
+            else
+            {
+                cmd_output->return_code = CMD_RC_FAIL;
+            }
+            cmd_output->length = 0;
+            break;
+        }
+
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 0;
+        break;
+    }
+    case CMD_FLRP_START_PERIODIC_LISTENING:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_START_PERIODIC_LISTENING: Received %d bytes\n", cmd_input->length );
+        smtc_flrp_return_code_t rc = smtc_flrp_start_periodic_listening( flrp_buffer, FLRP_BURST_SIZE );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_FLRP_START_PERIODIC_LISTENING: smtc_flrp_start_periodic_listening failed (rc=%u)\n", rc );
+            if( rc == SMTC_FLRP_RC_NOT_INIT )
+            {
+                cmd_output->return_code = CMD_RC_NOT_INIT;
+            }
+            else if( rc == SMTC_FLRP_RC_INVALID_PARAMS )
+            {
+                cmd_output->return_code = CMD_RC_INVALID;
+            }
+            else
+            {
+                cmd_output->return_code = CMD_RC_FAIL;
+            }
+            cmd_output->length = 0;
+            break;
+        }
+
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_START_PERIODIC_LISTENING: periodic listening started\n" );
+        cmd_output->buffer[0]   = smtc_flrp_core_get_mac_radio_access_id( );
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 1;
+        break;
+    }
+    case CMD_FLRP_STOP_PERIODIC_LISTENING:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_STOP_PERIODIC_LISTENING: Received %d bytes\n", cmd_input->length );
+        smtc_flrp_return_code_t rc = smtc_flrp_stop_periodic_listening( );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_FLRP_STOP_PERIODIC_LISTENING: smtc_flrp_stop_periodic_listening failed (rc=%u)\n", rc );
+            cmd_output->return_code = CMD_RC_FAIL;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 0;
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_STOP_PERIODIC_LISTENING: periodic listening stopped\n" );
+        break;
+    }
+    case CMD_FLRP_SLAVE_DATA_TO_SEND:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_SLAVE_DATA_TO_SEND: Received %u bytes\n", cmd_input->length );
+
+        uint32_t payload_size = 0;
+        payload_size |= ( uint32_t ) cmd_input->buffer[0] << 24;
+        payload_size |= ( uint32_t ) cmd_input->buffer[1] << 16;
+        payload_size |= ( uint32_t ) cmd_input->buffer[2] << 8;
+        payload_size |= ( uint32_t ) cmd_input->buffer[3];
+
+        if( payload_size > FLRP_BURST_SIZE )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_SLAVE_DATA_TO_SEND: payload_size %" PRIu32 " > FLRP_BURST_SIZE\n",
+                                  payload_size );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        if( payload_size > 0 )
+        {
+            flrp_fill_tx_test_pattern( payload_size );
+        }
+        else
+        {
+            memset( flrp_buffer, 0, FLRP_BUFFER_SIZE );
+        }
+        smtc_flrp_return_code_t rc = smtc_flrp_slave_prepare_data_to_send( flrp_buffer, payload_size );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_SLAVE_DATA_TO_SEND: smtc_flrp_slave_prepare_data_to_send failed (rc=%u)\n",
+                                  rc );
+            if( rc == SMTC_FLRP_RC_NOT_INIT )
+            {
+                cmd_output->return_code = CMD_RC_NOT_INIT;
+            }
+            else if( rc == SMTC_FLRP_RC_BUSY )
+            {
+                cmd_output->return_code = CMD_RC_BUSY;
+            }
+            else
+            {
+                cmd_output->return_code = CMD_RC_FAIL;
+            }
+            cmd_output->length = 0;
+            break;
+        }
+
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_SLAVE_DATA_TO_SEND: data prepared\n" );
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 0;
+        break;
+    }
+    case CMD_FLRP_INITIATE_TRANSMISSION:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_INITIATE_TRANSMISSION: Received %d bytes\n", cmd_input->length );
+
+        flrp_initiate_transmission_pb_t pb_tx  = flrp_initiate_transmission_pb_t_init_zero;
+        pb_istream_t                    stream = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
+
+        if( !pb_decode( &stream, flrp_initiate_transmission_pb_t_fields, &pb_tx ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_TRANSMISSION: Failed to decode protobuf message\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        if( !pb_tx.has_com_config )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_TRANSMISSION: missing com_config field\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_com_config_t com_config;
+        if( !convert_pb_flrp_com_config_to_native( &pb_tx.com_config, &com_config ) )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_FLRP_INITIATE_TRANSMISSION: invalid com_config (slave_dev_eui must be 8 bytes, enums valid, "
+                "filter_len<=63)\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        uint32_t payload_size = pb_tx.payload_size;
+        if( payload_size > FLRP_BURST_SIZE )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_TRANSMISSION: payload_size %" PRIu32 " > FLRP_BURST_SIZE\n",
+                                  payload_size );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+        if( payload_size > 0 )
+        {
+            flrp_fill_tx_test_pattern( payload_size );
+        }
+        else
+        {
+            memset( flrp_buffer, 0, FLRP_BUFFER_SIZE );
+        }
+
+        smtc_flrp_return_code_t rc = smtc_flrp_initiate_transmission( flrp_buffer, payload_size, com_config );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_TRANSMISSION: smtc_flrp_initiate_transmission failed (rc=%u)\n",
+                                  rc );
+            if( rc == SMTC_FLRP_RC_NOT_INIT )
+            {
+                cmd_output->return_code = CMD_RC_NOT_INIT;
+            }
+            else if( rc == SMTC_FLRP_RC_BUSY )
+            {
+                cmd_output->return_code = CMD_RC_BUSY;
+            }
+            else if( rc == SMTC_FLRP_RC_INVALID_PARAMS )
+            {
+                cmd_output->return_code = CMD_RC_INVALID;
+            }
+            else
+            {
+                cmd_output->return_code = CMD_RC_FAIL;
+            }
+            cmd_output->length = 0;
+            break;
+        }
+
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_INITIATE_TRANSMISSION: transmission initiated\n" );
+        cmd_output->buffer[0]   = smtc_flrp_core_get_mac_radio_access_id( );
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 1;
+        break;
+    }
+    case CMD_FLRP_INITIATE_RECEPTION:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_INITIATE_RECEPTION: Received %d bytes\n", cmd_input->length );
+
+        flrp_com_config_pb_t pb_rx  = flrp_com_config_pb_t_init_zero;
+        pb_istream_t         stream = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
+
+        if( !pb_decode( &stream, flrp_com_config_pb_t_fields, &pb_rx ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_RECEPTION: Failed to decode protobuf message\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_com_config_t com_config;
+        if( !convert_pb_flrp_com_config_to_native( &pb_rx, &com_config ) )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_FLRP_INITIATE_RECEPTION: invalid com_config (slave_dev_eui must be 8 bytes, enums valid, "
+                "filter_len<=63)\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+        smtc_flrp_return_code_t rc = smtc_flrp_initiate_reception( flrp_buffer, FLRP_BURST_SIZE, com_config );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_RECEPTION: smtc_flrp_initiate_reception failed (rc=%u)\n", rc );
+            if( rc == SMTC_FLRP_RC_NOT_INIT )
+            {
+                cmd_output->return_code = CMD_RC_NOT_INIT;
+            }
+            else if( rc == SMTC_FLRP_RC_BUSY )
+            {
+                cmd_output->return_code = CMD_RC_BUSY;
+            }
+            else if( rc == SMTC_FLRP_RC_INVALID_PARAMS )
+            {
+                cmd_output->return_code = CMD_RC_INVALID;
+            }
+            else
+            {
+                cmd_output->return_code = CMD_RC_FAIL;
+            }
+            cmd_output->length = 0;
+            break;
+        }
+
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_INITIATE_RECEPTION: reception initiated\n" );
+        cmd_output->buffer[0]   = smtc_flrp_core_get_mac_radio_access_id( );
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 1;
+        break;
+    }
+    case CMD_FLRP_GET_PARAMS:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_GET_PARAMS: Received %d bytes\n", cmd_input->length );
+
+        smtc_flrp_radio_config_t radio_config = smtc_flrp_get_current_radio_config( );
+        flrp_radio_config_pb_t   pb_config    = flrp_radio_config_pb_t_init_zero;
+
+        if( !convert_native_flrp_radio_config_to_pb( &radio_config, &pb_config ) )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_FLRP_GET_PARAMS: Failed to convert native smtc_flrp_radio_config_t to protobuf\n" );
+            cmd_output->return_code = CMD_RC_FAIL;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        pb_ostream_t stream = pb_ostream_from_buffer( cmd_output->buffer, 255 );
+        if( !pb_encode( &stream, flrp_radio_config_pb_t_fields, &pb_config ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_GET_PARAMS: Failed to encode protobuf message\n" );
+            cmd_output->return_code = CMD_RC_FAIL;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = ( uint8_t ) stream.bytes_written;
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_GET_PARAMS: Radio config retrieved (%u bytes)\n",
+                             ( unsigned int ) stream.bytes_written );
+        break;
+    }
+    case CMD_FLRP_GET_STATS:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_GET_STATS: Received %d bytes\n", cmd_input->length );
+
+        flrp_stats_pb_t pb = flrp_stats_pb_t_init_zero;
+
+        if( flrp_last_tx_valid )
+        {
+            pb.has_stats_tx               = true;
+            pb.stats_tx.flrp_return_code  = ( smtc_flrp_return_code_pb_t ) flrp_last_tx_rc;
+            pb.stats_tx.send_successfully = flrp_last_tx_send_successful;
+            pb.stats_tx.dest_addr.size    = SMTC_FLRP_EUI_LENGTH;
+            memcpy( pb.stats_tx.dest_addr.bytes, flrp_last_tx_dest, SMTC_FLRP_EUI_LENGTH );
+        }
+
+        if( flrp_last_rx_valid )
+        {
+            pb.has_stats_rx              = true;
+            pb.stats_rx.flrp_return_code = ( smtc_flrp_return_code_pb_t ) flrp_last_rx_rc;
+            pb.stats_rx.payload_size     = flrp_last_rx_payload_size;
+            pb.stats_rx.src_addr.size    = SMTC_FLRP_EUI_LENGTH;
+            memcpy( pb.stats_rx.src_addr.bytes, flrp_last_rx_src, SMTC_FLRP_EUI_LENGTH );
+            pb.stats_rx.has_payload_stats                         = true;
+            pb.stats_rx.payload_stats.nb_packets_received_ok      = flrp_last_rx_stats.nb_packets_received_ok;
+            pb.stats_rx.payload_stats.nb_packets_check_error      = flrp_last_rx_stats.nb_packets_check_error;
+            pb.stats_rx.payload_stats.nb_packets_received_nok     = flrp_last_rx_stats.nb_packets_received_nok;
+            pb.stats_rx.payload_stats.rssi_mean                   = flrp_last_rx_stats.rssi_mean;
+            pb.stats_rx.payload_stats.nb_packets_expected         = flrp_last_rx_stats.nb_packets_expected;
+            pb.stats_rx.payload_stats.payload_size_expected       = flrp_last_rx_stats.payload_size_expected;
+            pb.stats_rx.payload_stats.exchange_phase_success_mask = flrp_last_rx_stats.exchange_phase_success_mask;
+            pb.stats_rx.payload_stats.last_burst_missed_packets_bitfield.size =
+                CEIL_DIVISION( flrp_last_rx_stats.nb_packets_expected, 8 );
+            memcpy( pb.stats_rx.payload_stats.last_burst_missed_packets_bitfield.bytes,
+                    flrp_last_rx_stats.last_burst_missed_packets_bitfield,
+                    pb.stats_rx.payload_stats.last_burst_missed_packets_bitfield.size );
+            pb.stats_rx.wor_rssi = flrp_last_rx_wor_stats.rssi;
+            pb.stats_rx.wor_snr  = flrp_last_rx_wor_stats.snr;
+        }
+
+        pb_ostream_t stream = pb_ostream_from_buffer( cmd_output->buffer, 255 );
+        if( !pb_encode( &stream, flrp_stats_pb_t_fields, &pb ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_GET_STATS: Failed to encode flrp_stats_pb_t\n" );
+            cmd_output->return_code = CMD_RC_FAIL;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        flrp_last_tx_valid = false;
+        flrp_last_rx_valid = false;
+
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = ( uint8_t ) stream.bytes_written;
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_GET_STATS: flrp_stats_pb_t encoded (%u bytes)\n",
+                             ( unsigned int ) stream.bytes_written );
+        break;
+    }
+    case CMD_FLRP_SET_PARAMS_ADVANCED:
+    {
+        SMTC_HAL_TRACE_INFO( "CMD_FLRP_SET_PARAMS_ADVANCED: Received %d bytes\n", cmd_input->length );
+
+        flrp_flrc_advanced_radio_config_pb_t pb_config = flrp_flrc_advanced_radio_config_pb_t_init_zero;
+        pb_istream_t                         stream    = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
+
+        if( !pb_decode( &stream, flrp_flrc_advanced_radio_config_pb_t_fields, &pb_config ) )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_SET_PARAMS_ADVANCED: Failed to decode protobuf message\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_flrc_advanced_radio_config_t advanced_config;
+        convert_pb_flrp_flrc_advanced_radio_config_to_native( &pb_config, &advanced_config );
+        smtc_flrp_return_code_t rc = smtc_flrp_set_new_advanced_flrc_radio_config( advanced_config );
+        if( rc != SMTC_FLRP_RC_OK )
+        {
+            SMTC_HAL_TRACE_ERROR(
+                "CMD_FLRP_SET_PARAMS_ADVANCED: smtc_flrp_set_new_advanced_flrc_radio_config failed (rc=%u)\n", rc );
+            if( rc == SMTC_FLRP_RC_NOT_INIT )
+            {
+                cmd_output->return_code = CMD_RC_NOT_INIT;
+            }
+            else if( rc == SMTC_FLRP_RC_BUSY )
+            {
+                cmd_output->return_code = CMD_RC_BUSY;
+            }
+            else
+            {
+                cmd_output->return_code = CMD_RC_INVALID;
+            }
+            cmd_output->length = 0;
+            break;
+        }
+
+        cmd_output->return_code = CMD_RC_OK;
+        cmd_output->length      = 0;
+        break;
+    }
+#endif /* USE_FLRC_PROTOCOL */
 
     default:
     {
@@ -3077,7 +3908,7 @@ cmd_parse_status_t cmd_test_parser( cmd_tst_input_t* cmd_tst_input, cmd_tst_resp
         /* First check if modem is in test mode */
         if( modem_in_test_mode == true )
         {
-            hal_mcu_disable_irq( );
+            hw_modem_disable_irq( );
             /* Endless loop */
             while( 1 )
             {
@@ -3146,43 +3977,81 @@ static void rac_post_callback( rp_status_t status, smtc_rac_priority_t priority 
 {
     SMTC_HAL_TRACE_INFO( "RAC : %s\n", __func__ );
 
-    rac_context_data_t* rac_context_data = get_rac_context_data_from_priority( priority );
-    if( rac_context_data == NULL )
+    const uint8_t radio_index = priority_to_index( priority );
+
+    if( radio_index == ( ( uint8_t ) -1 ) )
     {
-        SMTC_HAL_TRACE_ERROR( "RAC: Invalid priority\n" );
+        SMTC_HAL_TRACE_ERROR( "Incorrect radio_index: %u. Returning...\n", radio_index );
         return;
     }
 
-    rac_context_data->status            = status;
-    rac_context_data->pending_rac_event = true;
+    uint8_t radio_id = radio_ids[radio_index];
 
-    // Log payload info based on operation type
-    if( rac_context_data->rac_context->radio_params.lora.is_tx )
+    rac_context_data_t* rac_context_data = &rac_contexts[radio_id];
+    rac_context_data->status             = status;
+    rac_context_data->pending_rac_event  = true;
+
+    // Log payload info
+    smtc_rac_context_t* rac_context = SMTC_SW_PLATFORM( smtc_rac_get_context( radio_id ) );
+
+    const smtc_rac_data_buffer_setup_t* buf_setup   = &rac_context->smtc_rac_data_buffer_setup;
+    const smtc_rac_data_result_t*       data_result = &rac_context->smtc_rac_data_result;
+
+    switch( rac_context->modulation_type )
     {
-        // TX operation - log transmitted payload
-        SMTC_HAL_TRACE_INFO( "TX size=%" PRIu32 "\n",
-                             ( uint32_t ) rac_context_data->rac_context->radio_params.lora.tx_size );
-        if( rac_context_data->rac_context->smtc_rac_data_buffer_setup.tx_payload_buffer &&
-            rac_context_data->rac_context->radio_params.lora.tx_size > 0 )
+    case SMTC_RAC_MODULATION_LORA:
+    {
+        const smtc_rac_radio_lora_params_t* lora = &rac_context->radio_params.lora;
+        if( lora->is_tx )
         {
-            SMTC_HAL_TRACE_ARRAY( "TX payload\n",
-                                  rac_context_data->rac_context->smtc_rac_data_buffer_setup.tx_payload_buffer,
-                                  ( uint32_t ) rac_context_data->rac_context->radio_params.lora.tx_size );
+            // TX operation - log transmitted payload
+            SMTC_HAL_TRACE_INFO( "TX size=%" PRIu32 "\n", ( uint32_t ) lora->tx_size );
+            if( buf_setup->tx_payload_buffer && lora->tx_size > 0 )
+            {
+                SMTC_HAL_TRACE_ARRAY( "TX payload\n", buf_setup->tx_payload_buffer, ( uint32_t ) lora->tx_size );
+            }
         }
+        else
+        {
+            // RX operation - log received payload
+            SMTC_HAL_TRACE_INFO( "RX size=%" PRIu32 " (max=%" PRIu32 ")\n", ( uint32_t ) data_result->rx_size,
+                                 ( uint32_t ) lora->max_rx_size );
+            if( buf_setup->rx_payload_buffer && data_result->rx_size > 0 )
+            {
+                SMTC_HAL_TRACE_ARRAY( "RX payload\n", buf_setup->rx_payload_buffer, data_result->rx_size );
+            }
+        }
+        break;
     }
-    else
+
+    case SMTC_RAC_MODULATION_FLRC:
     {
-        // RX operation - log received payload
-        SMTC_HAL_TRACE_INFO( "RX size=%" PRIu32 " (max=%" PRIu32 ")\n",
-                             ( uint32_t ) rac_context_data->rac_context->smtc_rac_data_result.rx_size,
-                             ( uint32_t ) rac_context_data->rac_context->radio_params.lora.max_rx_size );
-        if( rac_context_data->rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer &&
-            rac_context_data->rac_context->smtc_rac_data_result.rx_size > 0 )
+        const smtc_rac_radio_flrc_params_t* flrc = &rac_context->radio_params.flrc;
+        if( flrc->is_tx )
         {
-            SMTC_HAL_TRACE_ARRAY( "RX payload\n",
-                                  rac_context_data->rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer,
-                                  rac_context_data->rac_context->smtc_rac_data_result.rx_size );
+            // TX operation - log transmitted payload
+            SMTC_HAL_TRACE_INFO( "TX size=%" PRIu32 "\n", ( uint32_t ) flrc->tx_size );
+            if( buf_setup->tx_payload_buffer && flrc->tx_size > 0 )
+            {
+                SMTC_HAL_TRACE_ARRAY( "TX payload\n", buf_setup->tx_payload_buffer, ( uint32_t ) flrc->tx_size );
+            }
         }
+        else
+        {
+            // RX operation - log received payload
+            SMTC_HAL_TRACE_INFO( "RX size=%" PRIu32 " (max=%" PRIu32 ")\n", ( uint32_t ) data_result->rx_size,
+                                 ( uint32_t ) flrc->max_rx_size );
+            if( buf_setup->rx_payload_buffer && data_result->rx_size > 0 )
+            {
+                SMTC_HAL_TRACE_ARRAY( "RX payload\n", buf_setup->rx_payload_buffer, data_result->rx_size );
+            }
+        }
+        break;
+    }
+
+    default:
+        SMTC_HAL_TRACE_ERROR( "Modulation not yet supported\n" );
+        break;
     }
 }
 
@@ -3220,7 +4089,8 @@ static cmd_length_valid_t cmd_test_parser_check_cmd_size( host_cmd_test_id_t tst
     return CMD_LENGTH_VALID;
 }
 
-uint32_t cmd_parser_crc( const uint8_t* buf, int len )
+#if defined( ADD_SMTC_LFU )
+static uint32_t cmd_parser_crc( const uint8_t* buf, int len )
 {
     uint32_t crc = 0xFFFFFFFF;
     uint32_t mask;
@@ -3236,16 +4106,15 @@ uint32_t cmd_parser_crc( const uint8_t* buf, int len )
     }
     return ~crc;
 }
+#endif /* ADD_SMTC_LFU */
 
 /* ============================================================================ */
-/* NHM (New Hw Modem) Protocol Implementation                                  */
+/* NHM (New Hw Modem) Protocol Implementation                                   */
 /* ============================================================================ */
 
 /* Forward declarations for NHM RAC command handlers */
-static cmd_serial_rc_code_t handle_nhm_rac_lora_cmd( uint8_t* cmd_payload, uint16_t cmd_length, uint16_t rsp_max_length,
-                                                     uint8_t* rsp_payload, uint16_t* rsp_length );
-static cmd_serial_rc_code_t handle_nhm_rac_cad_cmd( uint8_t* cmd_payload, uint16_t cmd_length, uint16_t rsp_max_length,
-                                                    uint8_t* rsp_payload, uint16_t* rsp_length );
+static cmd_serial_rc_code_t handle_nhm_rac_cmd( uint8_t* cmd_payload, uint16_t cmd_length, uint16_t rsp_max_length,
+                                                uint8_t* rsp_payload, uint16_t* rsp_length );
 static cmd_serial_rc_code_t handle_nhm_rac_get_results_cmd( uint8_t* cmd_payload, uint16_t cmd_length,
                                                             uint16_t rsp_max_length, uint8_t* rsp_payload,
                                                             uint16_t* rsp_length );
@@ -3283,8 +4152,8 @@ cmd_parse_status_t parse_nhm_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_ou
 
     SMTC_HAL_TRACE_INFO( "NHM: MT=%d, PBF=%d, CMD_ID=0x%03x, Length=%d\n", mt, pbf, nhm_cmd_id, payload_length );
 
-    // Verify payload length consistency
-    if( payload_length != ( cmd_input->length - NHM_HEADER_SIZE ) || ( payload_length == 0 ) )
+    // Verify payload length consistency (header length must match actual received bytes; empty payload allowed)
+    if( payload_length != ( cmd_input->length - NHM_HEADER_SIZE ) )
     {
         SMTC_HAL_TRACE_ERROR( "NHM: Payload length mismatch (header=%d, actual=%d)\n", payload_length,
                               cmd_input->length - NHM_HEADER_SIZE );
@@ -3328,7 +4197,10 @@ cmd_parse_status_t parse_nhm_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_ou
 
     // Store cmd_id and append payload to buffer
     nhm_segmentation_state.cmd_id = nhm_cmd_id;
-    memcpy( &nhm_reassembly_buffer[nhm_segmentation_state.current_pos], payload, payload_length );
+    if( nhm_segmentation_state.current_pos < NHM_REASSEMBLY_BUFFER_SIZE )
+    {
+        memcpy( &nhm_reassembly_buffer[nhm_segmentation_state.current_pos], payload, payload_length );
+    }
     nhm_segmentation_state.current_pos += payload_length;
 
     SMTC_HAL_TRACE_PRINTF( "NHM: Segment stored (%d bytes, total=%d)\n", payload_length,
@@ -3364,29 +4236,13 @@ cmd_parse_status_t handle_nhm_complete_packet( uint16_t nhm_cmd_id, uint8_t* pay
     switch( nhm_cmd_id )
     {
     case NHM_CMD_USP_SUBMIT:
-        // Reset segmentation : macro or inline function
-        nhm_segmentation_rsp_state.cmd_id       = nhm_cmd_id;
-        nhm_segmentation_rsp_state.current_pos  = 0;
-        nhm_segmentation_rsp_state.total_length = 0;
-        cmd_output->return_code                 = handle_nhm_rac_lora_cmd( payload, length,
-
-                                                                           NHM_REASSEMBLY_BUFFER_SIZE, nhm_reassembly_rsp_buffer,
-                                                                           &( nhm_segmentation_rsp_state.total_length ) );
-        break;
-    case NHM_CMD_USP_CAD:
-        // Reset segmentation : macro or inline function
-        nhm_segmentation_rsp_state.cmd_id       = nhm_cmd_id;
-        nhm_segmentation_rsp_state.current_pos  = 0;
-        nhm_segmentation_rsp_state.total_length = 0;
+        NHM_RSP_STATE_RESET( nhm_cmd_id );
         cmd_output->return_code =
-            handle_nhm_rac_cad_cmd( payload, length, NHM_REASSEMBLY_BUFFER_SIZE, nhm_reassembly_rsp_buffer,
-                                    &( nhm_segmentation_rsp_state.total_length ) );
+            handle_nhm_rac_cmd( payload, length, NHM_REASSEMBLY_BUFFER_SIZE, nhm_reassembly_rsp_buffer,
+                                &( nhm_segmentation_rsp_state.total_length ) );
         break;
     case NHM_CMD_USP_GET_RESULTS:
-        // Reset segmentation : macro or inline function
-        nhm_segmentation_rsp_state.cmd_id       = nhm_cmd_id;
-        nhm_segmentation_rsp_state.current_pos  = 0;
-        nhm_segmentation_rsp_state.total_length = 0;
+        NHM_RSP_STATE_RESET( nhm_cmd_id );
         cmd_output->return_code =
             handle_nhm_rac_get_results_cmd( payload, length, NHM_REASSEMBLY_BUFFER_SIZE, nhm_reassembly_rsp_buffer,
                                             &( nhm_segmentation_rsp_state.total_length ) );
@@ -3394,8 +4250,9 @@ cmd_parse_status_t handle_nhm_complete_packet( uint16_t nhm_cmd_id, uint8_t* pay
     case NHM_CMD_USP_GET_NEXT_SEGMENT:
         if( nhm_segmentation_rsp_state.total_length - nhm_segmentation_rsp_state.current_pos > 0 )
         {
-            SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_GET_NEXT_SEGMENT:  send remaining length (%u bytes)\n",
-                                 nhm_segmentation_rsp_state.total_length - nhm_segmentation_rsp_state.current_pos );
+            SMTC_HAL_TRACE_INFO(
+                "NHM_CMD_USP_GET_NEXT_SEGMENT:  send remaining length (%" PRIu16 " bytes)\n",
+                ( uint16_t ) ( nhm_segmentation_rsp_state.total_length - nhm_segmentation_rsp_state.current_pos ) );
             cmd_output->return_code = CMD_RC_OK;
         }
         else
@@ -3404,13 +4261,20 @@ cmd_parse_status_t handle_nhm_complete_packet( uint16_t nhm_cmd_id, uint8_t* pay
             cmd_output->return_code = CMD_RC_INVALID;
         }
         break;
+    case NHM_CMD_GET_DEVICE_TIME:
+    {
+        NHM_RSP_STATE_RESET( nhm_cmd_id );
+        uint32_t device_time_ms = smtc_modem_hal_get_time_in_ms( );
+        memcpy( nhm_reassembly_rsp_buffer, &device_time_ms, sizeof( device_time_ms ) );
+        nhm_segmentation_rsp_state.total_length = sizeof( device_time_ms );
+        cmd_output->return_code                 = CMD_RC_OK;
+        SMTC_HAL_TRACE_INFO( "NHM_CMD_GET_DEVICE_TIME: timestamp=%" PRIu32 " ms\n", device_time_ms );
+    }
+    break;
     default:
         SMTC_HAL_TRACE_ERROR( "NHM: Unknown command ID 0x%03x\n", nhm_cmd_id );
+        NHM_RSP_STATE_RESET( nhm_cmd_id );
         cmd_output->return_code = CMD_RC_UNKNOWN;
-        // Reset segmentation : macro or inline function
-        nhm_segmentation_rsp_state.cmd_id       = nhm_cmd_id;
-        nhm_segmentation_rsp_state.current_pos  = 0;
-        nhm_segmentation_rsp_state.total_length = 0;
     }
 
     // Parse NHM header
@@ -3420,27 +4284,32 @@ cmd_parse_status_t handle_nhm_complete_packet( uint16_t nhm_cmd_id, uint8_t* pay
 
     if( cmd_output->return_code == CMD_RC_OK )
     {
-        uint16_t remaining_length = nhm_segmentation_rsp_state.total_length - nhm_segmentation_rsp_state.current_pos;
-        nhm_packet_boundary_t is_segmented =
-            ( remaining_length < 245 ) ? NHM_PBF_COMPLETE_OR_LAST : NHM_PBF_NOT_LAST;  // SSA-TBD : value to calculate
-        NHM_HEADER_SET_PBF( header, is_segmented );
+        uint16_t remaining        = nhm_segmentation_rsp_state.total_length - nhm_segmentation_rsp_state.current_pos;
+        bool     is_last          = ( remaining <= NHM_MAX_PAYLOAD_SIZE );
+        nhm_packet_boundary_t pbf = is_last ? NHM_PBF_COMPLETE_OR_LAST : NHM_PBF_NOT_LAST;
 
-        header->length = ( remaining_length < 245 ) ? remaining_length : 245;  // SSA-TBD :calculate value
+        NHM_HEADER_SET_PBF( header, pbf );
+        header->length = is_last ? ( uint8_t ) remaining : NHM_MAX_PAYLOAD_SIZE;
         memcpy( cmd_output->buffer + NHM_HEADER_SIZE,
-                nhm_reassembly_rsp_buffer + nhm_segmentation_rsp_state.current_pos, header->length );
+                nhm_segmentation_rsp_state.buffer + nhm_segmentation_rsp_state.current_pos, header->length );
 
         cmd_output->length = header->length + NHM_HEADER_SIZE;
-        SMTC_HAL_TRACE_INFO( "return code OK : Send RSP :  remaining=%u, pktsize=%u, PBF = %u\n", remaining_length,
-                             header->length, is_segmented );
+        SMTC_HAL_TRACE_INFO( "return code OK : Send RSP :  remaining=%" PRIu16 ", pktsize=%u, PBF = %u\n", remaining,
+                             header->length, pbf );
 
-        if( is_segmented == NHM_PBF_NOT_LAST )
+        if( is_last )
         {
-            nhm_segmentation_rsp_state.current_pos += header->length;
+            if( nhm_segmentation_rsp_state.pending_radio_id != RAC_INVALID_RADIO_ID )
+            {
+                rac_contexts[nhm_segmentation_rsp_state.pending_radio_id].pending_rac_event = false;
+                nhm_segmentation_rsp_state.pending_radio_id                                 = RAC_INVALID_RADIO_ID;
+            }
+            nhm_segmentation_rsp_state.current_pos  = 0;
+            nhm_segmentation_rsp_state.total_length = 0;
         }
         else
         {
-            nhm_segmentation_rsp_state.current_pos  = 0;
-            nhm_segmentation_rsp_state.total_length = 0;
+            nhm_segmentation_rsp_state.current_pos += header->length;
         }
 
         return PARSE_OK;
@@ -3456,8 +4325,8 @@ cmd_parse_status_t handle_nhm_complete_packet( uint16_t nhm_cmd_id, uint8_t* pay
 }
 
 /* NHM usp command handlers - Forward to existing implementations */
-static cmd_serial_rc_code_t handle_nhm_rac_lora_cmd( uint8_t* cmd_payload, uint16_t cmd_length, uint16_t rsp_max_length,
-                                                     uint8_t* rsp_payload, uint16_t* rsp_length )
+static cmd_serial_rc_code_t handle_nhm_rac_cmd( uint8_t* cmd_payload, uint16_t cmd_length, uint16_t rsp_max_length,
+                                                uint8_t* rsp_payload, uint16_t* rsp_length )
 {
     SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_SUBMIT: Processing %d bytes\n", cmd_length );
 
@@ -3467,76 +4336,187 @@ static cmd_serial_rc_code_t handle_nhm_rac_lora_cmd( uint8_t* cmd_payload, uint1
         return CMD_RC_INVALID;
     }
 
-    // Deserialize protobuf context
-    smtc_rac_lora_request_pb_t pb_rac_lora_call = smtc_rac_lora_request_pb_t_init_zero;
-    pb_istream_t               stream           = pb_istream_from_buffer( cmd_payload, cmd_length );
+    // Deserialize protobuf request
+    smtc_rac_request_pb_t pb_rac_request = smtc_rac_request_pb_t_init_zero;
+    pb_istream_t          stream         = pb_istream_from_buffer( cmd_payload, cmd_length );
 
-    if( !pb_decode( &stream, smtc_rac_lora_request_pb_t_fields, &pb_rac_lora_call ) )
+    if( !pb_decode( &stream, smtc_rac_request_pb_t_fields, &pb_rac_request ) )
     {
         SMTC_HAL_TRACE_ERROR( "NHM_CMD_USP_SUBMIT: Failed to decode protobuf request\n" );
         return CMD_RC_INVALID;
     }
 
     SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_SUBMIT: Protobuf decoded successfully\n" );
-    SMTC_HAL_TRACE_INFO( "  Radio Id: %d\n", pb_rac_lora_call.radio_access_id );
-    SMTC_HAL_TRACE_INFO( "  TX mode: %s\n", pb_rac_lora_call.rac_config.radio_params.is_tx ? "true" : "false" );
-    SMTC_HAL_TRACE_INFO( "  Frequency: %u Hz\n", pb_rac_lora_call.rac_config.radio_params.frequency_in_hz );
-    SMTC_HAL_TRACE_INFO( "  TX Power: %u dBm\n", pb_rac_lora_call.rac_config.radio_params.tx_power_in_dbm );
-    SMTC_HAL_TRACE_INFO( "  TX Payload size: %u bytes\n",
-                         ( uint32_t ) pb_rac_lora_call.rac_config.radio_params.tx_size );
-    SMTC_HAL_TRACE_INFO( "  RX Max size: %u bytes\n", pb_rac_lora_call.rac_config.radio_params.max_rx_size );
 
-    rac_context_data_t* rac_context_data = get_rac_context_data_from_handle( pb_rac_lora_call.radio_access_id );
-    if( rac_context_data == NULL )
-    {
-        SMTC_HAL_TRACE_ERROR( "CMD_USP_SUBMIT: Failed to get rac context data\n" );
-        return CMD_RC_FAIL;
-    }
+    // Print decoded values
+    print_rac_request_params( &pb_rac_request );
+
+    rac_context_data_t* rac_context_data = &rac_contexts[pb_rac_request.radio_access_id];
+    smtc_rac_context_t* rac_context      = SMTC_SW_PLATFORM( smtc_rac_get_context( pb_rac_request.radio_access_id ) );
 
     // Convert to native structure - use existing pre-allocated buffers
-    if( !rac_convert_context_from_pb( &( pb_rac_lora_call.rac_config ), rac_context_data->rac_context ) )
+    if( !rac_convert_context_from_pb( &( pb_rac_request.rac_config ), rac_context ) )
     {
         SMTC_HAL_TRACE_ERROR( "NHM_CMD_USP_SUBMIT: Failed to convert protobuf to native context\n" );
         return CMD_RC_FAIL;
     }
 
-    SMTC_HAL_TRACE_PRINTF( "NHM_CMD_USP_SUBMIT: Context converted to native successfully\n" );
+    // SMTC_HAL_TRACE_PRINTF( "NHM_CMD_USP_SUBMIT: Context converted to native successfully\n" );
 
     // The first time, the python script do not know embedded side absolute time so we set it to the current time +
     // processing time
-    if( rac_context_data->rac_context->scheduler_config.start_time_ms == 0 )
+    if( rac_context->scheduler_config.start_time_ms == 0 )
     {
-        if( rac_context_data->rac_context->scheduler_config.scheduling == SMTC_RAC_ASAP_TRANSACTION )
+        if( rac_context->scheduler_config.scheduling == SMTC_RAC_ASAP_TRANSACTION )
         {
-            rac_context_data->rac_context->scheduler_config.start_time_ms = smtc_modem_hal_get_time_in_ms( ) + 100;
+            rac_context->scheduler_config.start_time_ms = smtc_modem_hal_get_time_in_ms( ) + 100;
         }
         else
         {
-            rac_context_data->rac_context->scheduler_config.start_time_ms =
+            rac_context->scheduler_config.start_time_ms =
                 smtc_modem_hal_get_time_in_ms( ) + 100;  // 10 : processing time
         }
     }
+    // SMTC_HAL_TRACE_INFO("NHM_CMD_USP_SUBMIT: start_time_ms = %" PRIu32 " ms",
+    // rac_context->scheduler_config.start_time_ms);
 
     // Call RAC API
-    rac_context_data->rac_context->scheduler_config.callback_pre_radio_transaction = NULL;
-    smtc_rac_return_code_t ret = smtc_rac_submit_radio_transaction( pb_rac_lora_call.radio_access_id );
+    rac_context->scheduler_config.callback_pre_radio_transaction = NULL;
+    smtc_rac_return_code_t ret =
+        SMTC_SW_PLATFORM( smtc_rac_submit_radio_transaction( pb_rac_request.radio_access_id ) );
 
     // Store return code for CMD_USP_GET_RESULTS
     rac_context_data->last_rac_return_code = ret;
 
-    SMTC_HAL_TRACE_PRINTF( "NHM_CMD_USP_SUBMIT: Context processing completed successfully\n" );
+    // SMTC_HAL_TRACE_PRINTF( "NHM_CMD_USP_SUBMIT: Context processing completed successfully\n" );
     *rsp_length = 0;
-    return ( ret == SMTC_RAC_SUCCESS ) ? CMD_RC_OK : CMD_RC_FAIL;  // SSA-TBD : do this better : lut ?
+    return ( ret == SMTC_RAC_SUCCESS ) ? CMD_RC_OK : CMD_RC_FAIL;  // In future releases, true error code should be sent
+                                                                   // to response
 }
 
-static cmd_serial_rc_code_t handle_nhm_rac_cad_cmd( uint8_t* cmd_payload, uint16_t cmd_length, uint16_t rsp_max_length,
-                                                    uint8_t* rsp_payload, uint16_t* rsp_length )
+#if defined( USE_FLRC_PROTOCOL )
+/**
+ * @brief Encode FLRP / FLRC-burst RAC results into \c flrp_buffer as one contiguous protobuf \c rac_results_pb_t.
+ *
+ * Prologue and epilogue are built in \p rsp_payload; the raw RX bytes stay in \c flrp_buffer and are shifted with
+ * \c memmove so NHM segmentation can stream from a single linear buffer.
+ *
+ * \p rsp_length receives the total serialized size.
+ *
+ * \c rac_context_data->pending_rac_event is left \c true on success: the answer is split across several NHM packets
+ * (\c NHM_CMD_USP_GET_NEXT_SEGMENT), and if the link drops mid-stream the host can call \c NHM_CMD_USP_GET_RESULTS
+ * again and still see a completed transaction. The flag is cleared only after the last segment is emitted, in
+ * \c handle_nhm_complete_packet() when \c is_last is true (see \c nhm_segmentation_rsp_state.pending_radio_id).
+ */
+static cmd_serial_rc_code_t encode_flrp_nhm_rac_results( const rac_context_data_t* rac_context_data,
+                                                         const smtc_rac_context_t* rac_context,
+                                                         uint32_t radio_access_id, uint16_t rsp_max_length,
+                                                         uint8_t* rsp_payload, uint16_t* rsp_length )
 {
-    SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_CAD: Processing %d bytes\n", cmd_length );
-    // TODO: Implement CAD command processing similar to LORA
-    *rsp_length = 0;
-    return CMD_RC_NOT_IMPLEMENTED;
+    const uint8_t* rx_src = flrp_buffer;
+    const uint32_t rx_sz  = rac_context->smtc_rac_data_result.rx_size;
+
+    if( rx_sz > FLRP_BUFFER_SIZE )
+    {
+        SMTC_HAL_TRACE_ERROR( "NHM FLRP encode: rx_size %" PRIu32 " > FLRP_BUFFER_SIZE\n", rx_sz );
+        return CMD_RC_FAIL;
+    }
+
+    smtc_rac_data_result_pb_t inner = smtc_rac_data_result_pb_t_init_zero;
+    inner.rx_size                   = rx_sz;
+    inner.rssi_result               = flrp_last_rx_stats.rssi_mean;
+    inner.snr_result                = rac_context->smtc_rac_data_result.snr_result;
+    inner.radio_end_timestamp_ms    = rac_context->smtc_rac_data_result.radio_end_timestamp_ms;
+    inner.radio_start_timestamp_ms  = rac_context->smtc_rac_data_result.radio_start_timestamp_ms;
+    inner.lora_freq_offset_hz       = rac_context->smtc_rac_data_result.lora_freq_offset_hz;
+    inner.has_ranging_result        = true;
+
+    pb_ostream_t sizing = PB_OSTREAM_SIZING;
+    if( !pb_encode( &sizing, smtc_rac_data_result_pb_t_fields, &inner ) )
+    {
+        return CMD_RC_FAIL;
+    }
+    size_t metadata_size = sizing.bytes_written;
+
+    pb_ostream_t len_sizing = PB_OSTREAM_SIZING;
+    pb_encode_varint( &len_sizing, rx_sz );
+    size_t payload_len_varint_size = len_sizing.bytes_written;
+
+    size_t payload_field_size = 1 + payload_len_varint_size + rx_sz;
+    size_t total_submsg_size  = metadata_size + payload_field_size;
+
+    rac_transaction_status_pb_t tx_status = rac_transaction_status_pb_t_RAC_TRANSACTION_COMPLETED_PB;
+    smtc_rac_return_code_pb_t   ret_code  = ( smtc_rac_return_code_pb_t ) rac_context_data->last_rac_return_code;
+    rp_status_pb_t              rp_stat   = convert_native_rp_status_to_pb( rac_context_data->status );
+
+    pb_ostream_t out = pb_ostream_from_buffer( rsp_payload, rsp_max_length );
+
+    if( tx_status != 0 )
+    {
+        pb_encode_tag( &out, PB_WT_VARINT, rac_results_pb_t_transaction_status_tag );
+        pb_encode_varint( &out, ( uint64_t ) tx_status );
+    }
+    if( ret_code != 0 )
+    {
+        pb_encode_tag( &out, PB_WT_VARINT, rac_results_pb_t_return_code_tag );
+        pb_encode_varint( &out, ( uint64_t ) ret_code );
+    }
+
+    pb_encode_tag( &out, PB_WT_STRING, rac_results_pb_t_results_tag );
+    pb_encode_varint( &out, ( uint64_t ) total_submsg_size );
+    pb_encode( &out, smtc_rac_data_result_pb_t_fields, &inner );
+
+    pb_encode_tag( &out, PB_WT_STRING, smtc_rac_data_result_pb_t_rx_payload_buffer_tag );
+    pb_encode_varint( &out, ( uint64_t ) rx_sz );
+
+    size_t prologue_len = out.bytes_written;
+
+    pb_ostream_t epi = pb_ostream_from_buffer( rsp_payload + prologue_len, rsp_max_length - prologue_len );
+
+    if( rp_stat != 0 )
+    {
+        pb_encode_tag( &epi, PB_WT_VARINT, rac_results_pb_t_rp_status_tag );
+        pb_encode_varint( &epi, ( uint64_t ) rp_stat );
+    }
+    if( radio_access_id != 0 )
+    {
+        pb_encode_tag( &epi, PB_WT_VARINT, rac_results_pb_t_radio_access_id_tag );
+        pb_encode_varint( &epi, ( uint64_t ) radio_access_id );
+    }
+
+    size_t epilogue_len = epi.bytes_written;
+
+    if( ( out.errmsg != NULL ) || ( epi.errmsg != NULL ) )
+    {
+        SMTC_HAL_TRACE_ERROR( "NHM FLRP encode: protobuf stream error\n" );
+        return CMD_RC_FAIL;
+    }
+
+    uint16_t total = ( uint16_t ) ( prologue_len + rx_sz + epilogue_len );
+
+    if( ( size_t ) total > ( size_t ) FLRP_BUFFER_SIZE )
+    {
+        SMTC_HAL_TRACE_ERROR( "NHM FLRP encode: response too large (%" PRIu16 " > %u)\n", total,
+                              ( unsigned ) FLRP_BUFFER_SIZE );
+        return CMD_RC_FAIL;
+    }
+
+    memmove( flrp_buffer + prologue_len, rx_src, rx_sz );
+    memcpy( flrp_buffer, rsp_payload, prologue_len );
+    memcpy( flrp_buffer + prologue_len + rx_sz, rsp_payload + prologue_len, epilogue_len );
+
+    nhm_segmentation_rsp_state.buffer           = flrp_buffer;
+    nhm_segmentation_rsp_state.pending_radio_id = ( uint8_t ) radio_access_id;
+
+    *rsp_length = total;
+
+    SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_GET_RESULTS: FLRP large RX %" PRIu16 " B (prologue %u, payload %" PRIu32
+                         ", epilogue %u)\n",
+                         total, ( unsigned ) prologue_len, rx_sz, ( unsigned ) epilogue_len );
+
+    return CMD_RC_OK;
 }
+#endif /* USE_FLRC_PROTOCOL */
 
 static cmd_serial_rc_code_t handle_nhm_rac_get_results_cmd( uint8_t* cmd_payload, uint16_t cmd_length,
                                                             uint16_t rsp_max_length, uint8_t* rsp_payload,
@@ -3563,21 +4543,27 @@ static cmd_serial_rc_code_t handle_nhm_rac_get_results_cmd( uint8_t* cmd_payload
     SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_GET_RESULTS: Radio handle = %d\n", request.radio_access_id );
 
     // Get the context corresponding to the radio_access_id
-    rac_context_data_t* rac_context_data = get_rac_context_data_from_handle( request.radio_access_id );
-
-    if( rac_context_data == NULL )
-    {
-        SMTC_HAL_TRACE_ERROR( "NHM_CMD_USP_GET_RESULTS: Invalid radio handle %d\n", request.radio_access_id );
-        return CMD_RC_INVALID;
-    }
+    rac_context_data_t* rac_context_data = &rac_contexts[request.radio_access_id];
+    smtc_rac_context_t* rac_context      = SMTC_SW_PLATFORM( smtc_rac_get_context( request.radio_access_id ) );
 
     // Create optimized results message
     rac_results_pb_t results = rac_results_pb_t_init_zero;
-    results.radio_access_id  = rac_context_data->radio_handle;
+    results.radio_access_id  = request.radio_access_id;
 
     // Determine transaction status based on pending_rac_event
     if( rac_context_data->pending_rac_event == true )
     {
+#if defined( USE_FLRC_PROTOCOL )
+        /* FLRC burst (FLRP MAC): RX payload can exceed nanopb's inline limit — manual encode + NHM segmentation. */
+        if( ( rac_context->modulation_type == SMTC_RAC_MODULATION_FLRC_BURST ||
+              rac_context->modulation_type == SMTC_RAC_MODULATION_FLRC ) &&
+            rac_context->smtc_rac_data_result.rx_size > 511 )
+        {
+            return encode_flrp_nhm_rac_results( rac_context_data, rac_context, request.radio_access_id, rsp_max_length,
+                                                rsp_payload, rsp_length );
+        }
+#endif /* USE_FLRC_PROTOCOL */
+
         // Clear the pending event flag - results consumed
         rac_context_data->pending_rac_event = false;
 
@@ -3587,16 +4573,15 @@ static cmd_serial_rc_code_t handle_nhm_rac_get_results_cmd( uint8_t* cmd_payload
         results.rp_status          = convert_native_rp_status_to_pb( rac_context_data->status );
 
         // Convert native rac data result to protobuf
-        if( !rac_convert_data_result_to_pb( &rac_context_data->rac_context->smtc_rac_data_result, &results.results ) )
+        if( !rac_convert_data_result_to_pb( &rac_context->smtc_rac_data_result, &results.results ) )
         {
             SMTC_HAL_TRACE_ERROR( "NHM_CMD_USP_GET_RESULTS: Failed to convert results to protobuf\n" );
             return CMD_RC_FAIL;
         }
 
         // Copy RX payload if present
-        if( !rac_copy_rx_payload_to_result( rac_context_data->rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer,
-                                            rac_context_data->rac_context->smtc_rac_data_result.rx_size,
-                                            &results.results ) )
+        if( !rac_copy_rx_payload_to_result( rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer,
+                                            rac_context->smtc_rac_data_result.rx_size, &results.results ) )
         {
             SMTC_HAL_TRACE_ERROR( "NHM_CMD_USP_GET_RESULTS: Failed to copy RX payload\n" );
             return CMD_RC_FAIL;
@@ -3606,31 +4591,84 @@ static cmd_serial_rc_code_t handle_nhm_rac_get_results_cmd( uint8_t* cmd_payload
         results.has_results                = true;  // Also ensure results field is serialized
         results.results.has_ranging_result = true;
 
-        // Log results based on operation type (TX or RX)
-        if( rac_context_data->rac_context->radio_params.lora.tx_size > 0 )
+        // Log results based on modulation type and operation (TX or RX)
+        switch( rac_context->modulation_type )
         {
-            // TX operation results
-            SMTC_HAL_TRACE_INFO(
-                "NHM_CMD_USP_GET_RESULTS: TX Results - RSSI: %d dBm, SNR: %d dB, TX Payload: %d bytes\n",
-                results.results.rssi_result, results.results.snr_result,
-                ( uint32_t ) rac_context_data->rac_context->radio_params.lora.tx_size );
-            SMTC_HAL_TRACE_ARRAY( "TX payload\n",
-                                  rac_context_data->rac_context->smtc_rac_data_buffer_setup.tx_payload_buffer,
-                                  ( uint32_t ) rac_context_data->rac_context->radio_params.lora.tx_size );
-        }
-        else
+        case SMTC_RAC_MODULATION_LORA:
         {
-            // RX operation results
-            SMTC_HAL_TRACE_INFO(
-                "NHM_CMD_USP_GET_RESULTS: RX Results - RSSI: %d dBm, SNR: %d dB, RX Payload: %d bytes\n",
-                results.results.rssi_result, results.results.snr_result, ( uint32_t ) results.results.rx_size );
-            if( results.results.rx_size > 0 &&
-                rac_context_data->rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer )
+            const smtc_rac_radio_lora_params_t* lora = &rac_context->radio_params.lora;
+            if( lora->is_tx )
             {
-                SMTC_HAL_TRACE_ARRAY( "RX payload\n",
-                                      rac_context_data->rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer,
-                                      results.results.rx_size );
+                SMTC_HAL_TRACE_INFO(
+                    "NHM_CMD_USP_GET_RESULTS: TX Results (handle=%d) - RSSI: %d dBm, SNR: %d dB, TX Payload: %d "
+                    "bytes\n",
+                    request.radio_access_id, results.results.rssi_result, results.results.snr_result,
+                    ( uint32_t ) lora->tx_size );
+                SMTC_HAL_TRACE_ARRAY( "TX payload\n", rac_context->smtc_rac_data_buffer_setup.tx_payload_buffer,
+                                      ( uint32_t ) lora->tx_size );
             }
+            else
+            {
+                SMTC_HAL_TRACE_INFO(
+                    "NHM_CMD_USP_GET_RESULTS: RX Results (handle=%d) - RSSI: %d dBm, SNR: %d dB, RX Payload: %d "
+                    "bytes\n",
+                    request.radio_access_id, results.results.rssi_result, results.results.snr_result,
+                    ( uint32_t ) results.results.rx_size );
+                if( results.results.rx_size > 0 && rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer )
+                {
+                    SMTC_HAL_TRACE_ARRAY( "RX payload\n", rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer,
+                                          results.results.rx_size );
+                }
+            }
+            break;
+        }
+        case SMTC_RAC_MODULATION_FLRC:
+        {
+            const smtc_rac_radio_flrc_params_t* flrc = &rac_context->radio_params.flrc;
+            if( flrc->is_tx )
+            {
+                SMTC_HAL_TRACE_INFO(
+                    "NHM_CMD_USP_GET_RESULTS: TX Results (handle=%d) - RSSI: %d dBm, SNR: %d dB, TX Payload: %d "
+                    "bytes\n",
+                    request.radio_access_id, results.results.rssi_result, results.results.snr_result,
+                    ( uint32_t ) flrc->tx_size );
+                SMTC_HAL_TRACE_ARRAY( "TX payload\n", rac_context->smtc_rac_data_buffer_setup.tx_payload_buffer,
+                                      ( uint32_t ) flrc->tx_size );
+            }
+            else
+            {
+                SMTC_HAL_TRACE_INFO(
+                    "NHM_CMD_USP_GET_RESULTS: RX Results (handle=%d) - RSSI: %d dBm, SNR: %d dB, RX Payload: %d "
+                    "bytes\n",
+                    request.radio_access_id, results.results.rssi_result, results.results.snr_result,
+                    ( uint32_t ) results.results.rx_size );
+                if( results.results.rx_size > 0 && rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer )
+                {
+                    SMTC_HAL_TRACE_ARRAY( "RX payload\n", rac_context->smtc_rac_data_buffer_setup.rx_payload_buffer,
+                                          results.results.rx_size );
+                }
+            }
+            break;
+        }
+#if defined( USE_FLRC_PROTOCOL )
+        case SMTC_RAC_MODULATION_FLRC_BURST:
+        {
+            SMTC_HAL_TRACE_INFO(
+                "NHM_CMD_USP_GET_RESULTS: FLRC Burst RX (handle=%d) - RSSI: %d dBm, RX Payload: %" PRIu32 " bytes\n",
+                request.radio_access_id, results.results.rssi_result, results.results.rx_size );
+            break;
+        }
+#endif /* USE_FLRC_PROTOCOL */
+        case SMTC_RAC_MODULATION_FSK:
+            SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_GET_RESULTS: Modulation: FSK (not supported yet)\n" );
+            break;
+        case SMTC_RAC_MODULATION_LRFHSS:
+            SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_GET_RESULTS: Modulation: LR-FHSS (not supported yet)\n" );
+            break;
+        default:
+            SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_GET_RESULTS: Modulation: Unknown (%d)\n",
+                                 ( int ) rac_context->modulation_type );
+            break;
         }
     }
     else
@@ -3642,7 +4680,7 @@ static cmd_serial_rc_code_t handle_nhm_rac_get_results_cmd( uint8_t* cmd_payload
 
         SMTC_HAL_TRACE_INFO(
             "NHM_CMD_USP_GET_RESULTS: No results available for handle %d - transaction pending or not started\n",
-            rac_context_data->radio_handle );
+            request.radio_access_id );
     }
 
     // Serialize the results message
@@ -3657,9 +4695,192 @@ static cmd_serial_rc_code_t handle_nhm_rac_get_results_cmd( uint8_t* cmd_payload
     *rsp_length = out_stream.bytes_written;
 
     SMTC_HAL_TRACE_INFO( "NHM_CMD_USP_GET_RESULTS: Successfully encoded %u bytes for handle %d - Status: %d\n",
-                         out_stream.bytes_written, rac_context_data->radio_handle, results.transaction_status );
+                         out_stream.bytes_written, request.radio_access_id, results.transaction_status );
 
     return CMD_RC_OK;
 }
+
+/*
+ * -----------------------------------------------------------------------------
+ * --- FLRP STATIC FUNCTIONS ---------------------------------------------------
+ */
+
+#if defined( USE_FLRC_PROTOCOL )
+static bool flrc_protocol_host_ensure_initialized( cmd_response_t* cmd_output )
+{
+    if( flrc_protocol_initialized )
+    {
+        return true;
+    }
+
+    smtc_flrp_api_config_t flrp_config = { 0 };
+    uint8_t                dev_eui[]   = USER_FLRP_SELF_DEVICE_EUI;
+    memcpy( flrp_config.dev_eui, dev_eui, SMTC_FLRP_EUI_LENGTH );
+    flrp_config.crypto_enabled = false;
+    flrp_config.freq_plan      = SMTC_FLRP_FREQ_865MHz;
+    flrp_config.crystal_error  = 10;
+
+    smtc_flrp_return_code_t rc = smtc_flrp_init( flrp_config, flrp_tx_done_callback, flrp_rx_done_callback, NULL );
+    if( rc != SMTC_FLRP_RC_OK )
+    {
+        SMTC_HAL_TRACE_ERROR( "FLRP host init: smtc_flrp_init failed (rc=%u)\n", rc );
+        cmd_output->return_code = CMD_RC_FAIL;
+        cmd_output->length      = 0;
+        return false;
+    }
+
+    flrc_protocol_initialized = true;
+    SMTC_HAL_TRACE_INFO( "FLRP host init: protocol initialized\n" );
+    return true;
+}
+
+static void flrc_protocol_fill_tx_test_pattern( void )
+{
+    uint8_t flrp_tx_counter = 0;
+    for( uint32_t i = 0; i < FLRP_BURST_SIZE; i++ )
+    {
+        if( i % 128u == 0u )
+        {
+            flrp_tx_counter++;
+        }
+        flrp_buffer[i] = flrp_tx_counter;
+    }
+}
+
+static bool flrc_protocol_extract_cmd_flags( uint32_t length, const uint8_t* buf, bool* is_initiator_out,
+                                             bool* is_tx_out )
+{
+    if( length < 2U )
+    {
+        return false;
+    }
+    if( ( buf[0] > 1U ) || ( buf[1] > 1U ) )
+    {
+        return false;
+    }
+    *is_initiator_out = ( buf[0] != 0 );
+    *is_tx_out        = ( buf[1] != 0 );
+
+    if( !( *is_initiator_out ) )
+    {
+        return ( length == 2U );
+    }
+    return ( length == 2U ) || ( length == ( 2U + SMTC_FLRP_EUI_LENGTH ) );
+}
+
+static void flrc_protocol_copy_slave_dev_eui( uint32_t length, const uint8_t* buf,
+                                              uint8_t slave_dev_eui[SMTC_FLRP_EUI_LENGTH] )
+{
+    if( length >= ( 2U + SMTC_FLRP_EUI_LENGTH ) )
+    {
+        memcpy( slave_dev_eui, &buf[2], SMTC_FLRP_EUI_LENGTH );
+    }
+    else
+    {
+        uint8_t default_eui[] = USER_FLRP_TARGET_DEVICE_EUI;
+        memcpy( slave_dev_eui, default_eui, SMTC_FLRP_EUI_LENGTH );
+    }
+}
+
+static void flrc_protocol_apply_initiator_stream_com_config( smtc_flrp_com_config_t* com_cfg,
+                                                             const uint8_t slave_dev_eui[SMTC_FLRP_EUI_LENGTH] )
+{
+    memset( com_cfg, 0, sizeof( *com_cfg ) );
+    com_cfg->com_mode             = SMTC_FLRP_BIDIRECTIONAL;
+    com_cfg->link_adaptation_mode = SMTC_FLRP_LINK_ADAPTATION_CHANNEL_SELECTION_ONLY;
+    memcpy( com_cfg->slave_dev_eui, slave_dev_eui, SMTC_FLRP_EUI_LENGTH );
+}
+
+static void flrp_tx_done_callback( const void* context, smtc_flrp_return_code_t status, bool send_successful,
+                                   uint8_t* dest_addr )
+{
+    UNUSED( context );
+    flrp_last_tx_valid           = true;
+    flrp_last_tx_rc              = status;
+    flrp_last_tx_send_successful = send_successful;
+    if( dest_addr != NULL )
+    {
+        memcpy( flrp_last_tx_dest, dest_addr, SMTC_FLRP_EUI_LENGTH );
+    }
+    else
+    {
+        memset( flrp_last_tx_dest, 0, SMTC_FLRP_EUI_LENGTH );
+    }
+
+    if( status == SMTC_FLRP_RC_OK && send_successful )
+    {
+        SMTC_HAL_TRACE_INFO( "FLRP TX done: success to %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n", flrp_last_tx_dest[0],
+                             flrp_last_tx_dest[1], flrp_last_tx_dest[2], flrp_last_tx_dest[3], flrp_last_tx_dest[4],
+                             flrp_last_tx_dest[5], flrp_last_tx_dest[6], flrp_last_tx_dest[7] );
+    }
+    else
+    {
+        SMTC_HAL_TRACE_WARNING( "FLRP TX done: failed (status=%u, success=%s)\n", status,
+                                send_successful ? "true" : "false" );
+    }
+}
+
+static void flrp_rx_done_callback( const void* context, smtc_flrp_return_code_t status, uint32_t payload_size,
+                                   uint8_t* src_addr, smtc_flrp_rx_stats_t flrp_stats )
+{
+    UNUSED( context );
+    flrp_last_rx_valid        = true;
+    flrp_last_rx_rc           = status;
+    flrp_last_rx_payload_size = payload_size;
+    flrp_last_rx_stats        = flrp_stats.burst;
+    flrp_last_rx_wor_stats    = flrp_stats.wor;
+    if( src_addr != NULL )
+    {
+        memcpy( flrp_last_rx_src, src_addr, SMTC_FLRP_EUI_LENGTH );
+    }
+    else
+    {
+        memset( flrp_last_rx_src, 0, SMTC_FLRP_EUI_LENGTH );
+    }
+
+    if( status == SMTC_FLRP_RC_OK && payload_size > 0 )
+    {
+        const uint8_t       mac_radio_id = smtc_flrp_core_get_mac_radio_access_id( );
+        rac_context_data_t* rdata        = &rac_contexts[mac_radio_id];
+        smtc_rac_context_t* rac_ctx      = SMTC_SW_PLATFORM( smtc_rac_get_context( mac_radio_id ) );
+
+        rdata->status                                                 = RP_STATUS_RX_PACKET;
+        rdata->pending_rac_event                                      = true;
+        rdata->last_rac_return_code                                   = SMTC_RAC_SUCCESS;
+        rac_ctx->smtc_rac_data_result.rx_size                         = payload_size;
+        rac_ctx->smtc_rac_data_buffer_setup.rx_payload_buffer         = flrp_buffer;
+        rac_ctx->smtc_rac_data_buffer_setup.size_of_rx_payload_buffer = ( uint16_t ) FLRP_BUFFER_SIZE;
+
+        SMTC_HAL_TRACE_INFO(
+            "FLRP RX done: %" PRIu32
+            " bytes from %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X"
+            " (ok=%" PRIu32 ", err=%" PRIu32 ", rssi=%" PRId32 ", wor_rssi=%" PRId16 ", wor_snr=%" PRId8 ")\n",
+            payload_size, flrp_last_rx_src[0], flrp_last_rx_src[1], flrp_last_rx_src[2], flrp_last_rx_src[3],
+            flrp_last_rx_src[4], flrp_last_rx_src[5], flrp_last_rx_src[6], flrp_last_rx_src[7],
+            flrp_stats.burst.nb_packets_received_ok, flrp_stats.burst.nb_packets_check_error,
+            flrp_stats.burst.rssi_mean, flrp_stats.wor.rssi, flrp_stats.wor.snr );
+    }
+    else
+    {
+        SMTC_HAL_TRACE_WARNING( "FLRP RX done: status=%u, payload_size=%" PRIu32 "\n", status, payload_size );
+    }
+}
+static void flrp_fill_tx_test_pattern( uint32_t length )
+{
+    if( length > FLRP_BUFFER_SIZE )
+    {
+        length = FLRP_BUFFER_SIZE;
+    }
+    uint8_t flrp_tx_counter = 0;
+    for( uint32_t i = 0; i < length; i++ )
+    {
+        if( i % 128u == 0u )
+        {
+            flrp_tx_counter++;
+        }
+        flrp_buffer[i] = flrp_tx_counter;
+    }
+}
+#endif  // USE_FLRC_PROTOCOL
 
 /* --- EOF ------------------------------------------------------------------ */

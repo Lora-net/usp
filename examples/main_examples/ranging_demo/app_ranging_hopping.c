@@ -43,6 +43,7 @@
 #include "main_ranging_demo.h"
 #include "smtc_rac_api.h"
 #include "smtc_sw_platform_helper.h"
+#include "smtc_hal_led.h"
 #include "smtc_modem_hal.h"
 
 // Use unified logging system
@@ -360,8 +361,6 @@ void app_radio_ranging_params_init( bool is_manager, smtc_rac_priority_t priorit
     {
         rac_config->scheduler_config.callback_post_radio_transaction = ranging_state_machine_subordinate;
     }
-    // Setup the radio parameters for ranging
-    app_radio_ranging_setup( NULL );
 }
 
 /*!
@@ -440,9 +439,8 @@ static void ranging_state_machine_subordinate( rp_status_t status )
     {
     case APP_RADIO_IDLE:
         // Setup radio and LEDs for idle state
-        //  app_radio_ranging_setup( NULL );
-        set_led( SMTC_PF_LED_TX, false );
-        set_led( SMTC_PF_LED_RX, true );
+        hal_led_set( HAL_LED_TX, false );
+        hal_led_set( HAL_LED_RX, true );
         break;
     case APP_RADIO_RANGING_CONFIG:
     {
@@ -457,7 +455,7 @@ static void ranging_state_machine_subordinate( rp_status_t status )
             rac_config->radio_params.lora.frequency_in_hz     = ranging_hopping_channels_array[0];
             rac_config->scheduler_config.scheduling           = SCHEDULE_TRANSACTION;
 
-            rac_config->scheduler_config.callback_pre_radio_transaction = &toggle_led;
+            rac_config->scheduler_config.callback_pre_radio_transaction = &hal_led_toggle_tx_rx;
             if( activate_multiple_data_rate == true )
             {
                 rac_config->radio_params.lora.sf =
@@ -521,8 +519,14 @@ static void ranging_state_machine_subordinate( rp_status_t status )
             else
             {
                 // If address does not match, restart RX to wait for the correct config
+                uint32_t received_address =
+                    ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[0] << 24 ) |
+                    ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[1] << 16 ) |
+                    ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[2] << 8 ) |
+                    ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[3] );
                 RANGING_LOG_WARN(
-                    "Subordinate Ranging config rx done -> received address does not match expected address\n" );
+                    "Subordinate Ranging config rx done -> received address 0x%08X does not match expected 0x%08X\n",
+                    received_address, ranging_settings.rng_address );
             }
 
             rac_config->scheduler_config.scheduling                     = ASAP_TRANSACTION;
@@ -572,8 +576,8 @@ static void ranging_state_machine_subordinate( rp_status_t status )
                 // If all channels are done, reset state and LEDs, restart exchange
                 RANGING_LOG_PRINTF( "\n" );
                 current_channel = 0;
-                set_led( SMTC_PF_LED_TX, false );
-                set_led( SMTC_PF_LED_RX, true );
+                hal_led_set( HAL_LED_TX, false );
+                hal_led_set( HAL_LED_RX, true );
                 start_ranging_exchange( 0, false );
                 break;
             }
@@ -586,7 +590,7 @@ static void ranging_state_machine_subordinate( rp_status_t status )
             rac_config->radio_params.lora.frequency_in_hz = ranging_hopping_channels_array[current_channel];
 
             rac_config->scheduler_config.scheduling                     = ASAP_TRANSACTION;
-            rac_config->scheduler_config.callback_pre_radio_transaction = &toggle_led;
+            rac_config->scheduler_config.callback_pre_radio_transaction = &hal_led_toggle_tx_rx;
             SMTC_SW_PLATFORM( smtc_rac_submit_radio_transaction( ranging_radio_access_id ) );
             break;
 
@@ -636,9 +640,8 @@ static void ranging_state_machine_manager( rp_status_t status )
     {
     case APP_RADIO_IDLE:
         // Setup radio and LEDs for idle state
-        // app_radio_ranging_setup( NULL );
-        set_led( SMTC_PF_LED_TX, true );
-        set_led( SMTC_PF_LED_RX, false );
+        hal_led_set( HAL_LED_TX, true );
+        hal_led_set( HAL_LED_RX, false );
         break;
     case APP_RADIO_RANGING_CONFIG:
     {
@@ -667,7 +670,7 @@ static void ranging_state_machine_manager( rp_status_t status )
             rac_config->radio_params.lora.frequency_in_hz     = ranging_hopping_channels_array[0];
             rac_config->scheduler_config.scheduling           = SCHEDULE_TRANSACTION;
 
-            rac_config->scheduler_config.callback_pre_radio_transaction = &toggle_led;
+            rac_config->scheduler_config.callback_pre_radio_transaction = &hal_led_toggle_tx_rx;
             if( activate_multiple_data_rate == true )
             {
                 rac_config->radio_params.lora.sf = multiple_data_rate_config & 0x0F;  // Extract SF from payload
@@ -757,8 +760,8 @@ static void ranging_state_machine_manager( rp_status_t status )
                 }
 
                 current_channel = 0;
-                set_led( SMTC_PF_LED_TX, true );
-                set_led( SMTC_PF_LED_RX, false );
+                hal_led_set( HAL_LED_TX, true );
+                hal_led_set( HAL_LED_RX, false );
                 int32_t temp_distance[RANGING_HOPPING_CHANNELS_MAX] = { 0 };
                 for( int i = 0; i < RANGING_HOPPING_CHANNELS_MAX; i++ )
                 {
@@ -798,7 +801,7 @@ static void ranging_state_machine_manager( rp_status_t status )
             rac_config->radio_params.lora.frequency_in_hz = ranging_hopping_channels_array[current_channel];
 
             rac_config->scheduler_config.scheduling                     = SCHEDULE_TRANSACTION;
-            rac_config->scheduler_config.callback_pre_radio_transaction = &toggle_led;
+            rac_config->scheduler_config.callback_pre_radio_transaction = &hal_led_toggle_tx_rx;
             SMTC_SW_PLATFORM( smtc_rac_submit_radio_transaction( ranging_radio_access_id ) );
             /**
              * Calls the smtc_rac_lora function and then prints the result.
@@ -924,8 +927,8 @@ void start_ranging_exchange( uint16_t delay_ms, bool is_manager )
         rac_config->scheduler_config.scheduling                     = ASAP_TRANSACTION;
         rac_config->scheduler_config.start_time_ms                  = smtc_modem_hal_get_time_in_ms( );
         rac_config->scheduler_config.callback_pre_radio_transaction = NULL;
-        set_led( SMTC_PF_LED_TX, false );
-        set_led( SMTC_PF_LED_RX, true );
+        hal_led_set( HAL_LED_TX, false );
+        hal_led_set( HAL_LED_RX, true );
     }
 
     SMTC_SW_PLATFORM( smtc_rac_submit_radio_transaction( ranging_radio_access_id ) );
@@ -943,13 +946,13 @@ void start_ranging_exchange( uint16_t delay_ms, bool is_manager )
  */
 static const uint32_t rttof_delay_indicator_table_below_600mhz[7][8] = {
     /* SF5,  SF6,   SF7,   SF8,   SF9,   SF10,  SF11,  SF12 */
-    { 19737, 19694, 19614, 19457, 19159, 18632, 19036, 19024 },  // BW125
-    { 17502, 17546, 17566, 17682, 17739, 18042, 19036, 19024 },  // BW203
-    { 20134, 20111, 20068, 19981, 19811, 19489, 20236, 20232 },  // BW250
-    { 17794, 17827, 17831, 17871, 17819, 17826, 20295, 20298 },  // BW406
-    { 20569, 20579, 20577, 20549, 20491, 20372, 20295, 20298 },  // BW500
-    { 18713, 18778, 18746, 18805, 18725, 18786, 20295, 20298 },  // BW812
-    { 21629, 21660, 21685, 21660, 21597, 21466, 20295, 20298 },  // BW1000
+    { 19693, 19649, 19558, 19377, 19012, 18293, 19036, 19024 },  // BW125
+    { 17364, 17467, 17489, 17592, 17662, 18055, 19036, 19024 },  // BW203
+    { 20166, 20150, 20099, 20002, 19807, 19424, 20236, 20232 },  // BW250
+    { 17751, 17782, 17729, 17782, 17752, 17836, 20295, 20298 },  // BW406
+    { 20573, 20591, 20584, 20553, 20488, 20356, 20295, 20298 },  // BW500
+    { 18624, 18705, 18705, 18703, 18690, 18764, 20295, 20298 },  // BW812
+    { 21614, 21658, 21681, 21672, 21607, 21473, 20295, 20298 },  // BW1000
 };
 
 /*!
@@ -957,13 +960,14 @@ static const uint32_t rttof_delay_indicator_table_below_600mhz[7][8] = {
  */
 static const uint32_t rttof_delay_indicator_table_from_600mhz_to_2ghz[7][8] = {
     /* SF5,  SF6,   SF7,   SF8,   SF9,   SF10,  SF11,  SF12 */
-    { 19747, 19707, 19628, 19480, 19166, 18589, 19036, 19024 },  // BW125
-    { 17498, 17502, 17515, 17606, 17722, 18024, 19036, 19024 },  // BW203
-    { 20150, 20133, 20102, 20033, 19847, 19537, 20236, 20232 },  // BW250
-    { 17768, 17791, 17868, 17997, 18123, 18456, 20295, 20298 },  // BW406
-    { 20599, 20590, 20567, 20512, 20295, 19961, 20295, 20298 },  // BW500
-    { 18681, 18738, 18763, 18874, 18737, 18824, 20295, 20298 },  // BW812
-    { 21700, 21705, 21783, 21834, 21689, 21571, 20295, 20298 },  // BW1000
+    { 19721, 19679, 19600, 19444, 19139, 18519, 19036, 19024 },  // BW125
+    { 17346, 17389, 17439, 17599, 17637, 17987, 19036, 19024 },  // BW203
+    { 20163, 20140, 20101, 20016, 19851, 19528, 20236, 20232 },  // BW250
+    { 17732, 17769, 17840, 17891, 18060, 18431, 20295, 20298 },  // BW406
+    { 20628, 20609, 20568, 20484, 20305, 19971, 20295, 20298 },  // BW500
+    { 18656, 18697, 18696, 18753, 18726, 18806, 20295, 20298 },  // BW812
+    { 21706, 21711, 21718, 21697, 21648, 21560, 20295, 20298 },  // BW1000
+
 };
 
 /*!
@@ -971,13 +975,13 @@ static const uint32_t rttof_delay_indicator_table_from_600mhz_to_2ghz[7][8] = {
  */
 static const uint32_t rttof_delay_indicator_table_above_2ghz[7][8] = {
     /* SF5,  SF6,   SF7,   SF8,   SF9,   SF10,  SF11,  SF12 */
-    { 19582, 19498, 19330, 19012, 18368, 17125, 19036, 19024 },  // BW125
-    { 17173, 17262, 17335, 17554, 17828, 18557, 19036, 19024 },  // BW203
-    { 19938, 19896, 19818, 19646, 19316, 18667, 20236, 20232 },  // BW250
-    { 17767, 17822, 17869, 17937, 18119, 18442, 20295, 20298 },  // BW406
-    { 20588, 20586, 20550, 20451, 20287, 19938, 20295, 20298 },  // BW500
-    { 18698, 18777, 18848, 18981, 19047, 19449, 20295, 20298 },  // BW812
-    { 21574, 21611, 21622, 20095, 21370, 21009, 20295, 20298 },  // BW1000
+    { 19546, 19462, 19285, 18945, 18261, 16907, 19036, 19024 },  // BW125
+    { 17184, 17230, 17289, 17541, 17858, 18627, 19036, 19024 },  // BW203
+    { 19939, 19905, 19813, 19635, 19276, 18585, 20236, 20232 },  // BW250
+    { 17727, 17762, 17822, 17915, 18008, 18366, 20295, 20298 },  // BW406
+    { 20526, 20546, 20499, 20409, 20211, 19839, 20295, 20298 },  // BW500
+    { 18562, 18632, 18716, 18792, 18971, 19344, 20295, 20298 },  // BW812
+    { 21498, 21575, 21570, 21500, 21307, 20939, 20295, 20298 },  // BW1000
 };
 
 /*!

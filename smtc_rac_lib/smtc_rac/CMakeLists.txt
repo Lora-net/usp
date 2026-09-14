@@ -7,6 +7,7 @@ set(SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/smtc_rac_lrfhss.c
     ${CMAKE_CURRENT_SOURCE_DIR}/smtc_rac_lbt.c
     ${CMAKE_CURRENT_SOURCE_DIR}/smtc_rac_flrc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/smtc_rac_flrc_burst.c
 )
 
 add_library(smtc_rac STATIC ${SOURCES})
@@ -14,7 +15,6 @@ add_library(smtc_rac STATIC ${SOURCES})
 string(TOUPPER ${RADIO_FAMILY} RADIO_FAMILY_UPPER)
 target_compile_definitions(smtc_rac PUBLIC
     ${RADIO_FAMILY_UPPER}
-    RP_MARGIN_DELAY=${RP_MARGIN_DELAY}
 )
 
 # Apply RAC library logging configuration to smtc_rac target

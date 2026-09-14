@@ -42,6 +42,7 @@
 
 #include "smtc_hal_spi.h"
 #include "stm32l4xx_hal.h"
+#include "stm32l4xx_hal_spi.h"
 #include "stm32l4xx_ll_spi.h"
 #include "smtc_hal_gpio.h"
 
@@ -73,12 +74,18 @@ typedef struct spi_s
         hal_gpio_pin_names_t miso;
         hal_gpio_pin_names_t sclk;
     } pins;
+    volatile bool tx_done;
+    volatile bool rx_done;
 } spi_t;
 
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
+
+static DMA_HandleTypeDef hdma_spi_rx;
+static DMA_HandleTypeDef hdma_spi_tx;
+
 static spi_t spi_periph[] = {
     [0] =
         {
@@ -90,9 +97,10 @@ static spi_t spi_periph[] = {
                     .miso = NC,
                     .sclk = NC,
                 },
+            .tx_done = false,
+            .rx_done = false,
         },
-}
-;
+};
 
 /*
  * -----------------------------------------------------------------------------
@@ -117,7 +125,7 @@ void hal_spi_init( const uint32_t id, const hal_gpio_pin_names_t mosi, const hal
     spi_periph[local_id].handle.Init.CLKPolarity       = SPI_POLARITY_LOW;
     spi_periph[local_id].handle.Init.CLKPhase          = SPI_PHASE_1EDGE;
     spi_periph[local_id].handle.Init.NSS               = SPI_NSS_SOFT;
-    spi_periph[local_id].handle.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+    spi_periph[local_id].handle.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;  // SPI_BAUDRATEPRESCALER_4;
     spi_periph[local_id].handle.Init.FirstBit          = SPI_FIRSTBIT_MSB;
     spi_periph[local_id].handle.Init.TIMode            = SPI_TIMODE_DISABLE;
     spi_periph[local_id].handle.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
@@ -131,6 +139,8 @@ void hal_spi_init( const uint32_t id, const hal_gpio_pin_names_t mosi, const hal
     {
         mcu_panic( );
     }
+
+    // TODO not sure usefull
     __HAL_SPI_ENABLE( &spi_periph[local_id].handle );
 }
 
@@ -158,10 +168,108 @@ uint16_t hal_spi_in_out( const uint32_t id, const uint16_t out_data )
     return LL_SPI_ReceiveData8( spi_periph[local_id].interface );
 }
 
+void hal_spi_in_dma( const uint32_t id, uint8_t* in_data, const uint16_t length )
+{
+    assert_param( ( id > 0 ) && ( ( id - 1 ) < sizeof( spi_periph ) ) );
+    uint32_t local_id = id - 1;
+
+    spi_periph[0].rx_done    = false;
+    HAL_StatusTypeDef spi_rc = HAL_SPI_Receive_DMA( &spi_periph[local_id].handle, in_data, length );
+    if( spi_rc != HAL_OK )
+    {
+        mcu_panic( "SPI RX DMA 0x%x", spi_rc );
+    }
+    while( spi_periph[0].rx_done == false )
+    {
+    };
+}
+
+void hal_spi_out_dma( const uint32_t id, uint8_t* out_data, const uint16_t length )
+{
+    assert_param( ( id > 0 ) && ( ( id - 1 ) < sizeof( spi_periph ) ) );
+    uint32_t local_id        = id - 1;
+    spi_periph[0].tx_done    = false;
+    HAL_StatusTypeDef spi_rc = HAL_SPI_Transmit_DMA( &spi_periph[local_id].handle, out_data, length );
+    if( spi_rc != HAL_OK )
+    {
+        mcu_panic( "SPI TX DMA 0x%x", spi_rc );
+    }
+    while( spi_periph[0].tx_done == false )
+    {
+    };
+}
+
+void hal_spi_in_out_v2( const uint32_t id, uint8_t* out_data, uint8_t* in_data, const uint16_t length )
+{
+    assert_param( ( id > 0 ) && ( ( id - 1 ) < sizeof( spi_periph ) ) );
+    uint32_t local_id = id - 1;
+
+    if( ( out_data != NULL ) && ( in_data != NULL ) )
+    {
+        if( HAL_SPI_TransmitReceive( &spi_periph[local_id].handle, out_data, in_data, length, 0xFFFFFF ) != HAL_OK )
+        {
+            mcu_panic( "SPI TXRX error" );
+        }
+    }
+    else if( in_data != NULL )
+    {
+        if( HAL_SPI_Receive( &spi_periph[local_id].handle, in_data, length, 0xFFFFFF ) != HAL_OK )
+        {
+            mcu_panic( "SPI RX error" );
+        }
+    }
+    else if( out_data != NULL )
+    {
+        if( HAL_SPI_Transmit( &spi_periph[local_id].handle, out_data, length, 0xFFFFFF ) != HAL_OK )
+        {
+            mcu_panic( "SPI TX error" );
+        }
+    }
+}
+
 void HAL_SPI_MspInit( SPI_HandleTypeDef* spiHandle )
 {
     if( spiHandle->Instance == spi_periph[0].interface )
     {
+        __HAL_RCC_DMA1_CLK_ENABLE( );
+
+        hdma_spi_rx.Instance                 = DMA1_Channel2;
+        hdma_spi_rx.Init.Request             = DMA_REQUEST_1;
+        hdma_spi_rx.Init.Direction           = DMA_PERIPH_TO_MEMORY;
+        hdma_spi_rx.Init.PeriphInc           = DMA_PINC_DISABLE;
+        hdma_spi_rx.Init.MemInc              = DMA_MINC_ENABLE;
+        hdma_spi_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+        hdma_spi_rx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+        hdma_spi_rx.Init.Mode                = DMA_NORMAL;
+        hdma_spi_rx.Init.Priority            = DMA_PRIORITY_LOW;
+
+        if( HAL_DMA_Init( &hdma_spi_rx ) != HAL_OK )
+        {
+            mcu_panic( );
+        }
+        __HAL_LINKDMA( spiHandle, hdmarx, hdma_spi_rx );
+
+        hdma_spi_tx.Instance                 = DMA1_Channel3;
+        hdma_spi_tx.Init.Request             = DMA_REQUEST_1;
+        hdma_spi_tx.Init.Direction           = DMA_MEMORY_TO_PERIPH;
+        hdma_spi_tx.Init.PeriphInc           = DMA_PINC_DISABLE;
+        hdma_spi_tx.Init.MemInc              = DMA_MINC_ENABLE;
+        hdma_spi_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+        hdma_spi_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+        hdma_spi_tx.Init.Mode                = DMA_NORMAL;
+        hdma_spi_tx.Init.Priority            = DMA_PRIORITY_LOW;
+
+        if( HAL_DMA_Init( &hdma_spi_tx ) != HAL_OK )
+        {
+            mcu_panic( );
+        }
+        __HAL_LINKDMA( spiHandle, hdmatx, hdma_spi_tx );
+
+        HAL_NVIC_SetPriority( DMA1_Channel2_IRQn, 0, 0 );
+        HAL_NVIC_EnableIRQ( DMA1_Channel2_IRQn );
+        HAL_NVIC_SetPriority( DMA1_Channel3_IRQn, 0, 0 );
+        HAL_NVIC_EnableIRQ( DMA1_Channel3_IRQn );
+
         GPIO_InitTypeDef gpio = {
             .Mode      = GPIO_MODE_AF_PP,
             .Pull      = GPIO_NOPULL,
@@ -194,6 +302,32 @@ void HAL_SPI_MspInit( SPI_HandleTypeDef* spiHandle )
     }
 }
 
+void DMA1_Channel2_IRQHandler( void )
+{
+    HAL_DMA_IRQHandler( &hdma_spi_rx );
+}
+
+void DMA1_Channel3_IRQHandler( void )
+{
+    HAL_DMA_IRQHandler( &hdma_spi_tx );
+}
+
+void HAL_SPI_RxCpltCallback( SPI_HandleTypeDef* hspi )
+{
+    if( hspi->Instance == spi_periph[0].interface )
+    {
+        spi_periph[0].rx_done = true;
+    }
+}
+
+void HAL_SPI_TxCpltCallback( SPI_HandleTypeDef* hspi )
+{
+    if( hspi->Instance == spi_periph[0].interface )
+    {
+        spi_periph[0].tx_done = true;
+    }
+}
+
 void HAL_SPI_MspDeInit( SPI_HandleTypeDef* spiHandle )
 {
     if( spiHandle->Instance == spi_periph[0].interface )
@@ -214,6 +348,7 @@ void HAL_SPI_MspDeInit( SPI_HandleTypeDef* spiHandle )
         // put mosi and sclk in input pull down mode
         gpio.Mode = GPIO_MODE_INPUT;
         gpio.Pull = GPIO_PULLDOWN;
+
         gpio.Pin  = ( 1 << ( spi_periph[0].pins.mosi & 0x0F ) );
         gpio_port = ( GPIO_TypeDef* ) ( AHB2PERIPH_BASE + ( ( spi_periph[0].pins.mosi & 0xF0 ) << 6 ) );
         HAL_GPIO_Init( gpio_port, &gpio );
@@ -221,6 +356,12 @@ void HAL_SPI_MspDeInit( SPI_HandleTypeDef* spiHandle )
         gpio.Pin  = ( 1 << ( spi_periph[0].pins.sclk & 0x0F ) );
         gpio_port = ( GPIO_TypeDef* ) ( AHB2PERIPH_BASE + ( ( spi_periph[0].pins.sclk & 0xF0 ) << 6 ) );
         HAL_GPIO_Init( gpio_port, &gpio );
+
+        HAL_DMA_DeInit( &hdma_spi_rx );
+        HAL_DMA_DeInit( &hdma_spi_tx );
+        __HAL_RCC_DMA1_CLK_DISABLE( );
+        HAL_NVIC_DisableIRQ( DMA1_Channel2_IRQn );
+        HAL_NVIC_DisableIRQ( DMA1_Channel3_IRQn );
     }
     else
     {

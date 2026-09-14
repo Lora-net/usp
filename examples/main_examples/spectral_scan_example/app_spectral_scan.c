@@ -106,24 +106,10 @@
 #define RSSI_HISTOGRAM_BINS ( ( RSSI_TOP_LEVEL_DBM - RSSI_BOTTOM_LEVEL_DBM ) / RSSI_SCALE + 1 )
 #define FREQ_END_HZ ( FREQ_START_HZ + ( NB_CHAN - 1 ) * WIDTH_CHAN_HZ )
 
-#ifndef LORA_BANDWIDTH
-#define LORA_BANDWIDTH RAL_LORA_BW_125_KHZ
-#endif
-
-#ifndef LORA_SPREADING_FACTOR
-#define LORA_SPREADING_FACTOR 7
-#endif
-
-#ifndef LORA_CODING_RATE
-#define LORA_CODING_RATE 1  // CR 4/5
-#endif
-
 /**
  * @brief Operation delays
  */
 #define RSSI_MEASUREMENT_DELAY_MS 100
-#define CHANNEL_CHANGE_DELAY_MS 50
-#define MAX_RADIO_RETRIES 3
 #define LBT_BW_HZ_DEFAULT ( 200000 )
 #define LAP_OF_TIME_TO_GET_A_RSSI_VALID 8
 /*
@@ -151,7 +137,7 @@ typedef struct
     uint16_t total_samples;                  /*!< Total number of samples */
     int16_t  min_rssi_dbm;                   /*!< Minimum RSSI measured */
     int16_t  max_rssi_dbm;                   /*!< Maximum RSSI measured */
-    int16_t  avg_rssi_dbm;                   /*!< Average RSSI measured */
+    double   avg_rssi_dbm_double;            /*!< Average RSSI measured in double type*/
 } spectral_scan_channel_stats_t;
 
 /**
@@ -269,6 +255,12 @@ static void spectral_scan_display_ascii_histogram( const spectral_scan_channel_s
  * @param [in] ctx Pointer to spectral scan context with results
  */
 static void spectral_scan_display_summary( const spectral_scan_context_t* ctx );
+
+/**
+ * @brief Return int16 format from double rssi
+ * @param [in] rssi It is RSSI in type double
+ */
+static int16_t compute_integer_rssi( double rssi );
 
 /*
  * -----------------------------------------------------------------------------
@@ -402,6 +394,12 @@ static void spectral_scan_start_channel_measurement( void )
     spectral_scan_ctx.current_scan_count = 0;
     spectral_scan_ctx.scan_active        = true;
     current_state                        = SPECTRAL_SCAN_MEASURING;
+
+    // Reset total_samples to calculate the average
+    for( int i = 0; i < NB_CHAN; i++ )
+    {
+        spectral_scan_ctx.channel_stats[i].total_samples = 0;
+    }
 
     SMTC_HAL_TRACE_INFO(
         "Starting scan on channel %" PRIu32 " (%lu.%03lu MHz)\n", spectral_scan_ctx.current_channel,
@@ -561,20 +559,20 @@ static void spectral_scan_post_callback( rp_status_t status )
             // Calculate running average
             if( stats->total_samples == 1 )
             {
-                stats->avg_rssi_dbm = rssi_dbm;
+                stats->avg_rssi_dbm_double = rssi_dbm;
             }
             else
             {
                 // Use double for precise running average to avoid floor/rounding errors
-                double avg = ( ( double ) stats->avg_rssi_dbm * ( stats->total_samples - 1 ) + ( double ) rssi_dbm ) /
-                             ( double ) stats->total_samples;
-                stats->avg_rssi_dbm = ( int16_t ) ( avg + ( ( avg < 0 ) ? -0.5 : 0.5 ) );  // round to nearest int
+                stats->avg_rssi_dbm_double =
+                    ( ( double ) stats->avg_rssi_dbm_double * ( stats->total_samples - 1 ) + ( double ) rssi_dbm ) /
+                    ( double ) stats->total_samples;
             }
 
             SMTC_HAL_TRACE_INFO(
                 "RX "
                 "Ch%" PRIu32 ": RSSI %d dBm [bin %" PRIu32 "] Avg: %d dBm\n",
-                spectral_scan_ctx.current_channel, rssi_dbm, bin, stats->avg_rssi_dbm );
+                spectral_scan_ctx.current_channel, rssi_dbm, bin, compute_integer_rssi( stats->avg_rssi_dbm_double ) );
         }
 
         // Increment scan count for this channel
@@ -675,7 +673,8 @@ static void spectral_scan_display_results( const spectral_scan_context_t* ctx )
         SMTC_HAL_TRACE_INFO( "%lu.%03lu MHz: %s\n", ( unsigned long ) ( stats->frequency_hz / 1000000 ),
                              ( unsigned long ) ( ( stats->frequency_hz % 1000000 ) / 1000 ), histogram_str );
         SMTC_HAL_TRACE_INFO( "  Stats: %u samples, Min: %d dBm, Max: %d dBm, Avg: %d dBm\n", stats->total_samples,
-                             stats->min_rssi_dbm, stats->max_rssi_dbm, stats->avg_rssi_dbm );
+                             stats->min_rssi_dbm, stats->max_rssi_dbm,
+                             compute_integer_rssi( stats->avg_rssi_dbm_double ) );
 
         // Display ASCII histogram for detailed view
         spectral_scan_display_ascii_histogram( stats );
@@ -828,7 +827,7 @@ static void spectral_scan_display_summary( const spectral_scan_context_t* ctx )
             continue;
         }
 
-        int16_t avg_rssi = stats->avg_rssi_dbm;
+        int16_t avg_rssi = compute_integer_rssi( stats->avg_rssi_dbm_double );
 
         // Clamp avg_rssi within the range [rssi_min, rssi_max]
         if( avg_rssi < rssi_min )
@@ -865,7 +864,7 @@ static void spectral_scan_display_summary( const spectral_scan_context_t* ctx )
         }
 
         SMTC_HAL_TRACE_INFO( "%4lu.%1lu    %4d dBm  [%s]  \n", ( unsigned long ) mhz, ( unsigned long ) dec,
-                             ( int ) stats->avg_rssi_dbm, bar_buffer );
+                             ( int ) compute_integer_rssi( stats->avg_rssi_dbm_double ), bar_buffer );
     }
 
     // Display legend
@@ -877,4 +876,9 @@ static void spectral_scan_display_summary( const spectral_scan_context_t* ctx )
     SMTC_HAL_TRACE_INFO(
         "STATS "
         "=== END SUMMARY ===\n" );
+}
+
+static int16_t compute_integer_rssi( double rssi )
+{
+    return ( int16_t ) ( rssi + ( ( rssi < 0 ) ? -0.5 : 0.5 ) );  // round to nearest int
 }

@@ -60,21 +60,6 @@
 #define LR20XX_RTTOF_RESULT_SIZE_IN_BYTE ( 4 )
 #define LR20XX_RTTOF_STATS_SIZE_IN_BYTE ( 10 )
 
-#ifndef LR20XX_WORKAROUND_DISABLE_RTTOF_RSSI_COMPUTATION_FIX
-#define LR20XX_WORKAROUND_RTTOF_RSSI_COMPUTATION( cont, rssi1_raw, rssi2_raw, rssi1_fixed, rssi2_fixed ) \
-    lr20xx_rttof_fix_and_convert_rssi( cont, rssi1_raw, rssi2_raw, rssi1_fixed, rssi2_fixed )
-#else
-#define LR20XX_WORKAROUND_RTTOF_RSSI_COMPUTATION( cont, rssi1_raw, rssi2_raw, rssi1_fixed, rssi2_fixed ) \
-    lr20xx_rttof_convert_rssi( rssi1_raw, rssi2_raw, rssi1_fixed, rssi2_fixed )
-#endif  // LR20XX_WORKAROUND_DISABLE_RTTOF_RSSI_COMPUTATION
-
-#ifndef LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_RTTOF_EXTENDED_STUCK
-#define LR20XX_WORKAROUND_RTTOF_TTOF_EXTENDED_STUCK_CONDITIONALLY_APPLY( context, rttof_mode ) \
-    lr20xx_rttof_apply_rttof_stuck_workaround( context, rttof_mode )
-#else
-#define LR20XX_WORKAROUND_RTTOF_TTOF_EXTENDED_STUCK_CONDITIONALLY_APPLY( context, rttof_mode ) LR20XX_STATUS_OK
-#endif  // LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_RTTOF_EXTENDED_STUCK
-
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE CONSTANTS -------------------------------------------------------
@@ -110,15 +95,6 @@ enum
  */
 
 static void lr20xx_rttof_convert_rssi( uint8_t rssi1_raw, uint8_t rssi2_raw, int8_t* rssi1_val, int8_t* rssi2_val );
-
-#ifndef LR20XX_WORKAROUND_DISABLE_RTTOF_RSSI_COMPUTATION_FIX
-static lr20xx_status_t lr20xx_rttof_fix_and_convert_rssi( const void* context, uint8_t rssi1_raw, uint8_t rssi2_raw,
-                                                          int8_t* rssi1_val, int8_t* rssi2_val );
-#endif  // LR20XX_WORKAROUND_DISABLE_RTTOF_RSSI_COMPUTATION_FIX
-
-#ifndef LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_RTTOF_EXTENDED_STUCK
-static lr20xx_status_t lr20xx_rttof_apply_rttof_stuck_workaround( const void* context, lr20xx_rttof_mode_t rttof_mode );
-#endif  // LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_RTTOF_EXTENDED_STUCK
 
 /*
  * -----------------------------------------------------------------------------
@@ -173,7 +149,7 @@ lr20xx_status_t lr20xx_rttof_get_results( const void* context, lr20xx_rttof_resu
     {
         result->val = ( int32_t ) ( ( ( uint32_t ) data[0] << 16 ) + ( ( uint32_t ) data[1] << 8 ) +
                                     ( ( uint32_t ) data[2] << 0 ) );
-        LR20XX_WORKAROUND_RTTOF_RSSI_COMPUTATION( context, data[3], 0, &result->rssi, 0 );
+        lr20xx_rttof_convert_rssi( data[3], 0, &result->rssi, 0 );
     }
 
     return status;
@@ -198,7 +174,7 @@ lr20xx_status_t lr20xx_rttof_get_results_extended( const void* context, lr20xx_r
                                          ( ( uint32_t ) data[2] << 0 ) );
         result->res2.val = ( int32_t ) ( ( ( uint32_t ) data[4] << 16 ) + ( ( uint32_t ) data[5] << 8 ) +
                                          ( ( uint32_t ) data[6] << 0 ) );
-        LR20XX_WORKAROUND_RTTOF_RSSI_COMPUTATION( context, data[3], data[7], &result->res1.rssi, &result->res2.rssi );
+        lr20xx_rttof_convert_rssi( data[3], data[7], &result->res1.rssi, &result->res2.rssi );
     }
 
     return status;
@@ -248,17 +224,7 @@ lr20xx_status_t lr20xx_rttof_set_params( const void* context, const lr20xx_rttof
         ( uint8_t ) ( ( ( uint8_t ) params->mode << 7 ) | ( ( uint8_t ) params->spy_mode << 6 ) | params->nb_symbol ),
     };
 
-    const lr20xx_status_t status =
-        ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_RTTOF_SET_PARAMETERS_CMD_LENGTH, NULL, 0 );
-
-    if( status == LR20XX_STATUS_OK )
-    {
-        return LR20XX_WORKAROUND_RTTOF_TTOF_EXTENDED_STUCK_CONDITIONALLY_APPLY( context, params->mode );
-    }
-    else
-    {
-        return status;
-    }
+    return ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_RTTOF_SET_PARAMETERS_CMD_LENGTH, NULL, 0 );
 }
 
 lr20xx_status_t lr20xx_rttof_get_stats( const void* context, lr20xx_rttof_stats_t* stats )
@@ -322,22 +288,6 @@ int32_t lr20xx_rttof_distance_raw_to_meter( lr20xx_radio_lora_bw_t rttof_bw, con
  * --- PRIVATE FUNCTIONS DEFINITION --------------------------------------------
  */
 
-#ifndef LR20XX_WORKAROUND_DISABLE_RTTOF_RSSI_COMPUTATION_FIX
-lr20xx_status_t lr20xx_rttof_fix_and_convert_rssi( const void* context, uint8_t rssi1_raw, uint8_t rssi2_raw,
-                                                   int8_t* rssi1_val, int8_t* rssi2_val )
-{
-    uint8_t               rssi1_raw_fixed   = 0;
-    uint8_t               rssi2_raw_fixed   = 0;
-    const lr20xx_status_t workaround_status = lr20xx_workarounds_rttof_rssi_computation(
-        context, rssi1_raw, rssi2_raw, &rssi1_raw_fixed, ( rssi2_val == 0 ) ? 0 : &rssi2_raw_fixed );
-    if( workaround_status == LR20XX_STATUS_OK )
-    {
-        lr20xx_rttof_convert_rssi( rssi1_raw_fixed, rssi2_raw_fixed, rssi1_val, rssi2_val );
-    }
-    return workaround_status;
-}
-#endif  // LR20XX_WORKAROUND_DISABLE_RTTOF_RSSI_COMPUTATION_FIX
-
 void lr20xx_rttof_convert_rssi( uint8_t rssi1_raw, uint8_t rssi2_raw, int8_t* rssi1_val, int8_t* rssi2_val )
 {
     ( *rssi1_val ) = ( int8_t ) ( -( ( int8_t ) ( rssi1_raw >> 1 ) ) );
@@ -346,27 +296,5 @@ void lr20xx_rttof_convert_rssi( uint8_t rssi1_raw, uint8_t rssi2_raw, int8_t* rs
         ( *rssi2_val ) = ( int8_t ) ( -( ( int8_t ) ( rssi2_raw >> 1 ) ) );
     }
 }
-
-#ifndef LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_RTTOF_EXTENDED_STUCK
-lr20xx_status_t lr20xx_rttof_apply_rttof_stuck_workaround( const void* context, lr20xx_rttof_mode_t rttof_mode )
-{
-    switch( rttof_mode )
-    {
-    case LR20XX_RTTOF_MODE_NORMAL:
-    {
-        return lr20xx_workarounds_rttof_extended_stuck_second_request_disable( context );
-    }
-    case LR20XX_RTTOF_MODE_EXTENDED:
-    {
-        return lr20xx_workarounds_rttof_extended_stuck_second_request_enable( context );
-    }
-    default:
-    {
-        // Unknown rttof_mode
-        return LR20XX_STATUS_ERROR;
-    }
-    }
-}
-#endif  // LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_RTTOF_EXTENDED_STUCK
 
 /* --- EOF ------------------------------------------------------------------ */

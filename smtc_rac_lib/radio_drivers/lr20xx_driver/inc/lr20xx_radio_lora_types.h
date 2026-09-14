@@ -267,6 +267,7 @@ typedef struct lr20xx_radio_lora_rx_statistics_s
     uint16_t n_crc_errors;             //!< Number of received packets with CRC error
     uint16_t n_header_errors;          //!< Number of received packets with header error (Rx configured in
                                        //!< LR20XX_RADIO_LORA_PKT_EXPLICIT and header CRC check failed)
+    uint16_t n_header_valid;           //!< Number of detected header valid
     uint16_t n_false_synchronisation;  //!< Number of false synchronisation (preamble detected but syncword not
                                        //!< detected, probably preamble detected on noise)
 } lr20xx_radio_lora_rx_statistics_t;
@@ -288,6 +289,7 @@ typedef struct lr20xx_radio_lora_packet_status_s
                                  //!< Equivalent to rssi_pkt_in_dbm if snr_pkt_raw is positive, to rssi_pkt_in_dbm
                                  //!< + (snr_pkt_raw/4) if snr_pkt_raw is negative
     uint8_t rssi_signal_pkt_half_dbm_count;  //!< Count of 0.5 dBm to subtract to rssi_signal_pkt_in_dbm value in dBm
+    int32_t freq_offset_hz;                  //!< Frequency offset of the last packet received in Hz
 } lr20xx_radio_lora_packet_status_t;
 
 /**

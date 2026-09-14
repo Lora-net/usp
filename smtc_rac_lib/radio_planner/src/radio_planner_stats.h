@@ -91,6 +91,7 @@ typedef struct rp_stats_s
     uint32_t rx_timestamp;
     uint32_t none_timestamp;
     uint32_t task_hook_aborted_nb[RP_NB_HOOKS];
+    uint32_t end_of_task_time_ms[RP_NB_HOOKS];
     uint32_t rp_error;
 } rp_stats_t;
 

@@ -104,4 +104,19 @@ smtc_rac_return_code_t smtc_rac_lrfhss( uint8_t radio_access_id );
  */
 smtc_rac_return_code_t smtc_rac_flrc( uint8_t radio_access_id );
 
+/*!
+ * \brief Enqueue a FLRC burst task for execution by the radio planner.
+ *
+ * This function configures and schedules a FLRC burst radio task using the context
+ * previously configured via smtc_rac_get_context(). The FLRC parameters
+ * should be configured in the context's radio_params.flrc field.
+ * Note: FLRC burst is a multiple packet transmission task.
+
+ * \param [in] radio_access_id The radio access ID obtained from
+ * smtc_rac_open_radio.
+ *
+ * \return Return code indicating success or error.
+ */
+smtc_rac_return_code_t smtc_rac_flrc_burst( uint8_t radio_access_id );
+
 #endif

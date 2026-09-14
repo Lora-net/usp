@@ -1,11 +1,11 @@
 /**
- * @file      ral_lr20xx_bsp.c
+ * @file      lr20xx_hal.c
  *
  * @brief     HAL implementation for LR20xx radio chip.
  *
  *
  * The Clear BSD License
- * Copyright Semtech Corporation 2021. All rights reserved.
+ * Copyright Semtech Corporation 2025. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the disclaimer
@@ -39,6 +39,8 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 #include "lr20xx_hal.h"
 #include "smtc_hal_gpio.h"
 #include "smtc_hal_spi.h"
@@ -108,8 +110,8 @@ lr20xx_hal_status_t lr20xx_hal_wakeup( const void* radio )
 {
     // Busy is HIGH in sleep mode, wake-up the device with a small glitch on NSS
     hal_gpio_set_value( RADIO_NSS, 0 );
-    // wait for 1ms
-    hal_mcu_wait_us( 1000 );
+    // wait for 100us
+    hal_mcu_wait_us( 100 );
     hal_gpio_set_value( RADIO_NSS, 1 );
     radio_mode = RADIO_AWAKE;
     return LR20XX_HAL_STATUS_OK;
@@ -118,22 +120,38 @@ lr20xx_hal_status_t lr20xx_hal_wakeup( const void* radio )
 lr20xx_hal_status_t lr20xx_hal_read( const void* radio, const uint8_t* cbuffer, const uint16_t cbuffer_length,
                                      uint8_t* rbuffer, const uint16_t rbuffer_length )
 {
-    uint8_t dummy_bytes[2] = { 0x00, 0x00 };
+    // uint8_t dummy_bytes[2] = { 0x00, 0x00 };
 
     lr20xx_hal_check_device_ready( );
 
     // Put NSS low to start spi transaction
     hal_gpio_set_value( RADIO_NSS, 0 );
+    // Send command buffer
+#if OPTIMIZED_SPI
+    hal_spi_in_out_v2( RADIO_SPI_ID, ( uint8_t* ) cbuffer, NULL, cbuffer_length );
+#else
     for( uint16_t i = 0; i < cbuffer_length; i++ )
     {
         hal_spi_in_out( RADIO_SPI_ID, cbuffer[i] );
     }
+#endif
+    // Put NSS high as the spi transaction is finished
     hal_gpio_set_value( RADIO_NSS, 1 );
 
     if( rbuffer_length > 0 )
     {
         lr20xx_hal_wait_on_busy( );
         hal_gpio_set_value( RADIO_NSS, 0 );
+
+#if OPTIMIZED_SPI
+        uint8_t spi_read_buff_tmp[520] = { 0 };
+        hal_spi_in_out_v2( RADIO_SPI_ID, NULL, spi_read_buff_tmp,
+                           rbuffer_length + 2 );  // +2 for dummy bytes stat1 and stat2
+
+        // discard two dummy bytes stat1 and stat2
+        memcpy( rbuffer, &spi_read_buff_tmp[2], rbuffer_length );
+#else
+        uint8_t dummy_bytes[2] = { 0x00, 0x00 };
         // Send dummy bytes
         for( uint16_t i = 0; i < sizeof( dummy_bytes ); i++ )
         {
@@ -144,6 +162,8 @@ lr20xx_hal_status_t lr20xx_hal_read( const void* radio, const uint8_t* cbuffer, 
         {
             rbuffer[i] = hal_spi_in_out( RADIO_SPI_ID, 0 );
         }
+#endif
+
         // Put NSS high as the spi transaction is finished
         hal_gpio_set_value( RADIO_NSS, 1 );
     }
@@ -159,6 +179,14 @@ lr20xx_hal_status_t lr20xx_hal_write( const void* radio, const uint8_t* cbuffer,
     // Put NSS low to start spi transaction
     hal_gpio_set_value( RADIO_NSS, 0 );
 
+#if OPTIMIZED_SPI
+    uint8_t spi_write_buff_tmp[520] = { 0 };
+    memcpy( spi_write_buff_tmp, cbuffer, cbuffer_length );
+    memcpy( spi_write_buff_tmp + cbuffer_length, cdata, cdata_length );
+
+    // Send command + data
+    hal_spi_in_out_v2( RADIO_SPI_ID, ( uint8_t* ) spi_write_buff_tmp, NULL, cbuffer_length + cdata_length );
+#else
     // Send command
     for( uint16_t i = 0; i < cbuffer_length; i++ )
     {
@@ -169,6 +197,7 @@ lr20xx_hal_status_t lr20xx_hal_write( const void* radio, const uint8_t* cbuffer,
     {
         hal_spi_in_out( RADIO_SPI_ID, cdata[i] );
     }
+#endif
 
     // Put NSS high as the spi transaction is finished
     hal_gpio_set_value( RADIO_NSS, 1 );
@@ -192,10 +221,16 @@ lr20xx_hal_status_t lr20xx_hal_direct_read( const void* radio, uint8_t* data, co
     // Put NSS low to start spi transaction
     hal_gpio_set_value( RADIO_NSS, 0 );
 
+#if OPTIMIZED_SPI
+    memset( data, 0, data_length );
+    // Read data buffer
+    hal_spi_in_out_v2( RADIO_SPI_ID, NULL, data, data_length );
+#else
     for( uint16_t i = 0; i < data_length; i++ )
     {
         data[i] = hal_spi_in_out( RADIO_SPI_ID, 0 );
     }
+#endif
 
     // Put NSS high as the spi transaction is finished
     hal_gpio_set_value( RADIO_NSS, 1 );
@@ -212,6 +247,17 @@ lr20xx_hal_status_t lr20xx_hal_direct_read_fifo( const void* radio, const uint8_
     // Put NSS low to start spi transaction
     hal_gpio_set_value( RADIO_NSS, 0 );
 
+#if OPTIMIZED_SPI
+    // Send command
+    hal_spi_in_out_v2( RADIO_SPI_ID, ( uint8_t* ) command, NULL, command_length );
+
+    // Read data
+    if( data_length > 0 )
+    {
+        memset( data, 0, data_length );
+        hal_spi_in_dma( RADIO_SPI_ID, data, data_length );
+    }
+#else
     // Send command
     for( uint16_t i = 0; i < command_length; i++ )
     {
@@ -223,6 +269,7 @@ lr20xx_hal_status_t lr20xx_hal_direct_read_fifo( const void* radio, const uint8_
     {
         data[i] = hal_spi_in_out( RADIO_SPI_ID, 0 );
     }
+#endif
 
     // Put NSS high as the spi transaction is finished
     hal_gpio_set_value( RADIO_NSS, 1 );
@@ -252,8 +299,8 @@ static void lr20xx_hal_check_device_ready( void )
     {
         // Busy is HIGH in sleep mode, wake-up the device with a small glitch on NSS
         hal_gpio_set_value( RADIO_NSS, 0 );
-        // wait for 1ms
-        hal_mcu_wait_us( 1000 );
+        // wait for 100us
+        hal_mcu_wait_us( 100 );
         hal_gpio_set_value( RADIO_NSS, 1 );
         lr20xx_hal_wait_on_busy( );
         radio_mode = RADIO_AWAKE;

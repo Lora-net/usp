@@ -29,7 +29,7 @@ if(${RADIO_FAMILY} STREQUAL sx128x)
     endif()
 endif()
 
-# Only sx128x, lr1120, lr1121, lr2021 support 2.4GHz
+# Only sx128x, lr1120, lr1121, lr2021, lr2022 support 2.4GHz
 set(RADIOS_SUPPORT_2G4 sx1280 sx1281 lr1120 lr1121 lr2021 lr2022)
 if(NOT ${LBM_RADIO} IN_LIST RADIOS_SUPPORT_2G4)
     list(REMOVE_ITEM LBM_REGIONS WW_2G4)

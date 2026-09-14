@@ -179,8 +179,9 @@ void ral_lr11xx_bsp_get_lfclk_cfg_in_sleep( const void* context, bool* lfclk_is_
  * @return ral_status_t
  */
 ral_status_t ral_lr11xx_bsp_get_instantaneous_tx_power_consumption( const void* context,
-    const ral_lr11xx_bsp_tx_cfg_output_params_t* tx_cfg, lr11xx_system_reg_mode_t radio_reg_mode,
-    uint32_t* pwr_consumption_in_ua );
+                                                                    const ral_lr11xx_bsp_tx_cfg_output_params_t* tx_cfg,
+                                                                    lr11xx_system_reg_mode_t radio_reg_mode,
+                                                                    uint32_t*                pwr_consumption_in_ua );
 
 /**
  * @brief Get the instantaneous power consumption for the given GFSK Rx configuration
@@ -191,8 +192,10 @@ ral_status_t ral_lr11xx_bsp_get_instantaneous_tx_power_consumption( const void* 
  * @param [out] pwr_consumption_in_ua The corresponding instantaneous power consumption
  * @return ral_status_t
  */
-ral_status_t ral_lr11xx_bsp_get_instantaneous_gfsk_rx_power_consumption( const void* context,
-    lr11xx_system_reg_mode_t radio_reg_mode, bool rx_boosted, uint32_t* pwr_consumption_in_ua );
+ral_status_t ral_lr11xx_bsp_get_instantaneous_gfsk_rx_power_consumption( const void*              context,
+                                                                         lr11xx_system_reg_mode_t radio_reg_mode,
+                                                                         bool                     rx_boosted,
+                                                                         uint32_t* pwr_consumption_in_ua );
 
 /**
  * @brief Get the instantaneous power consumption for the given LoRa Rx configuration
@@ -203,8 +206,10 @@ ral_status_t ral_lr11xx_bsp_get_instantaneous_gfsk_rx_power_consumption( const v
  * @param pwr_consumption_in_ua The corresponding instantaneous power consumption
  * @return ral_status_t
  */
-ral_status_t ral_lr11xx_bsp_get_instantaneous_lora_rx_power_consumption( const void* context,
-    lr11xx_system_reg_mode_t radio_reg_mode, bool rx_boosted, uint32_t* pwr_consumption_in_ua );
+ral_status_t ral_lr11xx_bsp_get_instantaneous_lora_rx_power_consumption( const void*              context,
+                                                                         lr11xx_system_reg_mode_t radio_reg_mode,
+                                                                         bool                     rx_boosted,
+                                                                         uint32_t* pwr_consumption_in_ua );
 #ifdef __cplusplus
 }
 #endif

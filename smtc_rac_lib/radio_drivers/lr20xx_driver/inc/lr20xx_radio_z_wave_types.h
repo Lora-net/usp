@@ -154,6 +154,9 @@ typedef struct lr20xx_radio_z_wave_pkt_status_s
     int16_t                             rssi_sync_in_dbm;        //!< RSSI in dBm - value after syncword detection
     uint8_t rssi_sync_half_dbm_count;  //!< Count of 0.5 dBm to subtract to rssi_pkt_in_dbm value in dBm
     uint8_t link_quality_indicator;    //!< Margin to the detection level, in 0.25dB
+    uint8_t
+        last_channel_index;  //!< Index of the channel of last received packet (only available if Patch RAM is loaded).
+                             //!< It is the same indexing as for lr20xx_radio_z_wave_scan_params_s::channel_cfg
 } lr20xx_radio_z_wave_pkt_status_t;
 
 /**

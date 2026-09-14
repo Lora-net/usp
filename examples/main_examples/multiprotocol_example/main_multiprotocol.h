@@ -99,7 +99,7 @@
  * @struct multiprotocol_uplink_t
  * @brief Structure for multiprotocol uplink messages with ranging test result
  */
-typedef struct __packed multiprotocol_uplink_s
+typedef struct __attribute__( ( packed ) ) multiprotocol_uplink_s
 {
     uint16_t distance; /**< Distance in meters */
     uint8_t  sf;       /**< Spreading factor */

@@ -71,6 +71,8 @@
 #include "sx127x_hal.h"
 #elif defined( LR20XX )
 #include "lr20xx_hal.h"
+#elif defined( UDP_PF )
+// UDP virtual radio has no HAL
 #else
 #error "Please select radio board.."
 #endif

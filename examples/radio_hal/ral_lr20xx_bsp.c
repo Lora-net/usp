@@ -111,39 +111,39 @@ const lr20xx_pa_pwr_cfg_t pa_hf_cfg_table[LR20XX_HF_MAX_OUTPUT_POWER - LR20XX_HF
  * @remark measured at 3.3v and DCDC
  */
 static const uint32_t ral_lr20xx_convert_tx_dbm_to_ua_reg_mode_dcdc_lf_vreg[] = {
-    10400,   // -10 dBm
-    10100,   //  -9 dBm
-    9000,    //  -8 dBm
-    9000,    //  -7 dBm
-    8400,    //  -6 dBm
-    8700,    //  -5 dBm
-    10100,   //  -4 dBm
-    9200,    //  -3 dBm
-    10600,   //  -2 dBm
-    10000,   //  -1 dBm
-    10000,   //   0 dBm
-    12100,   //   1 dBm
-    10900,   //   2 dBm
-    12000,   //   3 dBm
-    13100,   //   4 dBm
-    13300,   //   5 dBm
-    13400,   //   6 dBm
-    14600,   //   7 dBm
-    15300,   //   8 dBm
-    16800,   //   9 dBm
-    18100,   //  10 dBm
-    20200,   //  11 dBm
-    21900,   //  12 dBm
-    25600,   //  13 dBm
-    28300,   //  14 dBm
-    32200,   //  15 dBm
-    37600,   //  16 dBm
-    46000,   //  17 dBm
-    51800,   //  18 dBm
-    61300,   //  19 dBm
-    74100,   //  20 dBm
-    89400,   //  21 dBm
-    108200,  //  22 dBm
+    6970,   // -10 dBm
+    7110,   //  -9 dBm
+    7270,   //  -8 dBm
+    7000,   //  -7 dBm
+    7200,   //  -6 dBm
+    7390,   //  -5 dBm
+    7920,   //  -4 dBm
+    8660,   //  -3 dBm
+    8520,   //  -2 dBm
+    8830,   //  -1 dBm
+    8500,   //   0 dBm
+    8820,   //   1 dBm
+    9300,   //   2 dBm
+    9710,   //   3 dBm
+    10200,  //   4 dBm
+    12180,  //   5 dBm
+    11630,  //   6 dBm
+    12780,  //   7 dBm
+    13580,  //   8 dBm
+    14810,  //   9 dBm
+    16500,  //  10 dBm
+    18290,  //  11 dBm
+    19810,  //  12 dBm
+    22880,  //  13 dBm
+    26490,  //  14 dBm
+    30980,  //  15 dBm
+    36170,  //  16 dBm
+    43010,  //  17 dBm
+    51400,  //  18 dBm
+    60980,  //  19 dBm
+    71710,  //  20 dBm
+    86560,  //  21 dBm
+    100480  //  22 dBm
 };
 
 // TODO
@@ -192,36 +192,36 @@ static const uint32_t ral_lr20xx_convert_tx_dbm_to_ua_reg_mode_ldo_lf_vreg[] = {
  * @remark measured at 3.3v
  */
 static const uint32_t ral_lr20xx_convert_tx_dbm_to_ua_reg_mode_dcdc_hf_vreg[] = {
-    8625,   // -17 dBm
-    8783,   // -16 dBm
-    8874,   // -15 dBm
-    8998,   // -14 dBm
-    9145,   // -13 dBm
-    9289,   // -12 dBm
-    9481,   // -11 dBm
-    9646,   // -10 dBm
-    9840,   //  -9 dBm
-    10073,  //  -8 dBm
-    10280,  //  -7 dBm
-    10597,  //  -6 dBm
-    10511,  //  -5 dBm
-    11200,  //  -4 dBm
-    11391,  //  -3 dBm
-    11630,  //  -2 dBm
-    11360,  //  -1 dBm
-    11635,  //   0 dBm
-    11986,  //   1 dBm
-    12670,  //   2 dBm
-    13292,  //   3 dBm
-    13859,  //   4 dBm
-    13685,  //   5 dBm
-    14629,  //   6 dBm
-    15388,  //   7 dBm
-    15804,  //   8 dBm
-    17270,  //   9 dBm
-    18943,  //  10 dBm
-    21041,  //  11 dBm
-    22524,  //  12 dBm
+    8320,   // -17 dBm
+    8460,   // -16 dBm
+    8600,   // -15 dBm
+    8650,   // -14 dBm
+    8830,   // -13 dBm
+    9010,   // -12 dBm
+    9190,   // -11 dBm
+    9410,   // -10 dBm
+    9460,   //  -9 dBm
+    9520,   //  -8 dBm
+    9950,   //  -7 dBm
+    10160,  //  -6 dBm
+    10450,  //  -5 dBm
+    10290,  //  -4 dBm
+    10750,  //  -3 dBm
+    11520,  //  -2 dBm
+    11550,  //  -1 dBm
+    11400,  //   0 dBm
+    11810,  //   1 dBm
+    12430,  //   2 dBm
+    12950,  //   3 dBm
+    13550,  //   4 dBm
+    14130,  //   5 dBm
+    14850,  //   6 dBm
+    15520,  //   7 dBm
+    15810,  //   8 dBm
+    16670,  //   9 dBm
+    18280,  //  10 dBm
+    20140,  //  11 dBm
+    22270   //  12 dBm
 };
 
 /**
@@ -343,7 +343,7 @@ void ral_lr20xx_bsp_get_tx_cfg( const void* context, const ral_lr20xx_bsp_tx_cfg
     lr20xx_radio_common_pa_selection_t pa_type;
 
     // check frequency band first to choose Low Frequency of High Frequency Power Amplifier
-    if( input_params->freq_in_hz >= 1600000000 )  // 1.6GHz
+    if( input_params->freq_in_hz >= 1500000000 )  // 1.5GHz
     {
         pa_type = LR20XX_RADIO_COMMON_PA_SEL_HF;
     }
@@ -359,7 +359,7 @@ void ral_lr20xx_bsp_get_tx_cfg( const void* context, const ral_lr20xx_bsp_tx_cfg
 void ral_lr20xx_bsp_get_rx_cfg( const void* context, const uint32_t freq_in_hz, lr20xx_radio_common_rx_path_t* rx_path,
                                 lr20xx_radio_common_rx_path_boost_mode_t* boost_mode )
 {
-    if( freq_in_hz >= 1600000000 )  // 1.6GHz
+    if( freq_in_hz >= 1500000000 )  // 1.5GHz
     {
         *rx_path = LR20XX_RADIO_COMMON_RX_PATH_HF;
     }
@@ -378,9 +378,9 @@ void ral_lr20xx_bsp_get_front_end_calibration_cfg(
     lr20xx_radio_common_rx_path_boost_mode_t boost_mode = LR20XX_RADIO_COMMON_RX_PATH_BOOST_MODE_NONE;
 
     uint32_t freq_in_hz[3] = {
-        470000000,   // Frequency 0 (range from 430MHz to 510MHz)
-        897500000,   // Frequency 1 (range from 867MHz to 928MHz)
-        2441000000,  // Frequency 2 (range from 2.403GHz to 2.479GHz)
+        870000000,   // Frequency 0 (range from 850MHz to 890MHz) +/- 20MHz
+        920000000,   // Frequency 1 (range from 900MHz to 940MHz) +/- 20MHz
+        2441000000,  // Frequency 2 (range from 2.391GHz to 2.491GHz) +/- 50MHz
     };
 
     for( uint8_t i = 0; i < 3; i++ )
@@ -399,17 +399,20 @@ void ral_lr20xx_bsp_get_dio_function( const void* context, lr20xx_system_dio_t d
         break;
     case LR20XX_SYSTEM_DIO_6:
         break;
+#if defined( LEGACY_EVK_LR20XX )
     case LR20XX_SYSTEM_DIO_7:
         break;
-#if defined( LEGACY_EVK_LR20XX )
     case LR20XX_SYSTEM_DIO_8:
         break;
     case LR20XX_SYSTEM_DIO_9:
-        *function = LR20XX_SYSTEM_DIO_FUNC_IRQ;  // LEGACY EVK
+        *function = LR20XX_SYSTEM_DIO_FUNC_IRQ;  // RADIO IRQ
         break;
 #else
+    case LR20XX_SYSTEM_DIO_7:
+        *function = LR20XX_SYSTEM_DIO_FUNC_IRQ;  // FIFO IRQs
+        break;
     case LR20XX_SYSTEM_DIO_8:
-        *function = LR20XX_SYSTEM_DIO_FUNC_IRQ;  // WIO board
+        *function = LR20XX_SYSTEM_DIO_FUNC_IRQ;  // Radio classic IRQs
         break;
     case LR20XX_SYSTEM_DIO_9:
         break;
@@ -424,7 +427,20 @@ void ral_lr20xx_bsp_get_dio_function( const void* context, lr20xx_system_dio_t d
 void ral_lr20xx_bsp_get_dio_sleep_drive( const void* context, lr20xx_system_dio_t dio,
                                          lr20xx_system_dio_drive_t* drive )
 {
+#if defined( FPB_RA0E2 )
+    switch( dio )
+    {
+    case LR20XX_SYSTEM_DIO_8:
+        *drive = LR20XX_SYSTEM_DIO_DRIVE_PULL_DOWN;
+        break;
+    default:
+        *drive = LR20XX_SYSTEM_DIO_DRIVE_NONE;
+        break;
+    }
+#else
+    ( void ) dio;
     *drive = LR20XX_SYSTEM_DIO_DRIVE_NONE;
+#endif
 }
 
 void ral_lr20xx_bsp_get_dio_irq_mask( const void* context, lr20xx_system_dio_t dio, lr20xx_system_irq_mask_t* irq_mask )
@@ -435,9 +451,13 @@ void ral_lr20xx_bsp_get_dio_irq_mask( const void* context, lr20xx_system_dio_t d
         *irq_mask = 0xFFFFFFFF & ~( LR20XX_SYSTEM_IRQ_FIFO_RX | LR20XX_SYSTEM_IRQ_FIFO_TX );
     }
 #else
-    if( dio == LR20XX_SYSTEM_DIO_8 )
+    if( dio == LR20XX_SYSTEM_DIO_8 )  // Main IRQ - All but FIFO RX/TX
     {
         *irq_mask = 0xFFFFFFFF & ~( LR20XX_SYSTEM_IRQ_FIFO_RX | LR20XX_SYSTEM_IRQ_FIFO_TX );
+    }
+    if( dio == LR20XX_SYSTEM_DIO_7 )  // FIFO IRQ - FIFO RX and TX
+    {
+        *irq_mask = ( LR20XX_SYSTEM_IRQ_FIFO_RX | LR20XX_SYSTEM_IRQ_FIFO_TX );
     }
 #endif
 }
@@ -498,8 +518,14 @@ void lr20xx_get_tx_cfg( lr20xx_radio_common_pa_selection_t pa_type, int8_t expec
 {
     int8_t power = expected_output_pwr_in_dbm;
 
-    // Ramp time is the same for any config
+    // Ramp time is the same for any config.
+    // When the FLRC protocol (FLRP) is enabled, a longer PA ramp time is required for the best
+    // sensitivity (CR 1/2, 2.4 GHz, 1-2 Mb/s): use 128 us instead of the default 48 us.
+#if defined( USE_FLRC_PROTOCOL )
+    output_params->pa_ramp_time = LR20XX_RADIO_COMMON_RAMP_272_US;
+#else
     output_params->pa_ramp_time = LR20XX_RADIO_COMMON_RAMP_48_US;
+#endif
 
     switch( pa_type )
     {

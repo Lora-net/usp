@@ -1,8 +1,8 @@
-## 
+##
 ## @file      CMakeLists.txt
-## 
+##
 ## @brief     Project CMake
-## 
+##
 ## The Clear BSD License
 ## Copyright Semtech Corporation 2021. All rights reserved.
 ##
@@ -30,7 +30,7 @@
 ## CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ## ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ## POSSIBILITY OF SUCH DAMAGE.
-## 
+##
 cmake_minimum_required(VERSION 3.6)
 
 cmake_minimum_required(VERSION 3.25)
@@ -50,7 +50,7 @@ install(EXPORT SmtcRalfTargets
 )
 
 export(
-    TARGETS smtc_ralf_lr11xx smtc_ralf_lr20xx smtc_ralf_sx126x smtc_ralf_sx127x smtc_ralf_sx128x
+    TARGETS smtc_ralf_lr11xx smtc_ralf_lr20xx smtc_ralf_sx126x smtc_ralf_sx127x smtc_ralf_sx128x smtc_ralf_udp_pf
     NAMESPACE smtc_ralf::
     FILE SmtcRalfTargets.cmake
 )

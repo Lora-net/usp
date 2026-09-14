@@ -12,14 +12,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
+  * This software is licensed under terms that can be found in the LICENSE file in
+  * the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   ******************************************************************************
   */
 
@@ -676,6 +674,10 @@ HAL_StatusTypeDef HAL_RCCEx_PeriphCLKConfig(RCC_PeriphCLKInitTypeDef  *PeriphClk
         /* set overall return value */
         status = ret;
       }
+    }
+    else
+    {
+      /* nothing to do */
     }
 
 #endif /* STM32L471xx || STM32L475xx || STM32L476xx || STM32L485xx || STM32L486xx || STM32L496xx || STM32L4A6xx */
@@ -2404,7 +2406,7 @@ __weak void HAL_RCCEx_LSECSS_Callback(void)
   */
 void HAL_RCCEx_EnableLSCO(uint32_t LSCOSource)
 {
-  GPIO_InitTypeDef GPIO_InitStruct;
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   FlagStatus       pwrclkchanged = RESET;
   FlagStatus       backupchanged = RESET;
 
@@ -2414,7 +2416,7 @@ void HAL_RCCEx_EnableLSCO(uint32_t LSCOSource)
   /* LSCO Pin Clock Enable */
   __LSCO_CLK_ENABLE();
 
-  /* Configue the LSCO pin in analog mode */
+  /* Configure the LSCO pin in analog mode */
   GPIO_InitStruct.Pin = LSCO_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
@@ -2533,7 +2535,7 @@ void HAL_RCCEx_OCTOSPIDelayConfig(uint32_t Delay1, uint32_t Delay2)
                 ##### Extended Clock Recovery System Control functions  #####
  ===============================================================================
     [..]
-      For devices with Clock Recovery System feature (CRS), RCC Extention HAL driver can be used as follows:
+      For devices with Clock Recovery System feature (CRS), RCC Extension HAL driver can be used as follows:
 
       (#) In System clock config, HSI48 needs to be enabled
 
@@ -2544,7 +2546,7 @@ void HAL_RCCEx_OCTOSPIDelayConfig(uint32_t Delay1, uint32_t Delay2)
               (+++) Default values can be set for frequency Error Measurement (reload and error limit)
                         and also HSI48 oscillator smooth trimming.
               (+++) Macro __HAL_RCC_CRS_RELOADVALUE_CALCULATE can be also used to calculate
-                        directly reload value with target and sychronization frequencies values
+                        directly reload value with target and synchronization frequencies values
           (##) Call function HAL_RCCEx_CRSConfig which
               (+++) Resets CRS registers to their default values.
               (+++) Configures CRS registers with synchronization configuration
@@ -3551,5 +3553,4 @@ static uint32_t RCCEx_GetSAIxPeriphCLKFreq(uint32_t PeriphClk, uint32_t InputFre
   * @}
   */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
 

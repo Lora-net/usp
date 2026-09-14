@@ -106,7 +106,7 @@ extern "C" {
 // Internal timestamp formatting
 #define RAC_LOG_TIMESTAMP( ) smtc_modem_hal_get_time_in_ms( )
 
-// Internal formatting helper
+// Internal formatting helper: %.218s + \n + \0 = 220 bytes max (fits SMTC_PRINT_BUFFER_SIZE)
 #define RAC_LOG_FORMAT( level, ... )                                                                 \
     do                                                                                               \
     {                                                                                                \
@@ -114,8 +114,9 @@ extern "C" {
         int  _offset = snprintf( _rac_log_buf, sizeof( _rac_log_buf ), "[%s-%s] [%8" PRIu32 " ms] ", \
                                  RAC_LOG_APP_PREFIX, level, RAC_LOG_TIMESTAMP( ) );                  \
         snprintf( _rac_log_buf + _offset, sizeof( _rac_log_buf ) - _offset, __VA_ARGS__ );           \
-        SMTC_MODEM_HAL_TRACE_PRINTF( "%s\n", _rac_log_buf );                                         \
+        SMTC_MODEM_HAL_TRACE_PRINTF( "%.218s\n", _rac_log_buf );                                     \
     } while( 0 )
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC MACROS -----------------------------------------------------------
@@ -244,7 +245,7 @@ extern "C" {
     do                                                     \
     {                                                      \
         RAC_LOG_DEBUG( "%s (%u bytes):\n", prefix, size ); \
-        SMTC_HAL_TRACE_ARRAY( "", data, size );            \
+        SMTC_MODEM_HAL_TRACE_ARRAY( "", data, size );      \
     } while( 0 )
 #else
 #define RAC_LOG_HEX_DUMP( prefix, data, size ) \

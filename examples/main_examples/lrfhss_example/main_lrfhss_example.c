@@ -41,10 +41,9 @@
  */
 
 #include "app_lrfhss_example.h"
-#include "main_lrfhss_example.h"
 
-#include "modem_pinout.h"
-#include "smtc_hal_gpio.h"
+#include "smtc_hal_button.h"
+#include "smtc_hal_led.h"
 #include "smtc_hal_mcu.h"
 #include "smtc_hal_watchdog.h"
 #include "smtc_rac_api.h"
@@ -63,61 +62,24 @@
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
 
-static const uint32_t SLEEP_DELAY          = 100;  // ms
-static const uint32_t BUTTON_TRIGGER_DELAY = 500;  // ms
-
-/*
- * -----------------------------------------------------------------------------
- * --- PRIVATE TYPES -----------------------------------------------------------
- */
-
-typedef struct user_button_s
-{
-    bool     is_pressed;            // is the button pressed
-    uint32_t last_press_timestamp;  // last absolute time the button was pressed
-} user_button_t;
-
-/*
- * -----------------------------------------------------------------------------
- * --- PRIVATE VARIABLES -------------------------------------------------------
- */
-
-static user_button_t user_button = {
-    .is_pressed           = false,
-    .last_press_timestamp = 0,
-};
-
-/*
- * -----------------------------------------------------------------------------
- * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
- */
-
-/** @brief update `user_button` */
-static void user_button_callback( void* context );
+static const uint32_t SLEEP_DELAY = 100;  // ms
 
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
  */
 
-int main_lrfhss_example( void )
+int main( void )
 {
     // initialize device systems
     hal_mcu_init( );
+
+    // Initialize LEDs and button
+    hal_led_init( );
+    hal_button_init( NULL, NULL );
+
     hal_watchdog_init( );
     smtc_rac_init( );
-
-    // setup user button
-    hal_gpio_irq_t nucleo_blue_button = {
-        .pin      = EXTI_BUTTON,
-        .context  = &user_button,
-        .callback = user_button_callback,
-    };
-    hal_gpio_init_in( EXTI_BUTTON, BSP_GPIO_PULL_MODE_NONE, BSP_GPIO_IRQ_MODE_FALLING, &nucleo_blue_button );
-
-    // initialize LEDs
-    hal_gpio_init_out( SMTC_LED_TX, 0 );
-    hal_gpio_init_out( SMTC_LED_RX, 0 );
 
     // initialize LR-FHSS application
     lrfhss_example_init( );
@@ -141,10 +103,10 @@ int main_lrfhss_example( void )
         }
 
         // handle button logic
-        if( user_button.is_pressed == true )
+        if( hal_button_is_pressed( ) )
         {
             RAC_LOG_INFO( "Button pressed - starting immediate transmission cycle" );
-            user_button.is_pressed = false;
+            hal_button_clear( );
 
             // Trigger immediate transmission cycle
             lrfhss_example_start_cycle( );
@@ -152,7 +114,7 @@ int main_lrfhss_example( void )
 
         // handle sleep
         hal_mcu_disable_irq( );
-        if( ( user_button.is_pressed == false ) && ( smtc_rac_is_irq_flag_pending( ) == false ) )
+        if( ( !hal_button_is_pressed( ) ) && ( smtc_rac_is_irq_flag_pending( ) == false ) )
         {
             hal_mcu_set_sleep_for_ms( SLEEP_DELAY );
             hal_watchdog_reload( );  // update watchdog after sleep
@@ -161,23 +123,4 @@ int main_lrfhss_example( void )
     }
 
     return 0;
-}
-
-/*
- * -----------------------------------------------------------------------------
- * --- PRIVATE FUNCTIONS DEFINITION --------------------------------------------
- */
-
-static void user_button_callback( void* context )
-{
-    UNUSED( context );
-
-    uint32_t timestamp = smtc_modem_hal_get_time_in_ms( );
-
-    // avoid multiple triggers
-    if( ( timestamp - user_button.last_press_timestamp ) > BUTTON_TRIGGER_DELAY )
-    {
-        user_button.last_press_timestamp = timestamp;
-        user_button.is_pressed           = true;
-    }
 }

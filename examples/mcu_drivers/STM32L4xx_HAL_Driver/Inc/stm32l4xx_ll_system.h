@@ -3,6 +3,18 @@
   * @file    stm32l4xx_ll_system.h
   * @author  MCD Application Team
   * @brief   Header file of SYSTEM LL module.
+  *
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   @verbatim
   ==============================================================================
                      ##### How to use this driver #####
@@ -16,17 +28,6 @@
       (+) Access to VREFBUF registers
 
   @endverbatim
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
   ******************************************************************************
   */
 
@@ -59,11 +60,13 @@ extern "C" {
   * @{
   */
 
+#define LL_EXTI_REGISTER_PINPOS_SHFT        16U   /*!< Define used to shift pin position in EXTICR register */
+
 /**
  * @brief Power-down in Run mode Flash key
  */
 #define FLASH_PDKEY1                  0x04152637U /*!< Flash power down key1 */
-#define FLASH_PDKEY2                  0xFAFBFCFDU /*!< Flash power down key2: used with FLASH_PDKEY1 
+#define FLASH_PDKEY2                  0xFAFBFCFDU /*!< Flash power down key2: used with FLASH_PDKEY1
                                                        to unlock the RUN_PD bit in FLASH_ACR */
 
 /**
@@ -96,9 +99,9 @@ extern "C" {
 /** @defgroup SYSTEM_LL_EC_BANKMODE SYSCFG BANK MODE
   * @{
   */
-#define LL_SYSCFG_BANKMODE_BANK1           0x00000000U               /*!< Flash Bank1 mapped at 0x08000000 (and aliased @0x00000000) 
+#define LL_SYSCFG_BANKMODE_BANK1           0x00000000U               /*!< Flash Bank1 mapped at 0x08000000 (and aliased @0x00000000)
                                                                       and Flash Bank2 mapped at 0x08080000 (and aliased at 0x00080000) */
-#define LL_SYSCFG_BANKMODE_BANK2           SYSCFG_MEMRMP_FB_MODE     /*!< Flash Bank2 mapped at 0x08000000 (and aliased @0x00000000) 
+#define LL_SYSCFG_BANKMODE_BANK2           SYSCFG_MEMRMP_FB_MODE     /*!< Flash Bank2 mapped at 0x08000000 (and aliased @0x00000000)
                                                                       and Flash Bank1 mapped at 0x08080000 (and aliased at 0x00080000) */
 /**
   * @}
@@ -153,22 +156,22 @@ extern "C" {
 /** @defgroup SYSTEM_LL_EC_EXTI_LINE SYSCFG EXTI LINE
   * @{
   */
-#define LL_SYSCFG_EXTI_LINE0               (uint32_t)(0x000FU << 16U | 0U)  /* !< EXTI_POSITION_0  | EXTICR[0] */
-#define LL_SYSCFG_EXTI_LINE1               (uint32_t)(0x00F0U << 16U | 0U)  /* !< EXTI_POSITION_4  | EXTICR[0] */
-#define LL_SYSCFG_EXTI_LINE2               (uint32_t)(0x0F00U << 16U | 0U)  /* !< EXTI_POSITION_8  | EXTICR[0] */
-#define LL_SYSCFG_EXTI_LINE3               (uint32_t)(0xF000U << 16U | 0U)  /* !< EXTI_POSITION_12 | EXTICR[0] */
-#define LL_SYSCFG_EXTI_LINE4               (uint32_t)(0x000FU << 16U | 1U)  /* !< EXTI_POSITION_0  | EXTICR[1] */
-#define LL_SYSCFG_EXTI_LINE5               (uint32_t)(0x00F0U << 16U | 1U)  /* !< EXTI_POSITION_4  | EXTICR[1] */
-#define LL_SYSCFG_EXTI_LINE6               (uint32_t)(0x0F00U << 16U | 1U)  /* !< EXTI_POSITION_8  | EXTICR[1] */
-#define LL_SYSCFG_EXTI_LINE7               (uint32_t)(0xF000U << 16U | 1U)  /* !< EXTI_POSITION_12 | EXTICR[1] */
-#define LL_SYSCFG_EXTI_LINE8               (uint32_t)(0x000FU << 16U | 2U)  /* !< EXTI_POSITION_0  | EXTICR[2] */
-#define LL_SYSCFG_EXTI_LINE9               (uint32_t)(0x00F0U << 16U | 2U)  /* !< EXTI_POSITION_4  | EXTICR[2] */
-#define LL_SYSCFG_EXTI_LINE10              (uint32_t)(0x0F00U << 16U | 2U)  /* !< EXTI_POSITION_8  | EXTICR[2] */
-#define LL_SYSCFG_EXTI_LINE11              (uint32_t)(0xF000U << 16U | 2U)  /* !< EXTI_POSITION_12 | EXTICR[2] */
-#define LL_SYSCFG_EXTI_LINE12              (uint32_t)(0x000FU << 16U | 3U)  /* !< EXTI_POSITION_0  | EXTICR[3] */
-#define LL_SYSCFG_EXTI_LINE13              (uint32_t)(0x00F0U << 16U | 3U)  /* !< EXTI_POSITION_4  | EXTICR[3] */
-#define LL_SYSCFG_EXTI_LINE14              (uint32_t)(0x0F00U << 16U | 3U)  /* !< EXTI_POSITION_8  | EXTICR[3] */
-#define LL_SYSCFG_EXTI_LINE15              (uint32_t)(0xF000U << 16U | 3U)  /* !< EXTI_POSITION_12 | EXTICR[3] */
+#define LL_SYSCFG_EXTI_LINE0               (uint32_t)((0x000FU << LL_EXTI_REGISTER_PINPOS_SHFT) | 0U)  /* !< EXTI_POSITION_0  | EXTICR[0] */
+#define LL_SYSCFG_EXTI_LINE1               (uint32_t)((0x00F0U << LL_EXTI_REGISTER_PINPOS_SHFT) | 0U)  /* !< EXTI_POSITION_4  | EXTICR[0] */
+#define LL_SYSCFG_EXTI_LINE2               (uint32_t)((0x0F00U << LL_EXTI_REGISTER_PINPOS_SHFT) | 0U)  /* !< EXTI_POSITION_8  | EXTICR[0] */
+#define LL_SYSCFG_EXTI_LINE3               (uint32_t)((0xF000U << LL_EXTI_REGISTER_PINPOS_SHFT) | 0U)  /* !< EXTI_POSITION_12 | EXTICR[0] */
+#define LL_SYSCFG_EXTI_LINE4               (uint32_t)((0x000FU << LL_EXTI_REGISTER_PINPOS_SHFT) | 1U)  /* !< EXTI_POSITION_0  | EXTICR[1] */
+#define LL_SYSCFG_EXTI_LINE5               (uint32_t)((0x00F0U << LL_EXTI_REGISTER_PINPOS_SHFT) | 1U)  /* !< EXTI_POSITION_4  | EXTICR[1] */
+#define LL_SYSCFG_EXTI_LINE6               (uint32_t)((0x0F00U << LL_EXTI_REGISTER_PINPOS_SHFT) | 1U)  /* !< EXTI_POSITION_8  | EXTICR[1] */
+#define LL_SYSCFG_EXTI_LINE7               (uint32_t)((0xF000U << LL_EXTI_REGISTER_PINPOS_SHFT) | 1U)  /* !< EXTI_POSITION_12 | EXTICR[1] */
+#define LL_SYSCFG_EXTI_LINE8               (uint32_t)((0x000FU << LL_EXTI_REGISTER_PINPOS_SHFT) | 2U)  /* !< EXTI_POSITION_0  | EXTICR[2] */
+#define LL_SYSCFG_EXTI_LINE9               (uint32_t)((0x00F0U << LL_EXTI_REGISTER_PINPOS_SHFT) | 2U)  /* !< EXTI_POSITION_4  | EXTICR[2] */
+#define LL_SYSCFG_EXTI_LINE10              (uint32_t)((0x0F00U << LL_EXTI_REGISTER_PINPOS_SHFT) | 2U)  /* !< EXTI_POSITION_8  | EXTICR[2] */
+#define LL_SYSCFG_EXTI_LINE11              (uint32_t)((0xF000U << LL_EXTI_REGISTER_PINPOS_SHFT) | 2U)  /* !< EXTI_POSITION_12 | EXTICR[2] */
+#define LL_SYSCFG_EXTI_LINE12              (uint32_t)((0x000FU << LL_EXTI_REGISTER_PINPOS_SHFT) | 3U)  /* !< EXTI_POSITION_0  | EXTICR[3] */
+#define LL_SYSCFG_EXTI_LINE13              (uint32_t)((0x00F0U << LL_EXTI_REGISTER_PINPOS_SHFT) | 3U)  /* !< EXTI_POSITION_4  | EXTICR[3] */
+#define LL_SYSCFG_EXTI_LINE14              (uint32_t)((0x0F00U << LL_EXTI_REGISTER_PINPOS_SHFT) | 3U)  /* !< EXTI_POSITION_8  | EXTICR[3] */
+#define LL_SYSCFG_EXTI_LINE15              (uint32_t)((0xF000U << LL_EXTI_REGISTER_PINPOS_SHFT) | 3U)  /* !< EXTI_POSITION_12 | EXTICR[3] */
 /**
   * @}
   */
@@ -176,14 +179,14 @@ extern "C" {
 /** @defgroup SYSTEM_LL_EC_TIMBREAK SYSCFG TIMER BREAK
   * @{
   */
-#define LL_SYSCFG_TIMBREAK_ECC             SYSCFG_CFGR2_ECCL  /*!< Enables and locks the ECC error signal 
+#define LL_SYSCFG_TIMBREAK_ECC             SYSCFG_CFGR2_ECCL  /*!< Enables and locks the ECC error signal
                                                                    with Break Input of TIM1/8/15/16/17                           */
-#define LL_SYSCFG_TIMBREAK_PVD             SYSCFG_CFGR2_PVDL  /*!< Enables and locks the PVD connection 
-                                                                   with TIM1/8/15/16/17 Break Input 
+#define LL_SYSCFG_TIMBREAK_PVD             SYSCFG_CFGR2_PVDL  /*!< Enables and locks the PVD connection
+                                                                   with TIM1/8/15/16/17 Break Input
                                                                    and also the PVDE and PLS bits of the Power Control Interface */
-#define LL_SYSCFG_TIMBREAK_SRAM2_PARITY    SYSCFG_CFGR2_SPL   /*!< Enables and locks the SRAM2_PARITY error signal 
+#define LL_SYSCFG_TIMBREAK_SRAM2_PARITY    SYSCFG_CFGR2_SPL   /*!< Enables and locks the SRAM2_PARITY error signal
                                                                    with Break Input of TIM1/8/15/16/17                           */
-#define LL_SYSCFG_TIMBREAK_LOCKUP          SYSCFG_CFGR2_CLL   /*!< Enables and locks the LOCKUP output of CortexM4 
+#define LL_SYSCFG_TIMBREAK_LOCKUP          SYSCFG_CFGR2_CLL   /*!< Enables and locks the LOCKUP output of CortexM4
                                                                    with Break Input of TIM1/15/16/17                             */
 /**
   * @}
@@ -771,7 +774,7 @@ __STATIC_INLINE uint32_t LL_SYSCFG_IsEnabledIT_FPU_IXC(void)
   */
 __STATIC_INLINE void LL_SYSCFG_SetEXTISource(uint32_t Port, uint32_t Line)
 {
-  MODIFY_REG(SYSCFG->EXTICR[Line & 0xFFU], (Line >> 16U), Port << POSITION_VAL((Line >> 16U)));
+  MODIFY_REG(SYSCFG->EXTICR[Line & 0x03U], (Line >> LL_EXTI_REGISTER_PINPOS_SHFT), Port << POSITION_VAL((Line >> LL_EXTI_REGISTER_PINPOS_SHFT)));
 }
 
 /**
@@ -812,14 +815,14 @@ __STATIC_INLINE void LL_SYSCFG_SetEXTISource(uint32_t Port, uint32_t Line)
   */
 __STATIC_INLINE uint32_t LL_SYSCFG_GetEXTISource(uint32_t Line)
 {
-  return (uint32_t)(READ_BIT(SYSCFG->EXTICR[Line & 0xFFU], (Line >> 16U)) >> POSITION_VAL(Line >> 16U));
+  return (uint32_t)(READ_BIT(SYSCFG->EXTICR[Line & 0x03U], (Line >> LL_EXTI_REGISTER_PINPOS_SHFT)) >> POSITION_VAL(Line >> LL_EXTI_REGISTER_PINPOS_SHFT));
 }
 
 /**
   * @brief  Enable SRAM2 Erase (starts a hardware SRAM2 erase operation. This bit is
   * automatically cleared at the end of the SRAM2 erase operation.)
   * @note This bit is write-protected: setting this bit is possible only after the
-  *       correct key sequence is written in the SYSCFG_SKR register as described in 
+  *       correct key sequence is written in the SYSCFG_SKR register as described in
   *       the Reference Manual.
   * @rmtoll SYSCFG_SCSR  SRAM2ER       LL_SYSCFG_EnableSRAM2Erase
   * @retval None
@@ -1624,5 +1627,3 @@ __STATIC_INLINE void LL_FLASH_DisableSleepPowerDown(void)
 #endif
 
 #endif /* STM32L4xx_LL_SYSTEM_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -32,6 +32,8 @@
 
 add_library(lr20xx_driver STATIC
     lr20xx_driver_version.c
+    lr20xx_patch.c
+    lr20xx_pram_load.c
     lr20xx_radio_common.c
     lr20xx_radio_fifo.c
     lr20xx_regmem.c

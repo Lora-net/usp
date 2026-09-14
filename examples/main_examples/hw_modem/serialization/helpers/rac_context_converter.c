@@ -37,7 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Forward declarations for enum conversion functions
+// Forward declarations for LoRa enum conversion functions
 static ral_lora_sf_t                convert_pb_sf_to_native( lora_spreading_factor_pb_t pb_sf );
 static lora_spreading_factor_pb_t   convert_native_sf_to_pb( ral_lora_sf_t native_sf );
 static ral_lora_bw_t                convert_pb_bw_to_native( lora_bandwidth_pb_t pb_bw );
@@ -47,6 +47,25 @@ static ral_lora_pkt_len_modes_t     convert_pb_header_type_to_native( lora_packe
 static lora_packet_length_mode_pb_t convert_native_header_type_to_pb( ral_lora_pkt_len_modes_t native_header );
 static smtc_rac_lora_syncword_t     convert_pb_sync_word_to_native( lora_syncword_pb_t pb_sync );
 static lora_syncword_pb_t           convert_native_sync_word_to_pb( smtc_rac_lora_syncword_t native_sync );
+
+// Forward declarations for FLRC enum conversion functions
+static ral_flrc_cr_t                    convert_pb_flrc_cr_to_native( ral_flrc_cr_pb_t pb_cr );
+static ral_flrc_cr_pb_t                 convert_native_flrc_cr_to_pb( ral_flrc_cr_t native_cr );
+static ral_flrc_crc_type_t              convert_pb_flrc_crc_type_to_native( ral_flrc_crc_type_pb_t pb_crc );
+static ral_flrc_crc_type_pb_t           convert_native_flrc_crc_type_to_pb( ral_flrc_crc_type_t native_crc );
+static ral_flrc_pulse_shape_t           convert_pb_flrc_pulse_shape_to_native( ral_flrc_pulse_shape_pb_t pb_shape );
+static ral_flrc_pulse_shape_pb_t        convert_native_flrc_pulse_shape_to_pb( ral_flrc_pulse_shape_t native_shape );
+static ral_flrc_sync_word_len_t         convert_pb_flrc_sync_word_len_to_native( ral_flrc_sync_word_len_pb_t pb_len );
+static ral_flrc_sync_word_len_pb_t      convert_native_flrc_sync_word_len_to_pb( ral_flrc_sync_word_len_t native_len );
+static ral_flrc_tx_syncword_t           convert_pb_flrc_tx_syncword_index_to_native( ral_flrc_tx_syncword_pb_t pb_sw );
+static ral_flrc_tx_syncword_pb_t        convert_native_flrc_tx_syncword_index_to_pb( ral_flrc_tx_syncword_t native_sw );
+static ral_flrc_rx_match_sync_word_t    convert_pb_flrc_rx_match_to_native( ral_flrc_rx_match_sync_word_pb_t pb_match );
+static ral_flrc_rx_match_sync_word_pb_t convert_native_flrc_rx_match_to_pb(
+    ral_flrc_rx_match_sync_word_t native_match );
+static ral_flrc_raw_bit_rate_t       convert_pb_flrc_raw_bit_rate_to_native( ral_flrc_raw_bit_rate_pb_t pb_br );
+static ral_flrc_raw_bit_rate_pb_t    convert_native_flrc_raw_bit_rate_to_pb( ral_flrc_raw_bit_rate_t native_br );
+static ral_flrc_preamble_length_t    convert_pb_flrc_preamble_len_to_native( ral_flrc_preamble_length_pb_t pb_len );
+static ral_flrc_preamble_length_pb_t convert_native_flrc_preamble_len_to_pb( ral_flrc_preamble_length_t native_len );
 
 // ========================================
 // ENUM CONVERSION FUNCTIONS
@@ -71,23 +90,27 @@ smtc_rac_priority_pb_t rac_convert_priority_to_pb( smtc_rac_priority_t native_pr
     }
 }
 
-smtc_rac_priority_t rac_convert_priority_from_pb( smtc_rac_priority_pb_t pb_priority )
+bool rac_convert_priority_from_pb( smtc_rac_priority_pb_t pb_priority, smtc_rac_priority_t* output )
 {
     switch( pb_priority )
     {
     case smtc_rac_priority_pb_t_RAC_VERY_HIGH_PRIORITY_PB:
-        return RAC_VERY_HIGH_PRIORITY;
+        *output = RAC_VERY_HIGH_PRIORITY;
+        return true;
     case smtc_rac_priority_pb_t_RAC_HIGH_PRIORITY_PB:
-        return RAC_HIGH_PRIORITY;
+        *output = RAC_HIGH_PRIORITY;
+        return true;
     case smtc_rac_priority_pb_t_RAC_MEDIUM_PRIORITY_PB:
-        return RAC_MEDIUM_PRIORITY;
+        *output = RAC_MEDIUM_PRIORITY;
+        return true;
     case smtc_rac_priority_pb_t_RAC_LOW_PRIORITY_PB:
-        return RAC_LOW_PRIORITY;
+        *output = RAC_LOW_PRIORITY;
+        return true;
     case smtc_rac_priority_pb_t_RAC_VERY_LOW_PRIORITY_PB:
-        return RAC_VERY_LOW_PRIORITY;
-    default:
-        return RAC_LOW_PRIORITY;  // Safe default
+        *output = RAC_VERY_LOW_PRIORITY;
+        return true;
     }
+    return false;
 }
 
 smtc_rac_return_code_pb_t rac_convert_return_code_to_pb( smtc_rac_return_code_t native_code )
@@ -210,25 +233,35 @@ static lora_bandwidth_pb_t convert_native_bw_to_pb( ral_lora_bw_t native_bw )
     switch( native_bw )
     {
     case RAL_LORA_BW_007_KHZ:
-        return lora_bandwidth_pb_t_BW_7_8_KHZ_PB;
+        return lora_bandwidth_pb_t_BW_007_KHZ_PB;
     case RAL_LORA_BW_010_KHZ:
-        return lora_bandwidth_pb_t_BW_10_4_KHZ_PB;
+        return lora_bandwidth_pb_t_BW_010_KHZ_PB;
     case RAL_LORA_BW_015_KHZ:
-        return lora_bandwidth_pb_t_BW_15_6_KHZ_PB;
+        return lora_bandwidth_pb_t_BW_015_KHZ_PB;
     case RAL_LORA_BW_020_KHZ:
-        return lora_bandwidth_pb_t_BW_20_8_KHZ_PB;
+        return lora_bandwidth_pb_t_BW_020_KHZ_PB;
     case RAL_LORA_BW_031_KHZ:
-        return lora_bandwidth_pb_t_BW_31_25_KHZ_PB;
+        return lora_bandwidth_pb_t_BW_031_KHZ_PB;
     case RAL_LORA_BW_041_KHZ:
-        return lora_bandwidth_pb_t_BW_41_7_KHZ_PB;
+        return lora_bandwidth_pb_t_BW_041_KHZ_PB;
     case RAL_LORA_BW_062_KHZ:
-        return lora_bandwidth_pb_t_BW_62_5_KHZ_PB;
+        return lora_bandwidth_pb_t_BW_062_KHZ_PB;
     case RAL_LORA_BW_125_KHZ:
         return lora_bandwidth_pb_t_BW_125_KHZ_PB;
+    case RAL_LORA_BW_200_KHZ:
+        return lora_bandwidth_pb_t_BW_200_KHZ_PB;
     case RAL_LORA_BW_250_KHZ:
         return lora_bandwidth_pb_t_BW_250_KHZ_PB;
+    case RAL_LORA_BW_400_KHZ:
+        return lora_bandwidth_pb_t_BW_400_KHZ_PB;
     case RAL_LORA_BW_500_KHZ:
         return lora_bandwidth_pb_t_BW_500_KHZ_PB;
+    case RAL_LORA_BW_800_KHZ:
+        return lora_bandwidth_pb_t_BW_800_KHZ_PB;
+    case RAL_LORA_BW_1000_KHZ:
+        return lora_bandwidth_pb_t_BW_1000_KHZ_PB;
+    case RAL_LORA_BW_1600_KHZ:
+        return lora_bandwidth_pb_t_BW_1600_KHZ_PB;
     default:
         return lora_bandwidth_pb_t_BW_125_KHZ_PB;  // Default to 125 kHz
     }
@@ -387,26 +420,37 @@ static ral_lora_bw_t convert_pb_bw_to_native( lora_bandwidth_pb_t pb_bw )
 {
     switch( pb_bw )
     {
-    case lora_bandwidth_pb_t_BW_7_8_KHZ_PB:
+    case lora_bandwidth_pb_t_BW_007_KHZ_PB:
         return RAL_LORA_BW_007_KHZ;
-    case lora_bandwidth_pb_t_BW_10_4_KHZ_PB:
+    case lora_bandwidth_pb_t_BW_010_KHZ_PB:
         return RAL_LORA_BW_010_KHZ;
-    case lora_bandwidth_pb_t_BW_15_6_KHZ_PB:
+    case lora_bandwidth_pb_t_BW_015_KHZ_PB:
         return RAL_LORA_BW_015_KHZ;
-    case lora_bandwidth_pb_t_BW_20_8_KHZ_PB:
+    case lora_bandwidth_pb_t_BW_020_KHZ_PB:
         return RAL_LORA_BW_020_KHZ;
-    case lora_bandwidth_pb_t_BW_31_25_KHZ_PB:
+    case lora_bandwidth_pb_t_BW_031_KHZ_PB:
         return RAL_LORA_BW_031_KHZ;
-    case lora_bandwidth_pb_t_BW_41_7_KHZ_PB:
+    case lora_bandwidth_pb_t_BW_041_KHZ_PB:
         return RAL_LORA_BW_041_KHZ;
-    case lora_bandwidth_pb_t_BW_62_5_KHZ_PB:
+    case lora_bandwidth_pb_t_BW_062_KHZ_PB:
         return RAL_LORA_BW_062_KHZ;
     case lora_bandwidth_pb_t_BW_125_KHZ_PB:
         return RAL_LORA_BW_125_KHZ;
+    case lora_bandwidth_pb_t_BW_200_KHZ_PB:
+        return RAL_LORA_BW_200_KHZ;
     case lora_bandwidth_pb_t_BW_250_KHZ_PB:
         return RAL_LORA_BW_250_KHZ;
+    case lora_bandwidth_pb_t_BW_400_KHZ_PB:
+        return RAL_LORA_BW_400_KHZ;
     case lora_bandwidth_pb_t_BW_500_KHZ_PB:
         return RAL_LORA_BW_500_KHZ;
+    case lora_bandwidth_pb_t_BW_800_KHZ_PB:
+        return RAL_LORA_BW_800_KHZ;
+    case lora_bandwidth_pb_t_BW_1000_KHZ_PB:
+        return RAL_LORA_BW_1000_KHZ;
+    case lora_bandwidth_pb_t_BW_1600_KHZ_PB:
+        return RAL_LORA_BW_1600_KHZ;
+
     default:
         return RAL_LORA_BW_125_KHZ;  // Default to 125kHz
     }
@@ -424,6 +468,12 @@ static ral_lora_cr_t convert_pb_cr_to_native( lora_coding_rate_pb_t pb_cr )
         return RAL_LORA_CR_4_7;
     case lora_coding_rate_pb_t_CR_4_8_PB:
         return RAL_LORA_CR_4_8;
+    case lora_coding_rate_pb_t_CR_LI_4_5_PB:
+        return RAL_LORA_CR_LI_4_5;
+    case lora_coding_rate_pb_t_CR_LI_4_6_PB:
+        return RAL_LORA_CR_LI_4_6;
+    case lora_coding_rate_pb_t_CR_LI_4_8_PB:
+        return RAL_LORA_CR_LI_4_8;
     default:
         return RAL_LORA_CR_4_5;  // Default to 4/5
     }
@@ -468,6 +518,12 @@ static lora_coding_rate_pb_t convert_native_cr_to_pb( ral_lora_cr_t native_cr )
         return lora_coding_rate_pb_t_CR_4_7_PB;
     case RAL_LORA_CR_4_8:
         return lora_coding_rate_pb_t_CR_4_8_PB;
+    case RAL_LORA_CR_LI_4_5:
+        return lora_coding_rate_pb_t_CR_LI_4_5_PB;
+    case RAL_LORA_CR_LI_4_6:
+        return lora_coding_rate_pb_t_CR_LI_4_6_PB;
+    case RAL_LORA_CR_LI_4_8:
+        return lora_coding_rate_pb_t_CR_LI_4_8_PB;
     default:
         return lora_coding_rate_pb_t_CR_4_5_PB;  // Default to 4/5
     }
@@ -498,6 +554,594 @@ static lora_syncword_pb_t convert_native_sync_word_to_pb( smtc_rac_lora_syncword
         return lora_syncword_pb_t_LORA_PRIVATE_NETWORK_SYNCWORD_PB;  // Default to private
     }
 }
+
+// ========================================
+// FLRC ENUM CONVERSION FUNCTIONS
+// ========================================
+
+static ral_flrc_cr_t convert_pb_flrc_cr_to_native( ral_flrc_cr_pb_t pb_cr )
+{
+    switch( pb_cr )
+    {
+    case ral_flrc_cr_pb_t_RAL_FLRC_CR_1_2_PB:
+        return RAL_FLRC_CR_1_2;
+    case ral_flrc_cr_pb_t_RAL_FLRC_CR_3_4_PB:
+        return RAL_FLRC_CR_3_4;
+    case ral_flrc_cr_pb_t_RAL_FLRC_CR_1_1_PB:
+        return RAL_FLRC_CR_1_1;
+    case ral_flrc_cr_pb_t_RAL_FLRC_CR_2_3_PB:
+        return RAL_FLRC_CR_2_3;
+    default:
+        return RAL_FLRC_CR_1_2;  // Default
+    }
+}
+
+static ral_flrc_cr_pb_t convert_native_flrc_cr_to_pb( ral_flrc_cr_t native_cr )
+{
+    switch( native_cr )
+    {
+    case RAL_FLRC_CR_1_2:
+        return ral_flrc_cr_pb_t_RAL_FLRC_CR_1_2_PB;
+    case RAL_FLRC_CR_3_4:
+        return ral_flrc_cr_pb_t_RAL_FLRC_CR_3_4_PB;
+    case RAL_FLRC_CR_1_1:
+        return ral_flrc_cr_pb_t_RAL_FLRC_CR_1_1_PB;
+    case RAL_FLRC_CR_2_3:
+        return ral_flrc_cr_pb_t_RAL_FLRC_CR_2_3_PB;
+    default:
+        return ral_flrc_cr_pb_t_RAL_FLRC_CR_1_2_PB;  // Default
+    }
+}
+
+static ral_flrc_crc_type_t convert_pb_flrc_crc_type_to_native( ral_flrc_crc_type_pb_t pb_crc )
+{
+    // NOTE: Protobuf uses sequential values (0,1,2,3), native uses (0,2,3,4)
+    switch( pb_crc )
+    {
+    case ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_OFF_PB:
+        return RAL_FLRC_CRC_OFF;
+    case ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_2_BYTES_PB:
+        return RAL_FLRC_CRC_2_BYTES;
+    case ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_3_BYTES_PB:
+        return RAL_FLRC_CRC_3_BYTES;
+    case ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_4_BYTES_PB:
+        return RAL_FLRC_CRC_4_BYTES;
+    default:
+        return RAL_FLRC_CRC_OFF;  // Default
+    }
+}
+
+static ral_flrc_crc_type_pb_t convert_native_flrc_crc_type_to_pb( ral_flrc_crc_type_t native_crc )
+{
+    // NOTE: Native uses (0,2,3,4), protobuf uses sequential values (0,1,2,3)
+    switch( native_crc )
+    {
+    case RAL_FLRC_CRC_OFF:
+        return ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_OFF_PB;
+    case RAL_FLRC_CRC_2_BYTES:
+        return ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_2_BYTES_PB;
+    case RAL_FLRC_CRC_3_BYTES:
+        return ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_3_BYTES_PB;
+    case RAL_FLRC_CRC_4_BYTES:
+        return ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_4_BYTES_PB;
+    default:
+        return ral_flrc_crc_type_pb_t_RAL_FLRC_CRC_OFF_PB;  // Default
+    }
+}
+
+static ral_flrc_pulse_shape_t convert_pb_flrc_pulse_shape_to_native( ral_flrc_pulse_shape_pb_t pb_shape )
+{
+    switch( pb_shape )
+    {
+    case ral_flrc_pulse_shape_pb_t_RAL_FLRC_PULSE_SHAPE_OFF_PB:
+        return RAL_FLRC_PULSE_SHAPE_OFF;
+    case ral_flrc_pulse_shape_pb_t_RAL_FLRC_PULSE_SHAPE_BT_05_PB:
+        return RAL_FLRC_PULSE_SHAPE_BT_05;
+    case ral_flrc_pulse_shape_pb_t_RAL_FLRC_PULSE_SHAPE_BT_1_PB:
+        return RAL_FLRC_PULSE_SHAPE_BT_1;
+    default:
+        return RAL_FLRC_PULSE_SHAPE_OFF;  // Default
+    }
+}
+
+static ral_flrc_pulse_shape_pb_t convert_native_flrc_pulse_shape_to_pb( ral_flrc_pulse_shape_t native_shape )
+{
+    switch( native_shape )
+    {
+    case RAL_FLRC_PULSE_SHAPE_OFF:
+        return ral_flrc_pulse_shape_pb_t_RAL_FLRC_PULSE_SHAPE_OFF_PB;
+    case RAL_FLRC_PULSE_SHAPE_BT_05:
+        return ral_flrc_pulse_shape_pb_t_RAL_FLRC_PULSE_SHAPE_BT_05_PB;
+    case RAL_FLRC_PULSE_SHAPE_BT_1:
+        return ral_flrc_pulse_shape_pb_t_RAL_FLRC_PULSE_SHAPE_BT_1_PB;
+    default:
+        return ral_flrc_pulse_shape_pb_t_RAL_FLRC_PULSE_SHAPE_OFF_PB;  // Default
+    }
+}
+
+static ral_flrc_sync_word_len_t convert_pb_flrc_sync_word_len_to_native( ral_flrc_sync_word_len_pb_t pb_len )
+{
+    switch( pb_len )
+    {
+    case ral_flrc_sync_word_len_pb_t_RAL_FLRC_SYNCWORD_LENGTH_OFF_PB:
+        return RAL_FLRC_SYNCWORD_LENGTH_OFF;
+    case ral_flrc_sync_word_len_pb_t_RAL_FLRC_SYNCWORD_LENGTH_2_BYTES_PB:
+        return RAL_FLRC_SYNCWORD_LENGTH_2_BYTES;
+    case ral_flrc_sync_word_len_pb_t_RAL_FLRC_SYNCWORD_LENGTH_4_BYTES_PB:
+        return RAL_FLRC_SYNCWORD_LENGTH_4_BYTES;
+    default:
+        return RAL_FLRC_SYNCWORD_LENGTH_OFF;  // Default
+    }
+}
+
+static ral_flrc_sync_word_len_pb_t convert_native_flrc_sync_word_len_to_pb( ral_flrc_sync_word_len_t native_len )
+{
+    switch( native_len )
+    {
+    case RAL_FLRC_SYNCWORD_LENGTH_OFF:
+        return ral_flrc_sync_word_len_pb_t_RAL_FLRC_SYNCWORD_LENGTH_OFF_PB;
+    case RAL_FLRC_SYNCWORD_LENGTH_2_BYTES:
+        return ral_flrc_sync_word_len_pb_t_RAL_FLRC_SYNCWORD_LENGTH_2_BYTES_PB;
+    case RAL_FLRC_SYNCWORD_LENGTH_4_BYTES:
+        return ral_flrc_sync_word_len_pb_t_RAL_FLRC_SYNCWORD_LENGTH_4_BYTES_PB;
+    default:
+        return ral_flrc_sync_word_len_pb_t_RAL_FLRC_SYNCWORD_LENGTH_OFF_PB;  // Default
+    }
+}
+
+static ral_flrc_tx_syncword_t convert_pb_flrc_tx_syncword_index_to_native( ral_flrc_tx_syncword_pb_t pb_sw )
+{
+    switch( pb_sw )
+    {
+    case ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_NONE_PB:
+        return RAL_FLRC_TX_SYNCWORD_NONE;
+    case ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_1_PB:
+        return RAL_FLRC_TX_SYNCWORD_1;
+    case ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_2_PB:
+        return RAL_FLRC_TX_SYNCWORD_2;
+    case ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_3_PB:
+        return RAL_FLRC_TX_SYNCWORD_3;
+    default:
+        return RAL_FLRC_TX_SYNCWORD_NONE;  // Default
+    }
+}
+
+static ral_flrc_tx_syncword_pb_t convert_native_flrc_tx_syncword_index_to_pb( ral_flrc_tx_syncword_t native_sw )
+{
+    switch( native_sw )
+    {
+    case RAL_FLRC_TX_SYNCWORD_NONE:
+        return ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_NONE_PB;
+    case RAL_FLRC_TX_SYNCWORD_1:
+        return ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_1_PB;
+    case RAL_FLRC_TX_SYNCWORD_2:
+        return ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_2_PB;
+    case RAL_FLRC_TX_SYNCWORD_3:
+        return ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_3_PB;
+    default:
+        return ral_flrc_tx_syncword_pb_t_RAL_FLRC_TX_SYNCWORD_NONE_PB;  // Default
+    }
+}
+
+static ral_flrc_rx_match_sync_word_t convert_pb_flrc_rx_match_to_native( ral_flrc_rx_match_sync_word_pb_t pb_match )
+{
+    switch( pb_match )
+    {
+    case ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_OFF_PB:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_OFF;
+    case ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_1_PB:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_1;
+    case ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_2_PB:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_2;
+    case ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_2_PB:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_2;
+    case ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_3_PB:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_3;
+    case ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_3_PB:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_3;
+    case ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_2_OR_3_PB:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_2_OR_3;
+    case ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_2_OR_3_PB:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_2_OR_3;
+    default:
+        return RAL_FLRC_RX_MATCH_SYNCWORD_OFF;  // Default
+    }
+}
+
+static ral_flrc_rx_match_sync_word_pb_t convert_native_flrc_rx_match_to_pb( ral_flrc_rx_match_sync_word_t native_match )
+{
+    switch( native_match )
+    {
+    case RAL_FLRC_RX_MATCH_SYNCWORD_OFF:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_OFF_PB;
+    case RAL_FLRC_RX_MATCH_SYNCWORD_1:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_1_PB;
+    case RAL_FLRC_RX_MATCH_SYNCWORD_2:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_2_PB;
+    case RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_2:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_2_PB;
+    case RAL_FLRC_RX_MATCH_SYNCWORD_3:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_3_PB;
+    case RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_3:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_3_PB;
+    case RAL_FLRC_RX_MATCH_SYNCWORD_2_OR_3:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_2_OR_3_PB;
+    case RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_2_OR_3:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_1_OR_2_OR_3_PB;
+    default:
+        return ral_flrc_rx_match_sync_word_pb_t_RAL_FLRC_RX_MATCH_SYNCWORD_OFF_PB;  // Default
+    }
+}
+
+static ral_flrc_raw_bit_rate_t convert_pb_flrc_raw_bit_rate_to_native( ral_flrc_raw_bit_rate_pb_t pb_br )
+{
+    switch( pb_br )
+    {
+    case ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_0_260_MBPS_PB:
+        return RAL_FLRC_RAW_BIT_RATE_0_260_MBPS;
+    case ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_0_325_MBPS_PB:
+        return RAL_FLRC_RAW_BIT_RATE_0_325_MBPS;
+    case ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_0_520_MBPS_PB:
+        return RAL_FLRC_RAW_BIT_RATE_0_520_MBPS;
+    case ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_0_650_MBPS_PB:
+        return RAL_FLRC_RAW_BIT_RATE_0_650_MBPS;
+    case ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_1_040_MBPS_PB:
+        return RAL_FLRC_RAW_BIT_RATE_1_040_MBPS;
+    case ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_1_300_MBPS_PB:
+        return RAL_FLRC_RAW_BIT_RATE_1_300_MBPS;
+    case ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_2_080_MBPS_PB:
+        return RAL_FLRC_RAW_BIT_RATE_2_080_MBPS;
+    case ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_2_600_MBPS_PB:
+        return RAL_FLRC_RAW_BIT_RATE_2_600_MBPS;
+    default:
+        return RAL_FLRC_RAW_BIT_RATE_1_040_MBPS;  // Default
+    }
+}
+
+static ral_flrc_raw_bit_rate_pb_t convert_native_flrc_raw_bit_rate_to_pb( ral_flrc_raw_bit_rate_t native_br )
+{
+    switch( native_br )
+    {
+    case RAL_FLRC_RAW_BIT_RATE_0_260_MBPS:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_0_260_MBPS_PB;
+    case RAL_FLRC_RAW_BIT_RATE_0_325_MBPS:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_0_325_MBPS_PB;
+    case RAL_FLRC_RAW_BIT_RATE_0_520_MBPS:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_0_520_MBPS_PB;
+    case RAL_FLRC_RAW_BIT_RATE_0_650_MBPS:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_0_650_MBPS_PB;
+    case RAL_FLRC_RAW_BIT_RATE_1_040_MBPS:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_1_040_MBPS_PB;
+    case RAL_FLRC_RAW_BIT_RATE_1_300_MBPS:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_1_300_MBPS_PB;
+    case RAL_FLRC_RAW_BIT_RATE_2_080_MBPS:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_2_080_MBPS_PB;
+    case RAL_FLRC_RAW_BIT_RATE_2_600_MBPS:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_2_600_MBPS_PB;
+    default:
+        return ral_flrc_raw_bit_rate_pb_t_RAL_FLRC_RAW_BIT_RATE_1_040_MBPS_PB;  // Default
+    }
+}
+
+static ral_flrc_preamble_length_t convert_pb_flrc_preamble_len_to_native( ral_flrc_preamble_length_pb_t pb_len )
+{
+    switch( pb_len )
+    {
+    case ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_4_BITS_PB:
+        return RAL_FLRC_PREAMBLE_LENGTH_4_BITS;
+    case ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_8_BITS_PB:
+        return RAL_FLRC_PREAMBLE_LENGTH_8_BITS;
+    case ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_12_BITS_PB:
+        return RAL_FLRC_PREAMBLE_LENGTH_12_BITS;
+    case ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_16_BITS_PB:
+        return RAL_FLRC_PREAMBLE_LENGTH_16_BITS;
+    case ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_20_BITS_PB:
+        return RAL_FLRC_PREAMBLE_LENGTH_20_BITS;
+    case ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_24_BITS_PB:
+        return RAL_FLRC_PREAMBLE_LENGTH_24_BITS;
+    case ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_28_BITS_PB:
+        return RAL_FLRC_PREAMBLE_LENGTH_28_BITS;
+    case ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_32_BITS_PB:
+        return RAL_FLRC_PREAMBLE_LENGTH_32_BITS;
+    default:
+        return RAL_FLRC_PREAMBLE_LENGTH_32_BITS;  // Default
+    }
+}
+
+static ral_flrc_preamble_length_pb_t convert_native_flrc_preamble_len_to_pb( ral_flrc_preamble_length_t native_len )
+{
+    switch( native_len )
+    {
+    case RAL_FLRC_PREAMBLE_LENGTH_4_BITS:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_4_BITS_PB;
+    case RAL_FLRC_PREAMBLE_LENGTH_8_BITS:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_8_BITS_PB;
+    case RAL_FLRC_PREAMBLE_LENGTH_12_BITS:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_12_BITS_PB;
+    case RAL_FLRC_PREAMBLE_LENGTH_16_BITS:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_16_BITS_PB;
+    case RAL_FLRC_PREAMBLE_LENGTH_20_BITS:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_20_BITS_PB;
+    case RAL_FLRC_PREAMBLE_LENGTH_24_BITS:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_24_BITS_PB;
+    case RAL_FLRC_PREAMBLE_LENGTH_28_BITS:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_28_BITS_PB;
+    case RAL_FLRC_PREAMBLE_LENGTH_32_BITS:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_32_BITS_PB;
+    default:
+        return ral_flrc_preamble_length_pb_t_RAL_FLRC_PREAMBLE_LENGTH_32_BITS_PB;  // Default
+    }
+}
+
+#if defined( USE_FLRC_PROTOCOL )
+void convert_pb_flrc_protocol_radio_config_to_native( const flrc_protocol_radio_config_pb_t* pb_config,
+                                                      smtc_flrp_radio_config_t*              native_config )
+{
+    if( pb_config == NULL || native_config == NULL )
+    {
+        return;
+    }
+
+    for( uint8_t i = 0; i < SMTC_FLRP_NB_CHANNELS_MAX; i++ )
+    {
+        native_config->flrc.channels_freq_hz[i] = pb_config->frequencies_hz[i];
+    }
+    native_config->flrc.nb_channels          = ( uint8_t ) pb_config->nb_frequencies;
+    native_config->flrc.default_channel      = ( uint8_t ) pb_config->default_channel;
+    native_config->flrc.raw_bit_rate         = convert_pb_flrc_raw_bit_rate_to_native( pb_config->raw_bit_rate );
+    native_config->flrc.tx_power_in_dbm      = ( int8_t ) pb_config->tx_power_in_dbm;
+    native_config->flrc.interframe_delay_us  = ( uint16_t ) pb_config->interframe_delay_us;
+    native_config->flrc.start_burst_delay_us = ( uint16_t ) pb_config->start_burst_delay_us;
+    native_config->flrc.start_ack_delay_us   = ( uint16_t ) pb_config->start_ack_delay_us;
+    native_config->flrc.adaptive_link_interframe_delay_us = ( uint16_t ) pb_config->adaptive_link_interframe_delay_us;
+    native_config->flrc.burst_target_per                  = ( uint8_t ) pb_config->burst_target_per;
+}
+
+static void flrp_pb_sync_bytes_to_row( pb_size_t size, const uint8_t* bytes,
+                                       uint8_t dest[SMTC_FLRP_SIZE_SYNC_WORD_MAX] )
+{
+    memset( dest, 0, SMTC_FLRP_SIZE_SYNC_WORD_MAX );
+    if( ( bytes != NULL ) && ( size > 0 ) )
+    {
+        pb_size_t n = ( size > SMTC_FLRP_SIZE_SYNC_WORD_MAX ) ? SMTC_FLRP_SIZE_SYNC_WORD_MAX : size;
+        memcpy( dest, bytes, n );
+    }
+}
+
+static void flrp_fill_native_advanced_flrc_from_pb_fields(
+    ral_flrc_cr_pb_t cr, ral_flrc_pulse_shape_pb_t pulse_shape, ral_flrc_preamble_length_pb_t preamble_len,
+    ral_flrc_sync_word_len_pb_t sync_word_len, ral_flrc_tx_syncword_pb_t tx_syncword_index,
+    ral_flrc_rx_match_sync_word_pb_t rx_match_sync_word, bool pld_is_fix, ral_flrc_crc_type_pb_t crc_type,
+    uint32_t crc_seed, uint32_t crc_polynomial, pb_size_t sw1_size, const uint8_t* sw1_bytes, pb_size_t sw2_size,
+    const uint8_t* sw2_bytes, pb_size_t sw3_size, const uint8_t* sw3_bytes,
+    smtc_flrp_flrc_advanced_radio_config_t* advanced_config )
+{
+    memset( advanced_config, 0, sizeof( *advanced_config ) );
+    advanced_config->cr                 = convert_pb_flrc_cr_to_native( cr );
+    advanced_config->pulse_shape        = convert_pb_flrc_pulse_shape_to_native( pulse_shape );
+    advanced_config->preambule_len      = convert_pb_flrc_preamble_len_to_native( preamble_len );
+    advanced_config->sync_word_len      = convert_pb_flrc_sync_word_len_to_native( sync_word_len );
+    advanced_config->tx_syncword_index  = convert_pb_flrc_tx_syncword_index_to_native( tx_syncword_index );
+    advanced_config->rx_match_sync_word = convert_pb_flrc_rx_match_to_native( rx_match_sync_word );
+    advanced_config->pld_is_fix         = pld_is_fix;
+    advanced_config->crc_type           = convert_pb_flrc_crc_type_to_native( crc_type );
+    advanced_config->crc_seed           = crc_seed;
+    advanced_config->crc_polynomial     = crc_polynomial;
+
+    flrp_pb_sync_bytes_to_row( sw1_size, sw1_bytes, advanced_config->sync_word[0] );
+    flrp_pb_sync_bytes_to_row( sw2_size, sw2_bytes, advanced_config->sync_word[1] );
+    flrp_pb_sync_bytes_to_row( sw3_size, sw3_bytes, advanced_config->sync_word[2] );
+}
+
+void convert_pb_flrc_protocol_radio_config_to_native_advanced( const flrc_protocol_radio_config_pb_t*  pb_config,
+                                                               smtc_flrp_flrc_advanced_radio_config_t* advanced_config )
+{
+    if( pb_config == NULL || advanced_config == NULL )
+    {
+        return;
+    }
+
+    flrp_fill_native_advanced_flrc_from_pb_fields(
+        pb_config->cr, pb_config->pulse_shape, pb_config->preamble_len, pb_config->sync_word_len,
+        pb_config->tx_syncword_index, pb_config->rx_match_sync_word, pb_config->pld_is_fix, pb_config->crc_type,
+        pb_config->crc_seed, pb_config->crc_polynomial, pb_config->sync_word_1.size,
+        ( const uint8_t* ) pb_config->sync_word_1.bytes, pb_config->sync_word_2.size,
+        ( const uint8_t* ) pb_config->sync_word_2.bytes, pb_config->sync_word_3.size,
+        ( const uint8_t* ) pb_config->sync_word_3.bytes, advanced_config );
+}
+
+void convert_pb_flrp_flrc_advanced_radio_config_to_native( const flrp_flrc_advanced_radio_config_pb_t* pb_config,
+                                                           smtc_flrp_flrc_advanced_radio_config_t*     advanced_config )
+{
+    if( pb_config == NULL || advanced_config == NULL )
+    {
+        return;
+    }
+
+    flrp_fill_native_advanced_flrc_from_pb_fields(
+        pb_config->cr, pb_config->pulse_shape, pb_config->preamble_len, pb_config->sync_word_len,
+        pb_config->tx_syncword_index, pb_config->rx_match_sync_word, pb_config->pld_is_fix, pb_config->crc_type,
+        pb_config->crc_seed, pb_config->crc_polynomial, pb_config->sync_word_1.size,
+        ( const uint8_t* ) pb_config->sync_word_1.bytes, pb_config->sync_word_2.size,
+        ( const uint8_t* ) pb_config->sync_word_2.bytes, pb_config->sync_word_3.size,
+        ( const uint8_t* ) pb_config->sync_word_3.bytes, advanced_config );
+}
+
+void convert_pb_flrp_radio_config( const flrp_radio_config_pb_t* pb_config,
+                                   smtc_flrp_radio_config_t*     flrp_radio_config )
+{
+    if( ( pb_config == NULL ) || ( flrp_radio_config == NULL ) )
+    {
+        return;
+    }
+
+    memset( flrp_radio_config, 0, sizeof( *flrp_radio_config ) );
+
+    if( pb_config->has_flrc )
+    {
+        const flrp_flrc_radio_config_pb_t* flrc_pb = &pb_config->flrc;
+        for( uint8_t i = 0; i < SMTC_FLRP_NB_CHANNELS_MAX; i++ )
+        {
+            flrp_radio_config->flrc.channels_freq_hz[i] = flrc_pb->channels_freq_hz[i];
+        }
+
+        flrp_radio_config->flrc.nb_channels          = ( uint8_t ) flrc_pb->nb_channels;
+        flrp_radio_config->flrc.default_channel      = ( uint8_t ) flrc_pb->default_channel;
+        flrp_radio_config->flrc.raw_bit_rate         = convert_pb_flrc_raw_bit_rate_to_native( flrc_pb->raw_bit_rate );
+        flrp_radio_config->flrc.tx_power_in_dbm      = ( int8_t ) flrc_pb->tx_power_in_dbm;
+        flrp_radio_config->flrc.interframe_delay_us  = ( uint16_t ) flrc_pb->interframe_delay_us;
+        flrp_radio_config->flrc.start_burst_delay_us = ( uint16_t ) flrc_pb->start_burst_delay_us;
+        flrp_radio_config->flrc.start_ack_delay_us   = ( uint16_t ) flrc_pb->start_ack_delay_us;
+        flrp_radio_config->flrc.adaptive_link_interframe_delay_us =
+            ( uint16_t ) flrc_pb->adaptive_link_interframe_delay_us;
+        flrp_radio_config->flrc.burst_target_per = ( uint8_t ) flrc_pb->burst_target_per;
+    }
+
+    if( pb_config->has_wor_rx )
+    {
+        flrp_radio_config->wor_rx.frequency_hz    = pb_config->wor_rx.frequency_hz;
+        flrp_radio_config->wor_rx.sf              = convert_pb_sf_to_native( pb_config->wor_rx.sf );
+        flrp_radio_config->wor_rx.bw              = convert_pb_bw_to_native( pb_config->wor_rx.bw );
+        flrp_radio_config->wor_rx.tx_power_in_dbm = ( int8_t ) pb_config->wor_rx.tx_power_in_dbm;
+    }
+
+    if( pb_config->has_wor_tx )
+    {
+        flrp_radio_config->wor_tx.frequency_hz    = pb_config->wor_tx.frequency_hz;
+        flrp_radio_config->wor_tx.sf              = convert_pb_sf_to_native( pb_config->wor_tx.sf );
+        flrp_radio_config->wor_tx.bw              = convert_pb_bw_to_native( pb_config->wor_tx.bw );
+        flrp_radio_config->wor_tx.tx_power_in_dbm = ( int8_t ) pb_config->wor_tx.tx_power_in_dbm;
+    }
+}
+
+bool convert_native_flrp_radio_config_to_pb( const smtc_flrp_radio_config_t* native_config,
+                                             flrp_radio_config_pb_t*         pb_config )
+{
+    if( ( native_config == NULL ) || ( pb_config == NULL ) )
+    {
+        return false;
+    }
+
+    memset( pb_config, 0, sizeof( *pb_config ) );
+
+    pb_config->has_flrc                  = true;
+    flrp_flrc_radio_config_pb_t* flrc_pb = &pb_config->flrc;
+    for( uint8_t i = 0; i < SMTC_FLRP_NB_CHANNELS_MAX; i++ )
+    {
+        flrc_pb->channels_freq_hz[i] = native_config->flrc.channels_freq_hz[i];
+    }
+    flrc_pb->nb_channels          = ( uint32_t ) native_config->flrc.nb_channels;
+    flrc_pb->default_channel      = ( uint32_t ) native_config->flrc.default_channel;
+    flrc_pb->raw_bit_rate         = convert_native_flrc_raw_bit_rate_to_pb( native_config->flrc.raw_bit_rate );
+    flrc_pb->tx_power_in_dbm      = ( int32_t ) native_config->flrc.tx_power_in_dbm;
+    flrc_pb->interframe_delay_us  = ( uint32_t ) native_config->flrc.interframe_delay_us;
+    flrc_pb->start_burst_delay_us = ( uint32_t ) native_config->flrc.start_burst_delay_us;
+    flrc_pb->start_ack_delay_us   = ( uint32_t ) native_config->flrc.start_ack_delay_us;
+    flrc_pb->adaptive_link_interframe_delay_us = ( uint32_t ) native_config->flrc.adaptive_link_interframe_delay_us;
+    flrc_pb->burst_target_per                  = ( uint32_t ) native_config->flrc.burst_target_per;
+
+    pb_config->has_wor_rx             = true;
+    pb_config->wor_rx.frequency_hz    = native_config->wor_rx.frequency_hz;
+    pb_config->wor_rx.sf              = convert_native_sf_to_pb( native_config->wor_rx.sf );
+    pb_config->wor_rx.bw              = convert_native_bw_to_pb( native_config->wor_rx.bw );
+    pb_config->wor_rx.tx_power_in_dbm = native_config->wor_rx.tx_power_in_dbm;
+
+    pb_config->has_wor_tx             = true;
+    pb_config->wor_tx.frequency_hz    = native_config->wor_tx.frequency_hz;
+    pb_config->wor_tx.sf              = convert_native_sf_to_pb( native_config->wor_tx.sf );
+    pb_config->wor_tx.bw              = convert_native_bw_to_pb( native_config->wor_tx.bw );
+    pb_config->wor_tx.tx_power_in_dbm = native_config->wor_tx.tx_power_in_dbm;
+
+    return true;
+}
+
+bool convert_pb_flrp_com_config_to_native( const flrp_com_config_pb_t* pb_config,
+                                           smtc_flrp_com_config_t*     native_config )
+{
+    if( ( pb_config == NULL ) || ( native_config == NULL ) )
+    {
+        return false;
+    }
+    if( pb_config->slave_dev_eui.size != SMTC_FLRP_EUI_LENGTH )
+    {
+        return false;
+    }
+    if( pb_config->filter_len > 63U )
+    {
+        return false;
+    }
+
+    switch( pb_config->com_mode )
+    {
+    case smtc_flrp_communication_mode_pb_t_SMTC_FLRP_BIDIRECTIONAL_PB:
+        native_config->com_mode = SMTC_FLRP_BIDIRECTIONAL;
+        break;
+    case smtc_flrp_communication_mode_pb_t_SMTC_FLRP_BIDIRECTIONAL_STREAM_PB:
+        native_config->com_mode = SMTC_FLRP_BIDIRECTIONAL_STREAM;
+        break;
+    case smtc_flrp_communication_mode_pb_t_SMTC_FLRP_COM_ONE_WAY_PB:
+        native_config->com_mode = SMTC_FLRP_COM_ONE_WAY;
+        break;
+    default:
+        return false;
+    }
+
+    memcpy( native_config->slave_dev_eui, pb_config->slave_dev_eui.bytes, SMTC_FLRP_EUI_LENGTH );
+    native_config->filter_len = ( uint8_t ) pb_config->filter_len;
+
+    switch( pb_config->link_adaptation_mode )
+    {
+    case smtc_flrp_link_adaptation_mode_pb_t_SMTC_FLRP_LINK_ADAPTATION_FULLY_ENABLED_PB:
+        native_config->link_adaptation_mode = SMTC_FLRP_LINK_ADAPTATION_FULLY_ENABLED;
+        break;
+    case smtc_flrp_link_adaptation_mode_pb_t_SMTC_FLRP_LINK_ADAPTATION_DISABLED_PB:
+        native_config->link_adaptation_mode = SMTC_FLRP_LINK_ADAPTATION_DISABLED;
+        break;
+    case smtc_flrp_link_adaptation_mode_pb_t_SMTC_FLRP_LINK_ADAPTATION_CHANNEL_SELECTION_ONLY_PB:
+        native_config->link_adaptation_mode = SMTC_FLRP_LINK_ADAPTATION_CHANNEL_SELECTION_ONLY;
+        break;
+    case smtc_flrp_link_adaptation_mode_pb_t_SMTC_FLRP_LINK_ADAPTATION_DATARATE_SELECTION_ONLY_PB:
+        native_config->link_adaptation_mode = SMTC_FLRP_LINK_ADAPTATION_DATARATE_SELECTION_ONLY;
+        break;
+    case smtc_flrp_link_adaptation_mode_pb_t_SMTC_FLRP_LINK_ADAPTATION_ENABLED_WITHOUT_SELECTION_PB:
+        native_config->link_adaptation_mode = SMTC_FLRP_LINK_ADAPTATION_ENABLED_WITHOUT_SELECTION;
+        break;
+    default:
+        return false;
+    }
+    return true;
+}
+
+bool convert_pb_flrp_api_config_to_native( const flrp_api_config_pb_t* pb_config,
+                                           smtc_flrp_api_config_t*     flrp_api_config )
+{
+    if( ( pb_config == NULL ) || ( flrp_api_config == NULL ) )
+    {
+        return false;
+    }
+    if( pb_config->dev_eui.size != SMTC_FLRP_EUI_LENGTH )
+    {
+        return false;
+    }
+
+    memcpy( flrp_api_config->dev_eui, pb_config->dev_eui.bytes, SMTC_FLRP_EUI_LENGTH );
+    flrp_api_config->crypto_enabled = pb_config->crypto_enabled;
+    flrp_api_config->crystal_error  = pb_config->crystal_error;
+
+    switch( pb_config->freq_plan )
+    {
+    case smtc_flrp_frequency_plan_pb_t_SMTC_FLRP_FREQ_865MHZ_PB:
+        flrp_api_config->freq_plan = SMTC_FLRP_FREQ_865MHz;
+        break;
+    case smtc_flrp_frequency_plan_pb_t_SMTC_FLRP_FREQ_2GHZ4_PB:
+        flrp_api_config->freq_plan = SMTC_FLRP_FREQ_2GHz4;
+        break;
+    default:
+        return false;
+    }
+    return true;
+}
+#endif  // USE_FLRC_PROTOCOL
 
 /**
  * \brief Convert native rp_status_t to protobuf rp_status_pb_t
@@ -559,6 +1203,7 @@ bool rac_convert_data_result_to_pb( const smtc_rac_data_result_t* native_result,
     // Copy radio results
     pb_result->rx_size                  = native_result->rx_size;
     pb_result->rssi_result              = native_result->rssi_result;
+    pb_result->signal_rssi_result       = native_result->signal_rssi_result;
     pb_result->snr_result               = native_result->snr_result;
     pb_result->radio_end_timestamp_ms   = native_result->radio_end_timestamp_ms;
     pb_result->radio_start_timestamp_ms = native_result->radio_start_timestamp_ms;
@@ -600,7 +1245,7 @@ bool rac_copy_rx_payload_to_result( const uint8_t* rx_payload_buffer, uint32_t r
     if( rx_size > 0 )
     {
         // Check buffer size limits
-        if( rx_size > 255 )
+        if( rx_size > sizeof( pb_result->rx_payload_buffer.bytes ) )
         {
             return false;  // Payload too large for protobuf
         }
@@ -640,7 +1285,7 @@ bool rac_convert_data_buffer_setup_from_pb( const smtc_rac_data_buffer_setup_pb_
             return false;  // No TX payload buffer pre-allocated
         }
         // Validate payload size using the bytes field size
-        if( pb_setup->tx_payload_buffer.size > 255 )
+        if( pb_setup->tx_payload_buffer.size > sizeof( pb_setup->tx_payload_buffer.bytes ) )
         {
             return false;  // Buffer too large for existing buffer
         }
@@ -663,9 +1308,10 @@ bool rac_convert_data_result_from_pb( const smtc_rac_data_result_pb_t* pb_result
     }
 
     // Copy radio results
-    native_result->rx_size     = pb_result->rx_size;
-    native_result->rssi_result = pb_result->rssi_result;
-    native_result->snr_result  = pb_result->snr_result;
+    native_result->rx_size            = pb_result->rx_size;
+    native_result->rssi_result        = pb_result->rssi_result;
+    native_result->signal_rssi_result = pb_result->signal_rssi_result;
+    native_result->snr_result         = pb_result->snr_result;
 
     // Copy timestamp values (direct values, no longer pointers)
     native_result->radio_end_timestamp_ms   = pb_result->radio_end_timestamp_ms;
@@ -677,7 +1323,7 @@ bool rac_convert_data_result_from_pb( const smtc_rac_data_result_pb_t* pb_result
         // Convert protobuf ranging result to native structure
         native_result->ranging_result.raw_distance = 0;  // Not available in protobuf version
         native_result->ranging_result.distance_m = ( int32_t ) pb_result->ranging_result.distance_m;  // float → int32_t
-        native_result->ranging_result.rssi       = ( int8_t ) pb_result->ranging_result.rssi;         // float → int8_t
+        native_result->ranging_result.rssi = ( int8_t ) pb_result->ranging_result.rssi;  // float → int8_t
     }
 
     return true;
@@ -786,54 +1432,56 @@ bool rac_convert_cad_context_to_pb( const smtc_rac_cad_radio_params_t* native_ca
     pb_cad->cad_timeout_in_ms = native_cad->cad_timeout_in_ms;
 
     // Convert CAD exit mode
-    switch (native_cad->cad_exit_mode) {
-        case RAL_LORA_CAD_ONLY:
-            pb_cad->cad_exit_mode = ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_ONLY_PB;
-            break;
-        case RAL_LORA_CAD_RX:
-            pb_cad->cad_exit_mode = ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_RX_PB;
-            break;
-        case RAL_LORA_CAD_LBT:
-            pb_cad->cad_exit_mode = ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_LBT_PB;
-            break;
-        default:
-            return false;
-            break;
+    switch( native_cad->cad_exit_mode )
+    {
+    case RAL_LORA_CAD_ONLY:
+        pb_cad->cad_exit_mode = ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_ONLY_PB;
+        break;
+    case RAL_LORA_CAD_RX:
+        pb_cad->cad_exit_mode = ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_RX_PB;
+        break;
+    case RAL_LORA_CAD_LBT:
+        pb_cad->cad_exit_mode = ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_LBT_PB;
+        break;
+    default:
+        return false;
+        break;
     }
 
     // Convert CAD symbol number
-    switch (native_cad->cad_symb_nb) {
-        case RAL_LORA_CAD_01_SYMB:
-            pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_01_SYMB_PB;
-            break;
-        case RAL_LORA_CAD_02_SYMB:
-            pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_02_SYMB_PB;
-            break;
-        case RAL_LORA_CAD_04_SYMB:
-            pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_04_SYMB_PB;
-            break;
-        case RAL_LORA_CAD_08_SYMB:
-            pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_08_SYMB_PB;
-            break;
-        case RAL_LORA_CAD_16_SYMB:
-            pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_16_SYMB_PB;
-            break;
-        default:
-            return false;
-            break;
+    switch( native_cad->cad_symb_nb )
+    {
+    case RAL_LORA_CAD_01_SYMB:
+        pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_01_SYMB_PB;
+        break;
+    case RAL_LORA_CAD_02_SYMB:
+        pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_02_SYMB_PB;
+        break;
+    case RAL_LORA_CAD_04_SYMB:
+        pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_04_SYMB_PB;
+        break;
+    case RAL_LORA_CAD_08_SYMB:
+        pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_08_SYMB_PB;
+        break;
+    case RAL_LORA_CAD_16_SYMB:
+        pb_cad->cad_symb_nb = ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_16_SYMB_PB;
+        break;
+    default:
+        return false;
+        break;
     }
 
     // Convert timeout
     pb_cad->cad_timeout_in_ms = native_cad->cad_timeout_in_ms;
 
     // Convert spreading factor
-    pb_cad->sf = convert_native_sf_to_pb(native_cad->sf);
+    pb_cad->sf = convert_native_sf_to_pb( native_cad->sf );
 
     // Convert bandwidth
-    pb_cad->bw = convert_native_bw_to_pb(native_cad->bw);
+    pb_cad->bw = convert_native_bw_to_pb( native_cad->bw );
 
     // Copy other parameters
-    pb_cad->rf_freq_in_hz = native_cad->rf_freq_in_hz;
+    pb_cad->rf_freq_in_hz   = native_cad->rf_freq_in_hz;
     pb_cad->invert_iq_is_on = native_cad->invert_iq_is_on;
 
     return true;
@@ -850,62 +1498,199 @@ bool rac_convert_cad_context_from_pb( const smtc_rac_cad_context_pb_t* pb_cad, s
     native_cad->cad_timeout_in_ms = pb_cad->cad_timeout_in_ms;
 
     // Convert CAD exit mode
-    switch (pb_cad->cad_exit_mode) {
-        case ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_ONLY_PB:
-            native_cad->cad_exit_mode = RAL_LORA_CAD_ONLY;
-            break;
-        case ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_RX_PB:
-            native_cad->cad_exit_mode = RAL_LORA_CAD_RX;
-            break;
-        case ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_LBT_PB:
-            native_cad->cad_exit_mode = RAL_LORA_CAD_LBT;
-            break;
-        default:
-            return false;
-            break;
+    switch( pb_cad->cad_exit_mode )
+    {
+    case ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_ONLY_PB:
+        native_cad->cad_exit_mode = RAL_LORA_CAD_ONLY;
+        break;
+    case ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_RX_PB:
+        native_cad->cad_exit_mode = RAL_LORA_CAD_RX;
+        break;
+    case ral_lora_cad_exit_modes_pb_t_RAL_LORA_CAD_LBT_PB:
+        native_cad->cad_exit_mode = RAL_LORA_CAD_LBT;
+        break;
+    default:
+        return false;
+        break;
     }
 
     // Convert CAD symbol number
-    switch (pb_cad->cad_symb_nb) {
-        case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_01_SYMB_PB:
-            native_cad->cad_symb_nb = RAL_LORA_CAD_01_SYMB;
-            break;
-        case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_02_SYMB_PB:
-            native_cad->cad_symb_nb = RAL_LORA_CAD_02_SYMB;
-            break;
-        case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_04_SYMB_PB:
-            native_cad->cad_symb_nb = RAL_LORA_CAD_04_SYMB;
-            break;
-        case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_08_SYMB_PB:
-            native_cad->cad_symb_nb = RAL_LORA_CAD_08_SYMB;
-            break;
-        case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_16_SYMB_PB:
-            native_cad->cad_symb_nb = RAL_LORA_CAD_16_SYMB;
-            break;
-        default:
-            return false;
-            break;
+    switch( pb_cad->cad_symb_nb )
+    {
+    case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_01_SYMB_PB:
+        native_cad->cad_symb_nb = RAL_LORA_CAD_01_SYMB;
+        break;
+    case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_02_SYMB_PB:
+        native_cad->cad_symb_nb = RAL_LORA_CAD_02_SYMB;
+        break;
+    case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_04_SYMB_PB:
+        native_cad->cad_symb_nb = RAL_LORA_CAD_04_SYMB;
+        break;
+    case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_08_SYMB_PB:
+        native_cad->cad_symb_nb = RAL_LORA_CAD_08_SYMB;
+        break;
+    case ral_lora_cad_symbs_pb_t_RAL_LORA_CAD_16_SYMB_PB:
+        native_cad->cad_symb_nb = RAL_LORA_CAD_16_SYMB;
+        break;
+    default:
+        return false;
+        break;
     }
 
     // Convert timeout
     native_cad->cad_timeout_in_ms = pb_cad->cad_timeout_in_ms;
 
     // Convert spreading factor
-    native_cad->sf = convert_pb_sf_to_native(pb_cad->sf);
+    native_cad->sf = convert_pb_sf_to_native( pb_cad->sf );
 
     // Convert bandwidth
-    native_cad->bw = convert_pb_bw_to_native(pb_cad->bw);
+    native_cad->bw = convert_pb_bw_to_native( pb_cad->bw );
 
     // Copy other parameters
-    native_cad->rf_freq_in_hz = pb_cad->rf_freq_in_hz;
+    native_cad->rf_freq_in_hz   = pb_cad->rf_freq_in_hz;
     native_cad->invert_iq_is_on = pb_cad->invert_iq_is_on;
 
     return true;
 }
 
 // ========================================
+// FLRC RADIO PARAMS CONVERSION FUNCTIONS
+// ========================================
+
+void rac_convert_flrc_radio_params_to_pb( const smtc_rac_radio_flrc_params_t* native_params,
+                                          rac_radio_flrc_params_pb_t*         pb_params )
+{
+    if( !native_params || !pb_params )
+    {
+        return;
+    }
+
+    pb_params->is_tx                     = native_params->is_tx;
+    pb_params->tx_size                   = native_params->tx_size;
+    pb_params->max_rx_size               = native_params->max_rx_size;
+    pb_params->frequency_in_hz           = native_params->frequency_in_hz;
+    pb_params->rx_frequency_offset_in_hz = native_params->rx_frequency_offset_in_hz;
+    pb_params->tx_power_in_dbm           = ( int32_t ) native_params->tx_power_in_dbm;
+
+    // Modulation parameters
+    pb_params->raw_bit_rate = convert_native_flrc_raw_bit_rate_to_pb( native_params->raw_bit_rate );
+    pb_params->cr           = convert_native_flrc_cr_to_pb( native_params->cr );
+    pb_params->pulse_shape  = convert_native_flrc_pulse_shape_to_pb( native_params->pulse_shape );
+
+    // Packet parameters
+    pb_params->preamble_len      = convert_native_flrc_preamble_len_to_pb( native_params->preamble_len );
+    pb_params->sync_word_len     = convert_native_flrc_sync_word_len_to_pb( native_params->sync_word_len );
+    pb_params->tx_syncword_index = convert_native_flrc_tx_syncword_index_to_pb( native_params->tx_syncword_index );
+    pb_params->match_sync_word   = convert_native_flrc_rx_match_to_pb( native_params->match_sync_word );
+    pb_params->pld_is_fix        = native_params->pld_is_fix;
+    pb_params->crc_type          = convert_native_flrc_crc_type_to_pb( native_params->crc_type );
+
+    // Advanced parameters - 3 sync words (4 bytes each)
+    if( native_params->sync_word[0] != NULL )
+    {
+        memcpy( pb_params->sync_word_1.bytes, native_params->sync_word[0], 4 );
+        pb_params->sync_word_1.size = 4;
+    }
+    else
+    {
+        pb_params->sync_word_1.size = 0;
+    }
+    if( native_params->sync_word[1] != NULL )
+    {
+        memcpy( pb_params->sync_word_2.bytes, native_params->sync_word[1], 4 );
+        pb_params->sync_word_2.size = 4;
+    }
+    else
+    {
+        pb_params->sync_word_2.size = 0;
+    }
+    if( native_params->sync_word[2] != NULL )
+    {
+        memcpy( pb_params->sync_word_3.bytes, native_params->sync_word[2], 4 );
+        pb_params->sync_word_3.size = 4;
+    }
+    else
+    {
+        pb_params->sync_word_3.size = 0;
+    }
+    pb_params->crc_seed       = native_params->crc_seed;
+    pb_params->crc_polynomial = native_params->crc_polynomial;
+
+    pb_params->rx_timeout_ms = native_params->rx_timeout_ms;
+}
+
+void rac_convert_flrc_radio_params_from_pb( const rac_radio_flrc_params_pb_t* pb_params,
+                                            smtc_rac_radio_flrc_params_t* native_params, uint8_t* sync_word_buffers[3] )
+{
+    if( !pb_params || !native_params )
+    {
+        return;
+    }
+
+    native_params->is_tx                     = pb_params->is_tx;
+    native_params->tx_size                   = ( uint16_t ) pb_params->tx_size;
+    native_params->max_rx_size               = ( uint16_t ) pb_params->max_rx_size;
+    native_params->frequency_in_hz           = pb_params->frequency_in_hz;
+    native_params->rx_frequency_offset_in_hz = pb_params->rx_frequency_offset_in_hz;
+    native_params->tx_power_in_dbm           = ( int8_t ) pb_params->tx_power_in_dbm;
+
+    // Modulation parameters
+    native_params->raw_bit_rate = convert_pb_flrc_raw_bit_rate_to_native( pb_params->raw_bit_rate );
+    native_params->cr           = convert_pb_flrc_cr_to_native( pb_params->cr );
+    native_params->pulse_shape  = convert_pb_flrc_pulse_shape_to_native( pb_params->pulse_shape );
+
+    // Packet parameters
+    native_params->preamble_len      = convert_pb_flrc_preamble_len_to_native( pb_params->preamble_len );
+    native_params->sync_word_len     = convert_pb_flrc_sync_word_len_to_native( pb_params->sync_word_len );
+    native_params->tx_syncword_index = convert_pb_flrc_tx_syncword_index_to_native( pb_params->tx_syncword_index );
+    native_params->match_sync_word   = convert_pb_flrc_rx_match_to_native( pb_params->match_sync_word );
+    native_params->pld_is_fix        = pb_params->pld_is_fix;
+    native_params->crc_type          = convert_pb_flrc_crc_type_to_native( pb_params->crc_type );
+
+    // Advanced parameters - 3 sync words (4 bytes each)
+    if( sync_word_buffers[0] != NULL && pb_params->sync_word_1.size > 0 )
+    {
+        memcpy( sync_word_buffers[0], pb_params->sync_word_1.bytes, pb_params->sync_word_1.size );
+        native_params->sync_word[0] = sync_word_buffers[0];
+    }
+    else
+    {
+        native_params->sync_word[0] = NULL;
+    }
+    if( sync_word_buffers[1] != NULL && pb_params->sync_word_2.size > 0 )
+    {
+        memcpy( sync_word_buffers[1], pb_params->sync_word_2.bytes, pb_params->sync_word_2.size );
+        native_params->sync_word[1] = sync_word_buffers[1];
+    }
+    else
+    {
+        native_params->sync_word[1] = NULL;
+    }
+    if( sync_word_buffers[2] != NULL && pb_params->sync_word_3.size > 0 )
+    {
+        memcpy( sync_word_buffers[2], pb_params->sync_word_3.bytes, pb_params->sync_word_3.size );
+        native_params->sync_word[2] = sync_word_buffers[2];
+    }
+    else
+    {
+        native_params->sync_word[2] = NULL;
+    }
+    native_params->crc_seed       = pb_params->crc_seed;
+    native_params->crc_polynomial = pb_params->crc_polynomial;
+
+    native_params->rx_timeout_ms = pb_params->rx_timeout_ms;
+}
+
+// ========================================
 // MAIN CONTEXT CONVERSION FUNCTIONS
 // ========================================
+
+// Static buffers for FLRC sync words (used during conversion)
+static uint8_t  flrc_sync_word_buffer_1[4];
+static uint8_t  flrc_sync_word_buffer_2[4];
+static uint8_t  flrc_sync_word_buffer_3[4];
+static uint8_t* flrc_sync_word_buffers[3] = { flrc_sync_word_buffer_1, flrc_sync_word_buffer_2,
+                                              flrc_sync_word_buffer_3 };
 
 bool rac_convert_context_from_pb( const smtc_rac_context_pb_t* pb_context, smtc_rac_context_t* native_context )
 {
@@ -914,18 +1699,37 @@ bool rac_convert_context_from_pb( const smtc_rac_context_pb_t* pb_context, smtc_
         return false;
     }
 
-    // Validate modulation type before conversion (only LoRa supported for now)
-    if( pb_context->modulation_type != smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_LORA_PB )
-    {
-        // Unsupported modulation type - only LoRa is supported
-        return false;
-    }
-
-    // Convert modulation type (validated above)
+    // Convert modulation type
     native_context->modulation_type = rac_convert_modulation_type_from_pb( pb_context->modulation_type );
 
-    // Convert radio parameters - direct access to .lora (no union)
-    rac_convert_radio_params_from_pb( &pb_context->radio_params, &native_context->radio_params.lora );
+    // Convert radio parameters based on modulation type (using oneof)
+    switch( pb_context->modulation_type )
+    {
+    case smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_LORA_PB:
+        // Validate that the oneof contains LoRa params
+        if( pb_context->which_radio_params != smtc_rac_context_pb_t_lora_params_tag )
+        {
+            return false;  // Modulation type mismatch with oneof
+        }
+        rac_convert_radio_params_from_pb( &pb_context->radio_params.lora_params, &native_context->radio_params.lora );
+        break;
+
+    case smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_FLRC_PB:
+        // Validate that the oneof contains FLRC params
+        if( pb_context->which_radio_params != smtc_rac_context_pb_t_flrc_params_tag )
+        {
+            return false;  // Modulation type mismatch with oneof
+        }
+        rac_convert_flrc_radio_params_from_pb( &pb_context->radio_params.flrc_params,
+                                               &native_context->radio_params.flrc, flrc_sync_word_buffers );
+        break;
+
+    case smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_FSK_PB:
+    case smtc_rac_modulation_type_pb_t_SMTC_RAC_MODULATION_LRFHSS_PB:
+    default:
+        // Unsupported modulation type - only LoRa and FLRC are supported
+        return false;
+    }
 
     // Convert LBT context
     if( !rac_convert_lbt_context_from_pb( &pb_context->lbt_context, &native_context->lbt_context ) )

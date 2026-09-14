@@ -64,8 +64,11 @@ extern "C" {
         .set_tx_cw = ral_lr20xx_set_tx_cw, .set_tx_infinite_preamble = ral_lr20xx_set_tx_infinite_preamble,           \
         .cal_img = ral_lr20xx_cal_img, .set_tx_cfg = ral_lr20xx_set_tx_cfg,                                           \
         .set_pkt_payload = ral_lr20xx_set_pkt_payload, .get_pkt_payload = ral_lr20xx_get_pkt_payload,                 \
+        .get_pkt_size = ral_lr20xx_get_pkt_size, .get_data_rx_buffer = ral_lr20xx_get_data_rx_buffer,                 \
+        .clear_rx_fifo = ral_lr20xx_clear_rx_fifo, .clear_tx_fifo = ral_lr20xx_clear_tx_fifo,                         \
         .get_tx_fifo_level = ral_lr20xx_get_tx_fifo_level, .get_rx_fifo_level = ral_lr20xx_get_rx_fifo_level,         \
-        .cfg_fifo_irq = ral_lr20xx_cfg_fifo_irq, .clear_fifo_irq = ral_lr20xx_clear_fifo_irq,                         \
+        .cfg_fifo_irq = ral_lr20xx_cfg_fifo_irq, .get_fifo_irq = ral_lr20xx_get_fifo_irq,                             \
+        .clear_fifo_irq = ral_lr20xx_clear_fifo_irq, .get_and_clear_fifo_irq = ral_lr20xx_get_and_clear_fifo_irq,     \
         .get_irq_status = ral_lr20xx_get_irq_status, .clear_irq_status = ral_lr20xx_clear_irq_status,                 \
         .get_and_clear_irq_status = ral_lr20xx_get_and_clear_irq_status,                                              \
         .set_dio_irq_params = ral_lr20xx_set_dio_irq_params, .set_rf_freq = ral_lr20xx_set_rf_freq,                   \
@@ -84,9 +87,11 @@ extern "C" {
         .get_flrc_time_on_air_in_us = ral_lr20xx_get_flrc_time_on_air_in_us,                                          \
         .set_gfsk_sync_word = ral_lr20xx_set_gfsk_sync_word, .set_lora_sync_word = ral_lr20xx_set_lora_sync_word,     \
         .set_flrc_sync_word = ral_lr20xx_set_flrc_sync_word, .set_gfsk_crc_params = ral_lr20xx_set_gfsk_crc_params,   \
-        .set_flrc_crc_params     = ral_lr20xx_set_flrc_crc_params,                                                    \
-        .set_gfsk_whitening_seed = ral_lr20xx_set_gfsk_whitening_seed, .lr_fhss_init = ral_lr20xx_lr_fhss_init,       \
-        .lr_fhss_build_frame = ral_lr20xx_lr_fhss_build_frame, .lr_fhss_handle_hop = ral_lr20xx_lr_fhss_handle_hop,   \
+        .set_flrc_crc_params          = ral_lr20xx_set_flrc_crc_params,                                               \
+        .set_gfsk_whitening_seed      = ral_lr20xx_set_gfsk_whitening_seed,                                           \
+        .set_gfsk_whitening_seed_comp = ral_lr20xx_set_gfsk_whitening_seed_comp,                                      \
+        .lr_fhss_init = ral_lr20xx_lr_fhss_init, .lr_fhss_build_frame = ral_lr20xx_lr_fhss_build_frame,               \
+        .lr_fhss_handle_hop             = ral_lr20xx_lr_fhss_handle_hop,                                              \
         .lr_fhss_handle_tx_done         = ral_lr20xx_lr_fhss_handle_tx_done,                                          \
         .lr_fhss_get_time_on_air_in_ms  = ral_lr20xx_lr_fhss_get_time_on_air_in_ms,                                   \
         .lr_fhss_get_hop_sequence_count = ral_lr20xx_lr_fhss_get_hop_sequence_count,                                  \
@@ -101,17 +106,41 @@ extern "C" {
         .rttof_set_request_address       = ral_lr20xx_rttof_set_request_address,                                      \
         .rttof_set_rx_tx_delay_indicator = ral_lr20xx_rttof_set_rx_tx_delay_indicator,                                \
         .rttof_get_raw_result            = ral_lr20xx_rttof_get_raw_result,                                           \
+        .check_lora_parameters           = ral_lr20xx_check_lora_parameters,                                          \
+        .check_rttof_parameters          = ral_lr20xx_check_rttof_parameters,                                         \
     }
 
 #define RAL_LR20XX_INSTANTIATE( ctx )                         \
     {                                                         \
         .context = ctx, .driver = RAL_LR20XX_DRV_INSTANTIATE, \
     }
+#define RAL_LR20XX_LF_HZ_MIN 150000000UL
+#define RAL_LR20XX_LF_HZ_MAX 960000000UL
 
+#if defined( LR2021 ) || defined( LR2022 )
+#define SUPPORT_2G4 true
+#define RAL_LR20XX_HF_HZ_MIN 1500000000UL
+#define RAL_LR20XX_HF_HZ_MAX 2500000000UL
+#else
+#define SUPPORT_2G4 false
+#define RAL_LR20XX_HF_HZ_MIN 0UL
+#define RAL_LR20XX_HF_HZ_MAX 0UL
+#endif
+#
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC CONSTANTS --------------------------------------------------------
  */
+
+#define LR20XX_FIFO_SIZE_INCREASE_WORKAROUND_ENABLE
+#if defined( LR20XX_FIFO_SIZE_INCREASE_WORKAROUND_ENABLE )
+#define RAL_LR20XX_MAX_DATA_FIFO_BYTES 0x3FF
+#else
+#define RAL_LR20XX_MAX_DATA_FIFO_BYTES 0xFF
+#endif  // LR20XX_FIFO_SIZE_INCREASE_WORKAROUND_ENABLE
+
+extern const ral_lora_bw_t RAL_LR20XX_SUPPORTED_BW[];
+extern const uint8_t       RAL_LR20XX_SUPPORTED_BW_SIZE;
 
 /*
  * -----------------------------------------------------------------------------
@@ -226,6 +255,26 @@ ral_status_t ral_lr20xx_get_pkt_payload( const void* context, uint16_t max_size_
                                          uint16_t* size_in_bytes );
 
 /**
+ * @see ral_get_pkt_size
+ */
+ral_status_t ral_lr20xx_get_pkt_size( const void* context, uint16_t* size_in_bytes );
+
+/**
+ * @see ral_get_data_rx_buffer
+ */
+ral_status_t ral_lr20xx_get_data_rx_buffer( const void* context, uint8_t* buffer, uint16_t size_in_bytes );
+
+/**
+ * @see ral_clear_rx_fifo
+ */
+ral_status_t ral_lr20xx_clear_rx_fifo( const void* context );
+
+/**
+ * @see ral_clear_tx_fifo
+ */
+ral_status_t ral_lr20xx_clear_tx_fifo( const void* context );
+
+/**
  * @see ral_get_tx_fifo_level
  */
 ral_status_t ral_lr20xx_get_tx_fifo_level( const void* context, uint16_t* fifo_level );
@@ -242,11 +291,24 @@ ral_status_t ral_lr20xx_cfg_fifo_irq( const void* context, ral_radio_fifo_flag_t
                                       ral_radio_fifo_flag_t tx_fifo_irq_enable, uint16_t rx_fifo_high_threshold,
                                       uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
                                       uint16_t tx_fifo_high_threshold );
+
+/**
+ * @see ral_get_fifo_irq
+ */
+ral_status_t ral_lr20xx_get_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                      ral_radio_fifo_flag_t* tx_fifo_flags );
+
 /**
  * @see ral_clear_fifo_irq
  */
 ral_status_t ral_lr20xx_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_flags_to_clear,
                                         ral_radio_fifo_flag_t tx_fifo_flags_to_clear );
+
+/**
+ * @see ral_get_and_clear_fifo_irq
+ */
+ral_status_t ral_lr20xx_get_and_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                                ral_radio_fifo_flag_t* tx_fifo_flags );
 
 /**
  * @see ral_get_irq_status
@@ -398,6 +460,12 @@ ral_status_t ral_lr20xx_set_flrc_crc_params( const void* context, const uint32_t
 ral_status_t ral_lr20xx_set_gfsk_whitening_seed( const void* context, const uint16_t seed );
 
 /**
+ * @see ral_set_gfsk_whitening_seed_comp
+ */
+ral_status_t ral_lr20xx_set_gfsk_whitening_seed_comp( const void* context, const ral_gfsk_dc_free_t dc_free,
+                                                      const uint16_t seed );
+
+/**
  * @see ral_lr_fhss_init
  */
 ral_status_t ral_lr20xx_lr_fhss_init( const void* context, const ral_lr_fhss_params_t* lr_fhss_params );
@@ -509,6 +577,20 @@ ral_status_t ral_lr20xx_rttof_set_rx_tx_delay_indicator( const void* context, co
  */
 ral_status_t ral_lr20xx_rttof_get_raw_result( const void* context, ral_lora_bw_t rttof_bw, int32_t* raw_results,
                                               int32_t* meter_results, int8_t* rssi_result );
+
+/**
+ * @see ral_check_lora_parameters
+ */
+ral_status_t ral_lr20xx_check_lora_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                               const ral_lora_pkt_params_t* pkt_params,
+                                               const ral_lora_mod_params_t* mod_params );
+
+/**
+ * @see ral_check_rttof_parameters
+ */
+ral_status_t ral_lr20xx_check_rttof_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                                const ral_lora_pkt_params_t* pkt_params,
+                                                const ral_lora_mod_params_t* mod_params );
 
 #ifdef __cplusplus
 }

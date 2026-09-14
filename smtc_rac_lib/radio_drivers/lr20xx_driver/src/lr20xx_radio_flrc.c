@@ -52,7 +52,7 @@
 #define LR20XX_RADIO_FLRC_GET_PKT_STATUS_CMD_LENGTH ( 2 )
 #define LR20XX_RADIO_FLRC_SET_SYNCWORD_CMD_LENGTH ( 2 + 1 )
 
-#define LR20XX_RADIO_FLRC_GET_RX_STATS_RBUFFER_LENGTH ( 6 )
+#define LR20XX_RADIO_FLRC_GET_RX_STATS_RBUFFER_LENGTH ( 8 )
 #define LR20XX_RADIO_FLRC_GET_PKT_STATUS_RBUFFER_LENGTH ( 5 )
 
 /*
@@ -176,17 +176,8 @@ lr20xx_status_t lr20xx_radio_flrc_set_modulation_params( const void*            
         ( uint8_t ) ( ( params->cr << 4 ) + params->shape ),
     };
 
-    const lr20xx_status_t write_status = ( lr20xx_status_t ) lr20xx_hal_write(
-        context, cbuffer, LR20XX_RADIO_FLRC_SET_MODULATION_PARAMS_CMD_LENGTH, 0, 0 );
-
-    if( write_status != LR20XX_STATUS_OK )
-    {
-        return write_status;
-    }
-    else
-    {
-        return LR20XX_WORKAROUNDS_CONDITIONAL_APPLY_AUTOMATIC_DCDC_CONFIGURE( context );
-    }
+    return ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_RADIO_FLRC_SET_MODULATION_PARAMS_CMD_LENGTH,
+                                                 0, 0 );
 }
 
 lr20xx_status_t lr20xx_radio_flrc_set_pkt_params( const void* context, const lr20xx_radio_flrc_pkt_params_t* params )
@@ -222,6 +213,7 @@ lr20xx_status_t lr20xx_radio_flrc_get_rx_stats( const void* context, lr20xx_radi
         statistics->received_packets = ( uint16_t ) ( ( ( uint16_t ) rbuffer[0] << 8 ) + rbuffer[1] );
         statistics->crc_errors       = ( uint16_t ) ( ( ( uint16_t ) rbuffer[2] << 8 ) + rbuffer[3] );
         statistics->length_errors    = ( uint16_t ) ( ( ( uint16_t ) rbuffer[4] << 8 ) + rbuffer[5] );
+        statistics->crc_ok           = ( uint16_t ) ( ( ( uint16_t ) rbuffer[6] << 8 ) + rbuffer[7] );
     }
 
     return status;

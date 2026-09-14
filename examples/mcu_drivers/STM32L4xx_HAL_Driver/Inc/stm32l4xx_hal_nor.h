@@ -6,13 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                       opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -25,7 +24,7 @@
 extern "C" {
 #endif
 
-#if defined FMC_BANK1
+#if defined(FMC_BANK1)
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32l4xx_ll_fmc.h"
@@ -126,7 +125,7 @@ typedef struct
 #if (USE_HAL_NOR_REGISTER_CALLBACKS == 1)
   void (* MspInitCallback)(struct __NOR_HandleTypeDef *hnor);               /*!< NOR Msp Init callback              */
   void (* MspDeInitCallback)(struct __NOR_HandleTypeDef *hnor);             /*!< NOR Msp DeInit callback            */
-#endif
+#endif /* USE_HAL_NOR_REGISTER_CALLBACKS */
 } NOR_HandleTypeDef;
 
 #if (USE_HAL_NOR_REGISTER_CALLBACKS == 1)
@@ -143,7 +142,7 @@ typedef enum
   * @brief  HAL NOR Callback pointer definition
   */
 typedef void (*pNOR_CallbackTypeDef)(NOR_HandleTypeDef *hnor);
-#endif
+#endif /* USE_HAL_NOR_REGISTER_CALLBACKS */
 /**
   * @}
   */
@@ -165,7 +164,7 @@ typedef void (*pNOR_CallbackTypeDef)(NOR_HandleTypeDef *hnor);
                                                              } while(0)
 #else
 #define __HAL_NOR_RESET_HANDLE_STATE(__HANDLE__) ((__HANDLE__)->State = HAL_NOR_STATE_RESET)
-#endif
+#endif /* USE_HAL_NOR_REGISTER_CALLBACKS */
 /**
   * @}
   */
@@ -214,7 +213,7 @@ HAL_StatusTypeDef HAL_NOR_Read_CFI(NOR_HandleTypeDef *hnor, NOR_CFITypeDef *pNOR
 HAL_StatusTypeDef HAL_NOR_RegisterCallback(NOR_HandleTypeDef *hnor, HAL_NOR_CallbackIDTypeDef CallbackId,
                                            pNOR_CallbackTypeDef pCallback);
 HAL_StatusTypeDef HAL_NOR_UnRegisterCallback(NOR_HandleTypeDef *hnor, HAL_NOR_CallbackIDTypeDef CallbackId);
-#endif
+#endif /* USE_HAL_NOR_REGISTER_CALLBACKS */
 /**
   * @}
   */
@@ -235,7 +234,7 @@ HAL_StatusTypeDef HAL_NOR_WriteOperation_Disable(NOR_HandleTypeDef *hnor);
   */
 
 /* NOR State functions ********************************************************/
-HAL_NOR_StateTypeDef  HAL_NOR_GetState(NOR_HandleTypeDef *hnor);
+HAL_NOR_StateTypeDef  HAL_NOR_GetState(const NOR_HandleTypeDef *hnor);
 HAL_NOR_StatusTypeDef HAL_NOR_GetStatus(NOR_HandleTypeDef *hnor, uint32_t Address, uint32_t Timeout);
 /**
   * @}
@@ -258,23 +257,23 @@ HAL_NOR_StatusTypeDef HAL_NOR_GetStatus(NOR_HandleTypeDef *hnor, uint32_t Addres
 #define DEVICE_CODE3_ADDR        ((uint16_t)0x000F)
 
 /* NOR CFI IDs addresses */
-#define CFI1_ADDRESS             ((uint16_t)0x61)
-#define CFI2_ADDRESS             ((uint16_t)0x62)
-#define CFI3_ADDRESS             ((uint16_t)0x63)
-#define CFI4_ADDRESS             ((uint16_t)0x64)
+#define CFI1_ADDRESS             ((uint16_t)0x0061)
+#define CFI2_ADDRESS             ((uint16_t)0x0062)
+#define CFI3_ADDRESS             ((uint16_t)0x0063)
+#define CFI4_ADDRESS             ((uint16_t)0x0064)
 
 /* NOR operation wait timeout */
 #define NOR_TMEOUT               ((uint16_t)0xFFFF)
 
 /* NOR memory data width */
-#define NOR_MEMORY_8B            ((uint8_t)0x0)
-#define NOR_MEMORY_16B           ((uint8_t)0x1)
+#define NOR_MEMORY_8B            ((uint8_t)0x00)
+#define NOR_MEMORY_16B           ((uint8_t)0x01)
 
 /* NOR memory device read/write start address */
-#define NOR_MEMORY_ADRESS1       ((uint32_t)0x60000000)
-#define NOR_MEMORY_ADRESS2       ((uint32_t)0x64000000)
-#define NOR_MEMORY_ADRESS3       ((uint32_t)0x68000000)
-#define NOR_MEMORY_ADRESS4       ((uint32_t)0x6C000000)
+#define NOR_MEMORY_ADRESS1       (0x60000000U)
+#define NOR_MEMORY_ADRESS2       (0x64000000U)
+#define NOR_MEMORY_ADRESS3       (0x68000000U)
+#define NOR_MEMORY_ADRESS4       (0x6C000000U)
 /**
   * @}
   */
@@ -325,5 +324,3 @@ HAL_NOR_StatusTypeDef HAL_NOR_GetStatus(NOR_HandleTypeDef *hnor, uint32_t Addres
 #endif
 
 #endif /* STM32L4xx_HAL_NOR_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

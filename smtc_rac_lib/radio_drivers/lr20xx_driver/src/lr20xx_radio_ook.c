@@ -137,17 +137,8 @@ lr20xx_status_t lr20xx_radio_ook_set_modulation_params( const void*             
         ( uint8_t ) params->mag_depth,
     };
 
-    const lr20xx_status_t write_status = ( lr20xx_status_t ) lr20xx_hal_write(
-        context, cbuffer, LR20XX_RADIO_OOK_SET_MODULATION_PARAMS_CMD_LENGTH, 0, 0 );
-
-    if( write_status != LR20XX_STATUS_OK )
-    {
-        return write_status;
-    }
-    else
-    {
-        return LR20XX_WORKAROUNDS_CONDITIONAL_APPLY_AUTOMATIC_DCDC_CONFIGURE( context );
-    }
+    return ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_RADIO_OOK_SET_MODULATION_PARAMS_CMD_LENGTH, 0,
+                                                 0 );
 }
 
 lr20xx_status_t lr20xx_radio_ook_set_packet_params( const void* context, const lr20xx_radio_ook_pkt_params_t* params )

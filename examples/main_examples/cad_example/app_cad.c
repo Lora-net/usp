@@ -41,6 +41,7 @@
 
 #include <stddef.h>
 #include "smtc_rac_api.h"
+#include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
 #include "smtc_modem_hal.h"
 
@@ -139,12 +140,12 @@ void cad_init( void )
     cad.transaction->cad_context.cad_timeout_in_ms                    = CAD_DURATION_MS;
     cad.transaction->cad_context.sf                                   = LORA_SPREADING_FACTOR;
     cad.transaction->cad_context.bw                                   = LORA_BANDWIDTH;
-    cad.transaction->cad_context.rf_freq_in_hz                        = FREQ_IN_HZ;
+    cad.transaction->cad_context.rf_freq_in_hz                        = RF_FREQ_IN_HZ;
     cad.transaction->cad_context.invert_iq_is_on                      = LORA_IQ;
 
     cad.transaction->radio_params.lora.is_tx                      = ( TYPE_OF_CAD == RAL_LORA_CAD_RX ) ? false : true;
     cad.transaction->radio_params.lora.is_ranging_exchange        = false;
-    cad.transaction->radio_params.lora.frequency_in_hz            = FREQ_IN_HZ;
+    cad.transaction->radio_params.lora.frequency_in_hz            = RF_FREQ_IN_HZ;
     cad.transaction->radio_params.lora.tx_power_in_dbm            = TX_OUTPUT_POWER_DBM;
     cad.transaction->radio_params.lora.sf                         = LORA_SPREADING_FACTOR;
     cad.transaction->radio_params.lora.bw                         = LORA_BANDWIDTH;
@@ -188,12 +189,12 @@ void cad_on_button_press( void )
 
 static void pre_cad_callback( void )
 {
-    set_led( SMTC_PF_LED_TX, true );
+    hal_led_set( HAL_LED_TX, true );
 }
 
 static void post_cad_callback( rp_status_t status )
 {
-    set_led( SMTC_PF_LED_TX, false );
+    hal_led_set( HAL_LED_TX, false );
 
     // Increment CAD counter
     cad_count++;
@@ -203,37 +204,50 @@ static void post_cad_callback( rp_status_t status )
     case RP_STATUS_CAD_POSITIVE:
         cad_positive_count++;
         last_cad_positive = cad_count;
-        CAD_PRINT( ">>> CAD #%lu: POSITIVE ( %lu positive %lu, %lu negative, Last positive: #%lu)\n", cad_count,
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": POSITIVE ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
                    cad_positive_count, cad_negative_count, last_cad_positive );
         break;
 
     case RP_STATUS_CAD_NEGATIVE:
         cad_negative_count++;
-        CAD_PRINT( ">>> CAD #%lu: NEGATIVE ( %lu positive, %lu negative, Last positive: #%lu)\n", cad_count,
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": NEGATIVE ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
                    cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         break;
 
     case RP_STATUS_TASK_ABORTED:
-        CAD_PRINT( ">>> CAD #%lu: ABORTED ( %lu positive, %lu negative, Last positive: #%lu)\n", cad_count,
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": ABORTED ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
                    cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         break;
     case RP_STATUS_TX_DONE:  // when activate CAD_TO_TX feature
         cad_negative_count++;
-        CAD_PRINT( ">>> CAD #%lu: TX DONE ( %lu positive, %lu negative, Last positive: #%lu)\n", cad_count,
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": TX DONE ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
                    cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         break;
     case RP_STATUS_RX_PACKET:  // when activate CAD_TO_RX feature
         cad_positive_count++;
-        CAD_PRINT( ">>> CAD #%lu: RX PACKET ( %lu positive, %lu negative, Last positive: #%lu)\n", cad_count,
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": RX PACKET ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
                    cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        CAD_PRINT( "Rssi: %d, Snr: %d\n", cad.transaction->smtc_rac_data_result.rssi_result,
+                   cad.transaction->smtc_rac_data_result.snr_result );
+        SMTC_HAL_TRACE_ARRAY( "INFO: RX payload: ", cad_buffer, cad.transaction->smtc_rac_data_result.rx_size );
         break;
     case RP_STATUS_RX_TIMEOUT:
         cad_positive_count++;
-        CAD_PRINT( ">>> CAD #%lu: RX TIMEOUT ( %lu positive, %lu negative, Last positive: #%lu)\n", cad_count,
-                   cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        // RP_STATUS_RX_TIMEOUT = timeout for the Tx too. So if my time on air is greater than cad tiemout then the chip
+        // go in RP_STATUS_RX_TIMEOUT same if he is Tx.
+        if( TYPE_OF_CAD == RAL_LORA_CAD_LBT )
+        {
+            CAD_PRINT( ">>> CAD #%" PRIu32 ": TX TIMEOUT ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
+                       cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        }
+        else
+        {
+            CAD_PRINT( ">>> CAD #%" PRIu32 ": RX TIMEOUT ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
+                       cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        }
         break;
     default:
-        CAD_PRINT( ">>> CAD #%lu: ERROR ( %lu positive, %lu negative, Last positive: #%lu)\n", cad_count,
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": ERROR ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
                    cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         break;
     }

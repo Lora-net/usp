@@ -1,13 +1,35 @@
-/*!
- * \file      smtc_rac.h
+/**
+ * @file      smtc_rac.h
  *
- * \brief     SMTC Radio Abstraction Component (RAC) header file
+ * @brief     smtc_rac api implementation
  *
- * \copyright Semtech Corporation 2024. All rights reserved.
+ * The Clear BSD License
+ * Copyright Semtech Corporation 2025. All rights reserved.
  *
- * \license   Revised BSD License, see section \ref LICENSE.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the disclaimer
+ * below) provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the Semtech corporation nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
  *
- * \date      2024
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
+ * THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+ * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
+ * NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL SEMTECH CORPORATION BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef SMTC_RAC_H
@@ -39,6 +61,7 @@ extern "C" {
  * --- PUBLIC CONSTANTS --------------------------------------------------------
  */
 #define RAC_INVALID_RADIO_ID 0xFF
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC TYPES ------------------------------------------------------------
@@ -69,7 +92,7 @@ typedef enum smtc_rac_priority_e
     RAC_HIGH_PRIORITY      = RP_HOOK_RAC_HIGH_PRIORITY,
     RAC_MEDIUM_PRIORITY    = RP_HOOK_RAC_MEDIUM_PRIORITY,
     RAC_LOW_PRIORITY       = RP_HOOK_RAC_LOW_PRIORITY,
-    RAC_VERY_LOW_PRIORITY  = RP_HOOK_RAC_VERY_LOW_PRIORITY /*!< Lowest priority */
+    RAC_VERY_LOW_PRIORITY  = RP_HOOK_RAC_VERY_LOW_PRIORITY, /*!< Lowest priority */
 } smtc_rac_priority_t;
 
 /*!
@@ -89,10 +112,11 @@ typedef enum smtc_rac_scheduling_e
  */
 typedef enum smtc_rac_modulation_type_e
 {
-    SMTC_RAC_MODULATION_LORA   = 0, /*!< LoRa modulation */
-    SMTC_RAC_MODULATION_FSK    = 1, /*!< FSK/GFSK modulation */
-    SMTC_RAC_MODULATION_LRFHSS = 2, /*!< LR-FHSS modulation (transmission only) */
-    SMTC_RAC_MODULATION_FLRC   = 3, /*!< FLRC modulation */
+    SMTC_RAC_MODULATION_LORA       = 0, /*!< LoRa modulation */
+    SMTC_RAC_MODULATION_FSK        = 1, /*!< FSK/GFSK modulation */
+    SMTC_RAC_MODULATION_LRFHSS     = 2, /*!< LR-FHSS modulation (transmission only) */
+    SMTC_RAC_MODULATION_FLRC       = 3, /*!< FLRC modulation */
+    SMTC_RAC_MODULATION_FLRC_BURST = 4, /*!< FLRC burst modulation */
 } smtc_rac_modulation_type_t;
 
 /*!
@@ -184,7 +208,7 @@ typedef struct smtc_rac_radio_lora_params_s
     uint16_t tx_size;         /*!< Size of the tx payload data in bytes. */
     // lora specific rx parameters
     uint32_t rx_timeout_ms;   /*!< Timeout for receiving data in milliseconds. */
-    uint8_t  symb_nb_timeout; /*!< Rx only parameters: Number of symbols to wait for the preamble. */
+    uint16_t symb_nb_timeout; /*!< Rx only parameters: Number of symbols to wait for the preamble. */
     uint16_t max_rx_size;     /*!< Maximum size of the payload data in bytes received by the radio. when the received
     payload is larger than the max_rx_size, the radio will discard the remaining payload. */
 } smtc_rac_radio_lora_params_t;
@@ -248,30 +272,112 @@ typedef struct smtc_rac_radio_flrc_params_s
     uint16_t max_rx_size;     /*!< Maximum size of the payload data in bytes received by the radio. when the received
                                  payload is larger than the max_rx_size, the radio will discard the remaining payload. */
     uint32_t frequency_in_hz; /*!< Frequency for transmission/reception in Hertz. */
-    int8_t   tx_power_in_dbm; /*!< Transmission power in dBm. */
+    int32_t  rx_frequency_offset_in_hz; /*!< Frequency offset for reception in Hertz to compensate the frequency
+                                           deviation. could be measured with a LoRa Rx (ex:WOR Rx) */
+    int8_t tx_power_in_dbm;             /*!< Transmission power in dBm. */
 
     // Modulation parameters
-    uint32_t               br_in_bps;    /*!< Bit rate in bits per second. */
-    uint32_t               bw_dsb_in_hz; /*!< Bandwidth (double-sided) in Hz. */
-    ral_flrc_cr_t          cr;           /*!< Coding rate. */
-    ral_flrc_pulse_shape_t pulse_shape;  /*!< Pulse shaping filter. */
+    ral_flrc_raw_bit_rate_t raw_bit_rate; /*!< Raw bit rate. */
+    ral_flrc_cr_t           cr;           /*!< Coding rate. */
+    ral_flrc_pulse_shape_t  pulse_shape;  /*!< Pulse shaping filter. */
 
     // Packet parameters
-    uint16_t                      preamble_len_in_bits; /*!< Length of the preamble in bits. */
-    ral_flrc_sync_word_len_t      sync_word_len;        /*!< Sync word length configuration. */
-    ral_flrc_tx_syncword_t        tx_syncword;          /*!< TX sync word index to use. */
-    ral_flrc_rx_match_sync_word_t match_sync_word;      /*!< RX sync word match configuration. */
-    bool                          pld_is_fix;           /*!< Fixed (true) or variable (false) length. */
-    ral_flrc_crc_type_t           crc_type;             /*!< CRC type configuration. */
+    ral_flrc_preamble_length_t    preamble_len;      /*!< Length of the preamble. */
+    ral_flrc_sync_word_len_t      sync_word_len;     /*!< Sync word length configuration. */
+    ral_flrc_tx_syncword_t        tx_syncword_index; /*!< TX sync word index to use. */
+    ral_flrc_rx_match_sync_word_t match_sync_word;   /*!< RX sync word match configuration. */
+    bool                          pld_is_fix;        /*!< Fixed (true) or variable (false) length. */
+    ral_flrc_crc_type_t           crc_type;          /*!< CRC type configuration. */
 
     // Advanced parameters
-    const uint8_t* sync_word; /*!< Pointer to synchronization word array (expected
-                                 4 bytes). */
-    uint32_t crc_seed;        /*!< CRC seed value. */
-    uint32_t crc_polynomial;  /*!< CRC polynomial value. */
+    const uint8_t* sync_word[3];   /*!< Pointer to synchronization word array (expected 4 bytes for each sync word). */
+    uint32_t       crc_seed;       /*!< CRC seed value. */
+    uint32_t       crc_polynomial; /*!< CRC polynomial value. */
 
     uint32_t rx_timeout_ms; /*!< Timeout for receiving data in milliseconds. */
 } smtc_rac_radio_flrc_params_t;
+
+/*
+ * -----------------------------------------------------------------------------
+ * --- PUBLIC TYPES - FLRC BURST RADIO PARAMETERS -----------------------------------
+ */
+
+/**
+ * @brief Number of tx fifo pointers
+ *
+ * @note This is the number of tx fifo pointers used to store the fragmented payloads pushed to the radio fifo
+ * alternatively.
+ */
+#ifndef RAC_FLRC_BURST_NUMBER_OF_TX_FIFO_PTR
+#define RAC_FLRC_BURST_NUMBER_OF_TX_FIFO_PTR 2
+#endif
+
+#ifndef RAC_FLRC_BURST_RADIO_PAYLOAD_MAX_LENGTH
+#define RAC_FLRC_BURST_RADIO_PAYLOAD_MAX_LENGTH 400
+#endif
+
+#ifndef RAC_FLRC_BURST_RADIO_FIFO_LENGTH
+#define RAC_FLRC_BURST_RADIO_FIFO_LENGTH 511
+#endif
+
+/*!
+ * \struct smtc_rac_radio_flrc_burst_params_s
+ * \brief Structure holding all radio parameters for FLRC burst operations.
+ *
+ * This structure is used to configure the radio for FLRC burst transmission or
+ * reception, including frequency, power, modulation parameters, and packet
+ * configuration.
+ * Note: FLRC burst is a multiple packet transmission task.
+ *
+ * The tx_fifo_payload_buffer and tx_fifo_payload_length are used to store the generated fragments of the bursted
+ * tx payload. this buffer must be allocated by the user.
+ */
+typedef struct smtc_rac_radio_flrc_burst_params_s
+{
+    bool is_tx;             /*!< Flag to indicate if the operation is a transmission (true) or
+                               reception (false). */
+    uint32_t burst_tx_size; /*!< Size of the bursted tx payloads data in bytes. Raw payload is limited to 24 bits. */
+    uint32_t burst_rx_size; /*!< Size of the bursted rx payloads data in bytes. Raw payload is limited to 24 bits. */
+
+    uint16_t max_rx_size; /*!< Maximum size of one payload data in bytes received by the radio. when the received
+                             payload is larger than the max_rx_size, the radio will discard the remaining payload. */
+
+    uint8_t* tx_fifo_payload_buffer[RAC_FLRC_BURST_NUMBER_OF_TX_FIFO_PTR];  /*!< Pointers to generated fragments of the
+                                                                               bursted tx payload. */
+    uint16_t* tx_fifo_payload_length[RAC_FLRC_BURST_NUMBER_OF_TX_FIFO_PTR]; /*!< Lengths of the generated fragments of
+                                                                               the bursted tx payload in bytes. */
+    uint16_t size_of_tx_fifo_payload_buffer[RAC_FLRC_BURST_NUMBER_OF_TX_FIFO_PTR]; /*!< Sizes of the tx payload buffers
+                                                                                      in bytes. */
+
+    uint32_t frequency_in_hz;           /*!< Frequency for transmission/reception in Hertz. */
+    int32_t  rx_frequency_offset_in_hz; /*!< Frequency offset for reception in Hertz to compensate the frequency
+                                           deviation. could be measured with a LoRa Rx (ex:WOR Rx) */
+    int8_t tx_power_in_dbm;             /*!< Transmission power in dBm. */
+
+    // Modulation parameters
+    ral_flrc_raw_bit_rate_t raw_bit_rate; /*!< Raw bit rate. */
+    ral_flrc_cr_t           cr;           /*!< Coding rate. */
+    ral_flrc_pulse_shape_t  pulse_shape;  /*!< Pulse shaping filter. */
+
+    // Packet parameters
+    ral_flrc_preamble_length_t    preamble_len;      /*!< Length of the preamble. */
+    ral_flrc_sync_word_len_t      sync_word_len;     /*!< Sync word length configuration. */
+    ral_flrc_tx_syncword_t        tx_syncword_index; /*!< TX sync word index to use. could be (1,2,3) */
+    ral_flrc_rx_match_sync_word_t match_sync_word;   /*!< RX sync word match configuration. */
+    bool                          pld_is_fix;        /*!< Fixed (true) or variable (false) length. */
+    ral_flrc_crc_type_t           crc_type;          /*!< CRC type configuration. */
+
+    // Advanced parameters
+    const uint8_t* sync_word[3];   /*!< Pointer to synchronization word array (expected 4 bytes for each sync word). */
+    uint32_t       crc_seed;       /*!< CRC seed value. */
+    uint32_t       crc_polynomial; /*!< CRC polynomial value. */
+
+    uint32_t rx_burst_timeout_margin_ms; /*!< Timeout margin for receiving all the burst data in milliseconds (added to
+                                            the time on air to configure the timeout) */
+
+    uint32_t min_interframe_delay_us;
+
+} smtc_rac_radio_flrc_burst_params_t;
 
 /*
  * -----------------------------------------------------------------------------
@@ -349,13 +455,16 @@ typedef struct smtc_rac_data_buffer_setup_s
 
 typedef struct smtc_rac_data_result_s
 {
-    uint16_t rx_size;     /*!< Size of the rx payload data in bytes received by the radio */
-    int16_t  rssi_result; /*!< Received Signal Strength Indicator (RSSI) value. */
+    uint16_t rx_size;            /*!< Size of the rx payload data in bytes received by the radio */
+    int16_t  rssi_result;        /*!< Received Signal Strength Indicator (RSSI) value. */
+    int16_t  signal_rssi_result; /*!<  Received signal RSSI power in dB (after despreading) WARNING : LoRa only. Not
+                                    Applicable for other modulations*/
     int8_t
         snr_result; /*!< Signal-to-Noise Ratio (SNR) value. WARNING : LoRa only. Not Applicable for other modulations */
     uint32_t            radio_end_timestamp_ms;   /*!< timestamp of the radio event in milliseconds. */
     uint32_t            radio_start_timestamp_ms; /*!< timestamp of the radio start event in milliseconds. */
     rp_ranging_result_t ranging_result;           /*!< Ranging result structure (for RTToF). */
+    int32_t             lora_freq_offset_hz;      /*!< LoRa Frequency offset of the last packet received in Hz */
 } smtc_rac_data_result_t;
 
 typedef struct smtc_rac_scheduler_config_s
@@ -428,6 +537,50 @@ smtc_rac_return_code_t smtc_rac_lrfhss( uint8_t radio_access_id );
  * \return Return code indicating success or error.
  */
 smtc_rac_return_code_t smtc_rac_flrc( uint8_t radio_access_id );
+
+/*!
+ * \brief Enqueue a FLRC burst task for execution by the radio planner.
+ *
+ * This function configures and schedules a FLRC burst radio task using the context
+ * previously configured via smtc_rac_get_context(). The FLRC parameters
+ * should be configured in the context's radio_params.flrc_burst field.
+ * Note: FLRC burst is a multiple packet transmission task.
+ *
+ * \param [in] radio_access_id The radio access ID obtained from
+ * smtc_rac_open_radio.
+ *
+ * \return Return code indicating success or error.
+ */
+smtc_rac_return_code_t smtc_rac_flrc_burst( uint8_t radio_access_id );
+
+/*!
+ * \brief Release the radio access for a radio task.
+ *
+ * \param [in] radio_access_id The radio access ID obtained from smtc_rac_open_radio.
+ *
+ * \return Return code indicating success or error.
+ */
+smtc_rac_return_code_t smtc_rac_flrc_burst_rx_done( uint8_t radio_access_id );
+
+/*!
+ * \brief Set the active time out for a radio task.
+ *
+ * \param [in] radio_access_id The radio access ID obtained from smtc_rac_open_radio.
+ * \param [in] active_time_out_time_ms The active time out time in milliseconds.
+ *
+ * \return Return code indicating success or error.
+ */
+smtc_rac_return_code_t smtc_rac_set_active_time_out( uint8_t radio_access_id, uint32_t active_time_out_time_ms );
+
+/*!
+ * \brief Release the active time out for a radio task.
+ *
+ * \param [in] radio_access_id The radio access ID obtained from smtc_rac_open_radio.
+ *
+ * \return Return code indicating success or error.
+ */
+
+smtc_rac_return_code_t smtc_rac_release_active_time_out( uint8_t radio_access_id );
 
 #ifdef __cplusplus
 }

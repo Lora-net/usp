@@ -200,6 +200,84 @@ lr20xx_status_t lr20xx_radio_fifo_get_irq( const void* context, lr20xx_radio_fif
 lr20xx_status_t lr20xx_radio_fifo_get_and_clear_irq_flags( const void* context, lr20xx_radio_fifo_flag_t* rx_fifo_flags,
                                                            lr20xx_radio_fifo_flag_t* tx_fifo_flags );
 
+/**
+ * @brief Switch Tx FiFo to 1024-bytes FiFo
+ *
+ * This command switches the Tx FiFo from default 256-byte Tx FiFo to extended 1024-byte Tx FiFo.
+ *
+ * It modifies internal registers that are not maintained during sleep mode.
+ * Refer to the function @ref lr20xx_radio_fifo_1024_byte_tx_fifo_store_retention_mem configures to configure the radio
+ * so that it maintains the registers.
+ *
+ * Usage of 1024-byte Tx FiFo comes with a limitation when configuring the low thresholds IRQ with @ref
+ * lr20xx_radio_fifo_cfg_irq.
+ * Refer to @ref lr20xx_workarounds_1024_byte_fifo_cfg_irq for a workaround of this limitation.
+ *
+ * @param [in] context Chip implementation context
+ * @param [in] retention_slot_address Retention memory slot to store Tx FiFo address
+ * @param [in] retention_slot_size Retention memory slot to store Tx FiFo size
+ *
+ * @return Operation status
+ *
+ * @see lr20xx_radio_fifo_1024_byte_tx_fifo_store_retention_mem, lr20xx_radio_fifo_configure_1024_byte_rx_fifo,
+ * lr20xx_workarounds_1024_byte_fifo_cfg_irq
+ */
+lr20xx_status_t lr20xx_radio_fifo_configure_1024_byte_tx_fifo( const void* context );
+
+/**
+ * @brief Store the registers to configure the 1024 bytes Tx FiFo in retention memory
+ *
+ * @param [in] context Chip implementation context
+ * @param [in] retention_slot_address Retention memory slot to store Tx FiFo address
+ * @param [in] retention_slot_size Retention memory slot to store Tx FiFo size
+ *
+ * @return Operation status
+ *
+ * @see lr20xx_system_add_register_to_retention_mem, lr20xx_radio_fifo_configure_1024_byte_tx_fifo
+ */
+lr20xx_status_t lr20xx_radio_fifo_1024_byte_tx_fifo_store_retention_mem( const void* context,
+                                                                         uint8_t     retention_slot_address,
+                                                                         uint8_t     retention_slot_size );
+
+/**
+ * @brief Switch Rx FiFo to 1024-bytes FiFo
+ *
+ * This command switches the Rx FiFo from default 256-byte Rx FiFo to extended 1024-byte Rx FiFo.
+ *
+ * It modifies internal registers that are not maintained during sleep mode.
+ * Refer to the function @ref lr20xx_radio_fifo_1024_byte_rx_fifo_store_retention_mem configures to configure the radio
+ * so that it maintains the registers.
+ *
+ * Usage of 1024-byte Rx FiFo comes with a limitation when configuring the low thresholds IRQ with @ref
+ * lr20xx_radio_fifo_cfg_irq.
+ * Refer to @ref lr20xx_workarounds_1024_byte_fifo_cfg_irq for a workaround of this limitation.
+ *
+ * @param [in] context Chip implementation context
+ * @param [in] retention_slot_address Retention memory slot to store Rx FiFo address
+ * @param [in] retention_slot_size Retention memory slot to store Rx FiFo size
+ *
+ * @return Operation status
+ *
+ * @see lr20xx_radio_fifo_1024_byte_rx_fifo_store_retention_mem,
+ * lr20xx_radio_fifo_configure_1024_byte_tx_fifo,lr20xx_workarounds_1024_byte_fifo_cfg_irq
+ */
+lr20xx_status_t lr20xx_radio_fifo_configure_1024_byte_rx_fifo( const void* context );
+
+/**
+ * @brief Store the registers to configure the 1024 bytes Rx FiFo in retention memory
+ *
+ * @param [in] context Chip implementation context
+ * @param [in] retention_slot_address Retention memory slot to store Rx FiFo address
+ * @param [in] retention_slot_size Retention memory slot to store Rx FiFo size
+ *
+ * @return Operation status
+ *
+ * @see lr20xx_system_add_register_to_retention_mem, lr20xx_radio_fifo_configure_1024_byte_rx_fifo
+ */
+lr20xx_status_t lr20xx_radio_fifo_1024_byte_rx_fifo_store_retention_mem( const void* context,
+                                                                         uint8_t     retention_slot_address,
+                                                                         uint8_t     retention_slot_size );
+
 #ifdef __cplusplus
 }
 #endif

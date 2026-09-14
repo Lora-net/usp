@@ -86,14 +86,24 @@ typedef ral_status_t ( *ral_set_tx_cfg_f )( const void* context, const int8_t ou
 typedef ral_status_t ( *ral_set_pkt_payload_f )( const void* context, const uint8_t* buffer, const uint16_t size );
 typedef ral_status_t ( *ral_get_pkt_payload_f )( const void* context, uint16_t max_size_in_bytes, uint8_t* buffer,
                                                  uint16_t* size_in_bytes );
+typedef ral_status_t ( *ral_get_pkt_size_f )( const void* context, uint16_t* size_in_bytes );
+typedef ral_status_t ( *ral_get_data_rx_buffer_f )( const void* context, uint8_t* buffer, uint16_t size_in_bytes );
+
+typedef ral_status_t ( *ral_clear_rx_fifo_f )( const void* context );
+typedef ral_status_t ( *ral_clear_tx_fifo_f )( const void* context );
+
 typedef ral_status_t ( *ral_get_tx_fifo_level_f )( const void* context, uint16_t* fifo_level );
 typedef ral_status_t ( *ral_get_rx_fifo_level_f )( const void* context, uint16_t* fifo_level );
 typedef ral_status_t ( *ral_cfg_fifo_irq_f )( const void* context, ral_radio_fifo_flag_t rx_fifo_irq_enable,
                                               ral_radio_fifo_flag_t tx_fifo_irq_enable, uint16_t rx_fifo_high_threshold,
                                               uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
                                               uint16_t tx_fifo_high_threshold );
+typedef ral_status_t ( *ral_get_fifo_irq_f )( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                              ral_radio_fifo_flag_t* tx_fifo_flags );
 typedef ral_status_t ( *ral_clear_fifo_irq_f )( const void* context, ral_radio_fifo_flag_t rx_fifo_flags_to_clear,
                                                 ral_radio_fifo_flag_t tx_fifo_flags_to_clear );
+typedef ral_status_t ( *ral_get_and_clear_fifo_irq_f )( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                                        ral_radio_fifo_flag_t* tx_fifo_flags );
 typedef ral_status_t ( *ral_get_irq_status_f )( const void* context, ral_irq_t* irq );
 typedef ral_status_t ( *ral_clear_irq_status_f )( const void* context, const ral_irq_t irq );
 typedef ral_status_t ( *ral_get_and_clear_irq_status_f )( const void* context, ral_irq_t* irq );
@@ -131,6 +141,8 @@ typedef ral_status_t ( *ral_set_gfsk_crc_params_f )( const void* context, const 
 typedef ral_status_t ( *ral_set_flrc_crc_params_f )( const void* context, const uint32_t seed,
                                                      const uint32_t polynomial );
 typedef ral_status_t ( *ral_set_gfsk_whitening_seed_f )( const void* context, const uint16_t seed );
+typedef ral_status_t ( *ral_set_gfsk_whitening_seed_comp_f )( const void* context, const ral_gfsk_dc_free_t dc_free,
+                                                              const uint16_t seed );
 typedef ral_status_t ( *ral_lr_fhss_init_f )( const void* context, const ral_lr_fhss_params_t* lr_fhss_params );
 typedef ral_status_t ( *ral_lr_fhss_build_frame_f )( const void* context, const ral_lr_fhss_params_t* lr_fhss_params,
                                                      ral_lr_fhss_memory_state_t memory_state_holder,
@@ -169,6 +181,14 @@ typedef ral_status_t ( *ral_rttof_get_raw_result_f )( const void* context, ral_l
                                                       int32_t* results_meter, int8_t* rssi_result );
 typedef ral_status_t ( *ral_rttof_set_address_f )( const void* context, const uint32_t address,
                                                    const uint8_t check_length );
+
+typedef ral_status_t ( *ral_check_lora_parameters_f )( const void* context, const uint32_t rf_freq_in_hz,
+                                                       const ral_lora_pkt_params_t* pkt_params,
+                                                       const ral_lora_mod_params_t* mod_params );
+
+typedef ral_status_t ( *ral_check_rttof_parameters_f )( const void* context, const uint32_t rf_freq_in_hz,
+                                                        const ral_lora_pkt_params_t* pkt_params,
+                                                        const ral_lora_mod_params_t* mod_params );
 typedef struct ral_drv_s
 {
     ral_handles_part_f                    handles_part;
@@ -191,10 +211,16 @@ typedef struct ral_drv_s
     ral_set_tx_cfg_f                      set_tx_cfg;
     ral_set_pkt_payload_f                 set_pkt_payload;
     ral_get_pkt_payload_f                 get_pkt_payload;
+    ral_get_pkt_size_f                    get_pkt_size;
+    ral_get_data_rx_buffer_f              get_data_rx_buffer;
+    ral_clear_rx_fifo_f                   clear_rx_fifo;
+    ral_clear_tx_fifo_f                   clear_tx_fifo;
     ral_get_tx_fifo_level_f               get_tx_fifo_level;
     ral_get_rx_fifo_level_f               get_rx_fifo_level;
     ral_cfg_fifo_irq_f                    cfg_fifo_irq;
+    ral_get_fifo_irq_f                    get_fifo_irq;
     ral_clear_fifo_irq_f                  clear_fifo_irq;
+    ral_get_and_clear_fifo_irq_f          get_and_clear_fifo_irq;
     ral_get_irq_status_f                  get_irq_status;
     ral_clear_irq_status_f                clear_irq_status;
     ral_get_and_clear_irq_status_f        get_and_clear_irq_status;
@@ -224,6 +250,7 @@ typedef struct ral_drv_s
     ral_set_gfsk_crc_params_f             set_gfsk_crc_params;
     ral_set_flrc_crc_params_f             set_flrc_crc_params;
     ral_set_gfsk_whitening_seed_f         set_gfsk_whitening_seed;
+    ral_set_gfsk_whitening_seed_comp_f    set_gfsk_whitening_seed_comp;
     ral_lr_fhss_init_f                    lr_fhss_init;
     ral_lr_fhss_build_frame_f             lr_fhss_build_frame;
     ral_lr_fhss_handle_hop_f              lr_fhss_handle_hop;
@@ -244,6 +271,8 @@ typedef struct ral_drv_s
     ral_rttof_set_request_address_f       rttof_set_request_address;
     ral_rttof_set_rx_tx_delay_indicator_f rttof_set_rx_tx_delay_indicator;
     ral_rttof_get_raw_result_f            rttof_get_raw_result;
+    ral_check_lora_parameters_f           check_lora_parameters;
+    ral_check_rttof_parameters_f          check_rttof_parameters;
 } ral_drv_t;
 
 /*

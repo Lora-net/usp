@@ -688,7 +688,7 @@ smtc_multicast_config_rc_t smtc_ping_slot_multicast_b_stop_session( smtc_ping_sl
     ping_slot_obj->rx_session_param[mc_group_id + 1]->fcnt_dwn_min = 0;
     ping_slot_obj->rx_session_param[mc_group_id + 1]->fcnt_dwn_max = ~0;
 
-    if( ping_slot_obj->rx_session_index == ( mc_group_id + 1 ) )
+    if( ping_slot_obj->rx_session_index == ( rx_session_type_t ) ( mc_group_id + 1 ) )
     {
         rp_task_abort( ping_slot_obj->rp, ping_slot_obj->ping_slot_id4rp );
         rp_callback( ping_slot_obj->rp );

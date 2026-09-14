@@ -239,6 +239,7 @@ typedef enum rp_status_e
     RP_STATUS_RTTOF_TIMEOUT,
     RP_STATUS_RADIO_LOCKED,
     RP_STATUS_RADIO_UNLOCKED,
+    RP_STATUS_REQUEST_NEXT_TX_PAYLOAD,
 } rp_status_t;
 
 typedef enum rp_next_state_status_e

@@ -66,6 +66,33 @@ bool hw_modem_is_a_cmd_available( void );
  */
 bool hw_modem_is_low_power_ok( void );
 
+/**
+ * @brief Set HW_MODEM_EVENT_PIN to 0
+ */
+void hw_modem_unset_event_pin( void );
+
+/**
+ * @brief Disable interrupts
+ */
+void hw_modem_disable_irq( void );
+
+/**
+ * @brief Set the Tx power offset in dB
+ *
+ * @param [in] context Chip implementation context or NULL
+ * @param [in] tx_pwr_offset_db power offset in dB
+ */
+void hw_modem_set_tx_power_offset( const void* context, uint8_t tx_pwr_offset_db );
+
+/**
+ * @brief Get the Tx power offset in dB
+ *
+ * @param [in] context Chip implementation context or NULL
+ *
+ * @return Tx power offset in dB
+ */
+uint8_t hw_modem_get_tx_power_offset( const void* context );
+
 #ifdef __cplusplus
 }
 #endif

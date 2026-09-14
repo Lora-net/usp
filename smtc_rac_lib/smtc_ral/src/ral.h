@@ -136,7 +136,14 @@ static inline ral_status_t ral_wakeup( const ral_t* radio )
  */
 static inline ral_status_t ral_set_sleep( const ral_t* radio, const bool retain_config )
 {
+#if defined( LINUX_PLATFORM )
+    // On Linux, skip sleep mode as waking up requires special NSS manipulation not yet implemented
+    ( void ) radio;
+    ( void ) retain_config;
+    return RAL_STATUS_OK;
+#else
     return radio->driver.set_sleep( radio->context, retain_config );
+#endif
 }
 
 /**
@@ -352,6 +359,42 @@ static inline ral_status_t ral_get_pkt_payload( const ral_t* radio, uint16_t max
     return radio->driver.get_pkt_payload( radio->context, max_size_in_bytes, buffer, size_in_bytes );
 }
 
+/**
+ * @brief Get the size of the packet received
+ *
+ * @param [in] radio             Pointer to radio data structure
+ * @param [out] size_in_bytes    Size of the received packet - in bytes
+ *
+ * @returns Operation status
+ */
+static inline ral_status_t ral_get_pkt_size( const ral_t* radio, uint16_t* size_in_bytes )
+{
+    return radio->driver.get_pkt_size( radio->context, size_in_bytes );
+}
+
+/**
+ * @brief Fetch a certain amount of data from the radio reception buffer.
+ *
+ * @param [in] radio             Pointer to radio data structure
+ * @param [out] buffer           Pointer to the buffer to be filled with received data. It is up to the
+ * @param [in] size_in_bytes     The number of bytes to get from the reception buffer
+ * user that it contains at least @p size_in_bytes bytes.
+ *
+ * @returns Operation status
+ */
+static inline ral_status_t ral_get_data_rx_buffer( const ral_t* radio, uint8_t* buffer, uint16_t size_in_bytes )
+{
+    return radio->driver.get_data_rx_buffer( radio->context, buffer, size_in_bytes );
+}
+
+static inline ral_status_t ral_clear_rx_fifo( const ral_t* radio )
+{
+    return radio->driver.clear_rx_fifo( radio->context );
+}
+static inline ral_status_t ral_clear_tx_fifo( const ral_t* radio )
+{
+    return radio->driver.clear_tx_fifo( radio->context );
+}
 static inline ral_status_t ral_get_tx_fifo_level( const ral_t* radio, uint16_t* fifo_level )
 {
     return radio->driver.get_tx_fifo_level( radio->context, fifo_level );
@@ -368,10 +411,20 @@ static inline ral_status_t ral_cfg_fifo_irq( const ral_t* radio, ral_radio_fifo_
     return radio->driver.cfg_fifo_irq( radio->context, rx_fifo_irq_enable, tx_fifo_irq_enable, rx_fifo_high_threshold,
                                        tx_fifo_low_threshold, rx_fifo_low_threshold, tx_fifo_high_threshold );
 }
+static inline ral_status_t ral_get_fifo_irq( const ral_t* radio, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                             ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    return radio->driver.get_fifo_irq( radio->context, rx_fifo_flags, tx_fifo_flags );
+}
 static inline ral_status_t ral_clear_fifo_irq( const ral_t* radio, ral_radio_fifo_flag_t rx_fifo_flags_to_clear,
                                                ral_radio_fifo_flag_t tx_fifo_flags_to_clear )
 {
     return radio->driver.clear_fifo_irq( radio->context, rx_fifo_flags_to_clear, tx_fifo_flags_to_clear );
+}
+static inline ral_status_t ral_get_and_clear_fifo_irq( const ral_t* radio, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                                       ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    return radio->driver.get_and_clear_fifo_irq( radio->context, rx_fifo_flags, tx_fifo_flags );
 }
 
 /**
@@ -785,6 +838,21 @@ static inline ral_status_t ral_set_gfsk_whitening_seed( const ral_t* radio, cons
 }
 
 /**
+ * @brief Configure the whitening seed used in GFSK packet with compatibility mode
+ *
+ * @param [in] radio  Pointer to radio data structure
+ * @param [in] dc_free Compatibility mode for data whitening
+ * @param [in] seed   Seed value used in data whitening
+ *
+ * @returns Operation status
+ */
+static inline ral_status_t ral_set_gfsk_whitening_seed_comp( const ral_t* radio, const ral_gfsk_dc_free_t dc_free,
+                                                             const uint16_t seed )
+{
+    return radio->driver.set_gfsk_whitening_seed_comp( radio->context, dc_free, seed );
+}
+
+/**
  * @brief Initialise LR FHSS
  *
  * @param [in] radio  Pointer to radio data structure
@@ -1058,6 +1126,40 @@ static inline ral_status_t ral_rttof_get_raw_result( const ral_t* radio, ral_lor
                                                      int32_t* results_meter, int8_t* rssi_result )
 {
     return radio->driver.rttof_get_raw_result( radio->context, rttof_bw, raw_results, results_meter, rssi_result );
+}
+
+/**
+ * Check RTTOF parameters using LoRa modem
+ *
+ * @param [in] radio Pointer to const ral_t
+ * @param [in] rf_freq_in_hz Frequency
+ * @param [in] pkt_params Packet parameters
+ * @param [in] mod_params Modulation parameters
+ *
+ * @returns status Operation status
+ */
+static inline ral_status_t ral_check_rttof_parameters( const ral_t* radio, const uint32_t rf_freq_in_hz,
+                                                       const ral_lora_pkt_params_t* pkt_params,
+                                                       const ral_lora_mod_params_t* mod_params )
+{
+    return radio->driver.check_rttof_parameters( radio, rf_freq_in_hz, pkt_params, mod_params );
+}
+
+/**
+ * Check parameters using LoRa modem
+ *
+ * @param [in] radio Pointer to const ral_t
+ * @param [in] rf_freq_in_hz Frequency
+ * @param [in] pkt_params Packet parameters
+ * @param [in] mod_params Modulation parameters
+ *
+ * @returns status Operation status
+ */
+static inline ral_status_t ral_check_lora_parameters( const ral_t* radio, const uint32_t rf_freq_in_hz,
+                                                      const ral_lora_pkt_params_t* pkt_params,
+                                                      const ral_lora_mod_params_t* mod_params )
+{
+    return radio->driver.check_lora_parameters( radio, rf_freq_in_hz, pkt_params, mod_params );
 }
 
 #ifdef __cplusplus

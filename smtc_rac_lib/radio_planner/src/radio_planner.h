@@ -83,21 +83,29 @@ typedef struct radio_planner_s
     rp_status_t       status[RP_NB_HOOKS];
     ral_irq_t         raw_radio_irq[RP_NB_HOOKS];
     uint32_t          irq_timestamp_ms[RP_NB_HOOKS];
+    bool              active_time_out[RP_NB_HOOKS];
+    uint32_t          active_time_out_time_ms[RP_NB_HOOKS];
     rp_stats_t        stats;
     uint8_t           hook_to_execute;
     uint32_t          hook_to_execute_time_ms;
     uint8_t           radio_task_id;
     uint32_t          timer_value;
+    uint32_t          timer_absolute_time_ms;
     uint8_t           timer_hook_id;
     bool              radio_irq_flag;
     bool              timer_irq_flag;
     bool              radio_is_free;
+    bool              arbiter_flag;
     uint32_t          disable_failsafe;
     void ( *hook_callbacks[RP_NB_HOOKS] )( void* );
     rp_next_state_status_t next_state_status;
     const ralf_t*          radio;
     const ralf_t*          radio_target_attached_to_this_hook[RP_NB_HOOKS];
     uint32_t               margin_delay;
+    bool                   timer_armed;
+    bool                   radio_task_running[RP_NB_HOOKS];
+    void ( *immediate_irq_callback )( void );
+    bool radio_immediate_access_in_progress;
 } radio_planner_t;
 
 /*
@@ -190,6 +198,8 @@ void rp_disable_failsafe( radio_planner_t* rp, bool disable );
  * @return true if the radio isn't used by any task, false otherwise
  */
 bool rp_radio_is_free( radio_planner_t* rp );
+bool rp_get_immediate_radio_access( radio_planner_t* rp, uint8_t priority, void ( *irq_callback )( void ) );
+bool rp_release_immediate_radio_access( radio_planner_t* rp );
 #ifdef __cplusplus
 }
 #endif

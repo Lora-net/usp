@@ -2,11 +2,50 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "FPB-RA0E2: periodical_uplink",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build_fpb_ra0e2/periodical_uplink",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "jlink",
+            "device": "R7FA0E209",
+            "interface": "swd",
+            "svdFile": "${workspaceFolder}/examples/mcu_drivers/renesas_ra0e2/svd/R7FA0E209.svd",
+            "runToEntryPoint": "main",
+            // "armToolchainPath": "/opt/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi/bin",
+            "gdbPath": "gdb-multiarch",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            }
+        },
+        {
+            "name": "FPB-RA0E2: porting_tests",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build_fpb_ra0e2/porting_tests",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "jlink",
+            "device": "R7FA0E209",
+            "interface": "swd",
+            "svdFile": "${workspaceFolder}/examples/mcu_drivers/renesas_ra0e2/svd/R7FA0E209.svd",
+            "runToEntryPoint": "main",
+            // "armToolchainPath": "/opt/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi/bin",
+            "gdbPath": "gdb-multiarch",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            }
+        },
+        {
             "name": "STM32L476RG with openocd",
             "type": "cortex-debug",
             "request": "launch",
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/build/example",
+            "executable": "${workspaceFolder}/build/immediate_radio_access",
+            "linux": {
+                "gdbPath": "gdb-multiarch"
+            }
             "device": "STM32L476RG",
             "runToEntryPoint": "main",
             "servertype": "openocd",

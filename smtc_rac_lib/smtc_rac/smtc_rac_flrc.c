@@ -103,6 +103,7 @@
 #include "ralf_sx127x.h"
 #elif defined( LR20XX )
 #include "ralf_lr20xx.h"
+#include "lr20xx_regmem.h"
 #endif
 
 /*
@@ -111,6 +112,15 @@
  */
 #define RALF_RADIO_POINTER smtc_rac_get_rp( )->radio
 #define RAL_RADIO_POINTER &( smtc_rac_get_rp( )->radio->ral )
+
+#if defined( LR20XX )
+/* ShapeCfg = "Generic TX Modulator" (Genmod), base 0xF30900 + offset 0x04.
+ * See dig_top_rif_1_1.html / LR20xx datasheet. */
+#define LR20XX_GENMOD_SHAPECFG_REG_ADDR ( 0x00F30904UL )
+/* DblRate = bit 8: interpolate by 16 instead of 8.
+ * Datasheet: "Can only be enabled for symbol rate inferior or equal to 2Mb/s". */
+#define LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK ( 1UL << 8 )
+#endif
 
 /*
  * -----------------------------------------------------------------------------
@@ -165,11 +175,13 @@ smtc_rac_return_code_t smtc_rac_flrc( uint8_t radio_access_id )
         .state = ( rac_config->scheduler_config.scheduling == SMTC_RAC_SCHEDULED_TRANSACTION ) ? RP_TASK_STATE_SCHEDULE
                                                                                                : RP_TASK_STATE_ASAP,
         .schedule_task_low_priority = false,
-        .duration_time_ms           = time_on_air_us / 1000,
+        .duration_time_ms           = time_on_air_us / 1000 + ( ( time_on_air_us % 1000 != 0 ) ? 1 : 0 ),
         .start_time_ms              = rac_config->scheduler_config.start_time_ms,
         .launch_task_callbacks =
             ( rac_config->radio_params.flrc.is_tx == true ) ? smtc_rac_flrc_tx_callback : smtc_rac_flrc_rx_callback,
     };
+
+    rac_config->scheduler_config.duration_time_ms = rp_task.duration_time_ms;
 
     if( rp_task_enqueue( smtc_rac_get_rp( ), &rp_task,
                          ( rac_config->radio_params.flrc.is_tx == true )
@@ -196,30 +208,38 @@ smtc_rac_return_code_t smtc_rac_flrc( uint8_t radio_access_id )
 
 static rp_radio_params_t prepare_radio_params_for_flrc( smtc_rac_context_t* rac_config )
 {
-    ralf_params_flrc_t flrc_param;
-    memset( &flrc_param, 0, sizeof( flrc_param ) );
+    ralf_params_flrc_t flrc_param = { 0 };
 
     // Basic radio parameters
-    flrc_param.rf_freq_in_hz     = rac_config->radio_params.flrc.frequency_in_hz;
+    flrc_param.rf_freq_in_hz = rac_config->radio_params.flrc.frequency_in_hz;
+
+    if( rac_config->radio_params.flrc.is_tx == false )
+    {
+        flrc_param.rf_freq_in_hz += rac_config->radio_params.flrc.rx_frequency_offset_in_hz;
+    }
+
     flrc_param.output_pwr_in_dbm = rac_config->radio_params.flrc.tx_power_in_dbm;
 
     // Modulation parameters
-    flrc_param.mod_params.br_in_bps    = rac_config->radio_params.flrc.br_in_bps;
-    flrc_param.mod_params.bw_dsb_in_hz = rac_config->radio_params.flrc.bw_dsb_in_hz;
+    flrc_param.mod_params.raw_bit_rate = rac_config->radio_params.flrc.raw_bit_rate;
     flrc_param.mod_params.cr           = rac_config->radio_params.flrc.cr;
     flrc_param.mod_params.pulse_shape  = rac_config->radio_params.flrc.pulse_shape;
 
     // Packet parameters
-    flrc_param.pkt_params.preamble_len_in_bits = rac_config->radio_params.flrc.preamble_len_in_bits;
-    flrc_param.pkt_params.sync_word_len        = rac_config->radio_params.flrc.sync_word_len;
-    flrc_param.pkt_params.tx_syncword          = rac_config->radio_params.flrc.tx_syncword;
-    flrc_param.pkt_params.match_sync_word      = rac_config->radio_params.flrc.match_sync_word;
-    flrc_param.pkt_params.pld_is_fix           = rac_config->radio_params.flrc.pld_is_fix;
+    flrc_param.pkt_params.preamble_len    = rac_config->radio_params.flrc.preamble_len;
+    flrc_param.pkt_params.sync_word_len   = rac_config->radio_params.flrc.sync_word_len;
+    flrc_param.pkt_params.tx_syncword     = rac_config->radio_params.flrc.tx_syncword_index;
+    flrc_param.pkt_params.match_sync_word = rac_config->radio_params.flrc.match_sync_word;
+    flrc_param.pkt_params.pld_is_fix      = rac_config->radio_params.flrc.pld_is_fix;
 
     flrc_param.pkt_params.crc_type = rac_config->radio_params.flrc.crc_type;
 
     // Advanced
-    flrc_param.sync_word      = rac_config->radio_params.flrc.sync_word;
+    for( uint8_t i = 0; i < ( sizeof( flrc_param.sync_word ) / sizeof( flrc_param.sync_word[0] ) ); i++ )
+    {
+        flrc_param.sync_word[i] = rac_config->radio_params.flrc.sync_word[i];
+    }
+
     flrc_param.crc_seed       = rac_config->radio_params.flrc.crc_seed;
     flrc_param.crc_polynomial = rac_config->radio_params.flrc.crc_polynomial;
 
@@ -230,6 +250,7 @@ static rp_radio_params_t prepare_radio_params_for_flrc( smtc_rac_context_t* rac_
 
     if( rac_config->radio_params.flrc.is_tx == true )
     {
+        rp_radio_params.tx.flrc.is_tx = true;
         // Note: FLRC shares union with lora/gfsk/lr_fhss in radio_planner_types
         // Use flrc union member shape to carry params where needed for ToA helper
         flrc_param.pkt_params.pld_len_in_bytes    = rac_config->radio_params.flrc.tx_size;
@@ -237,18 +258,26 @@ static rp_radio_params_t prepare_radio_params_for_flrc( smtc_rac_context_t* rac_
         rp_radio_params.tx.flrc.pkt_params        = *( ( ral_flrc_pkt_params_t* ) &( flrc_param.pkt_params ) );
         rp_radio_params.tx.flrc.rf_freq_in_hz     = flrc_param.rf_freq_in_hz;
         rp_radio_params.tx.flrc.output_pwr_in_dbm = flrc_param.output_pwr_in_dbm;
-        rp_radio_params.tx.flrc.sync_word         = flrc_param.sync_word;
-        rp_radio_params.tx.flrc.crc_seed          = flrc_param.crc_seed;
-        rp_radio_params.tx.flrc.crc_polynomial    = flrc_param.crc_polynomial;
+
+        rp_radio_params.tx.flrc.sync_word[flrc_param.pkt_params.tx_syncword - 1] =
+            &flrc_param.sync_word[flrc_param.pkt_params.tx_syncword - 1][0];
+
+        rp_radio_params.tx.flrc.crc_seed       = flrc_param.crc_seed;
+        rp_radio_params.tx.flrc.crc_polynomial = flrc_param.crc_polynomial;
     }
     else
     {
+        rp_radio_params.rx.flrc.is_tx          = false;
         flrc_param.pkt_params.pld_len_in_bytes = rac_config->radio_params.flrc.max_rx_size;
         rp_radio_params.rx.flrc.mod_params     = *( ( ral_flrc_mod_params_t* ) &( flrc_param.mod_params ) );
         rp_radio_params.rx.flrc.pkt_params     = *( ( ral_flrc_pkt_params_t* ) &( flrc_param.pkt_params ) );
         rp_radio_params.rx.flrc.rf_freq_in_hz  = flrc_param.rf_freq_in_hz;
         rp_radio_params.rx.timeout_in_ms       = rac_config->radio_params.flrc.rx_timeout_ms;
-        rp_radio_params.rx.flrc.sync_word      = flrc_param.sync_word;
+        for( uint8_t i = 0;
+             i < ( sizeof( rp_radio_params.rx.flrc.sync_word ) / sizeof( rp_radio_params.rx.flrc.sync_word[0] ) ); i++ )
+        {
+            rp_radio_params.rx.flrc.sync_word[i] = flrc_param.sync_word[i];
+        }
         rp_radio_params.rx.flrc.crc_seed       = flrc_param.crc_seed;
         rp_radio_params.rx.flrc.crc_polynomial = flrc_param.crc_polynomial;
     }
@@ -269,6 +298,7 @@ static void smtc_rac_flrc_tx_callback( void* rp_void )
     uint8_t             id           = rp->radio_task_id;
     rp_radio_params_t*  radio_params = &rp->radio_params[id];
     smtc_rac_context_t* rac_config   = smtc_rac_get_context( id );
+
     if( rac_config->lbt_context.lbt_enabled )
     {
         smtc_rac_lbt_listen_channel( id, rac_config->radio_params.flrc.frequency_in_hz,
@@ -289,6 +319,23 @@ static void smtc_rac_flrc_tx_callback( void* rp_void )
     }
 
     SMTC_MODEM_HAL_PANIC_ON_FAILURE( ralf_setup_flrc( rp->radio, &radio_params->tx.flrc ) == RAL_STATUS_OK );
+
+#if defined( LR20XX )
+    /* DblRate only applies to FLRC and for a bit rate <= 2 Mb/s (i.e. everything except 2.08 / 2.6 Mbps).
+     * Written AFTER ralf_setup_flrc, because SetFlrcModulationParams rewrites ShapeCfg.
+     * Masked read-modify-write: only bit 8 is touched, the rest of ShapeCfg is preserved.
+     * Explicitly write 0 when the bit rate is >= 2 Mb/s to stay deterministic.
+     * No leak to other modulations: GFSK clears it back to 0 on set_pkt_type, and LoRa ignores ShapeCfg. */
+    {
+        const bool enable_dbl_rate =
+            ( radio_params->tx.flrc.mod_params.raw_bit_rate < RAL_FLRC_RAW_BIT_RATE_2_080_MBPS );
+
+        lr20xx_regmem_write_regmem32_mask( rp->radio->ral.context, LR20XX_GENMOD_SHAPECFG_REG_ADDR,
+                                           LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK,
+                                           enable_dbl_rate ? LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK : 0U );
+    }
+#endif
+
     SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_set_dio_irq_params( &( rp->radio->ral ), RAL_IRQ_TX_DONE ) == RAL_STATUS_OK );
 
     SMTC_MODEM_HAL_PANIC_ON_FAILURE(
@@ -300,9 +347,12 @@ static void smtc_rac_flrc_tx_callback( void* rp_void )
     }
 
     rac_config->smtc_rac_data_result.radio_start_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
-    while( ( int32_t ) ( rp->tasks[id].start_time_ms - rac_config->smtc_rac_data_result.radio_start_timestamp_ms ) > 0 )
+    if( rac_config->scheduler_config.scheduling == SMTC_RAC_SCHEDULED_TRANSACTION )
     {
-        rac_config->smtc_rac_data_result.radio_start_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
+        while( ( int32_t ) ( rp->tasks[id].start_time_ms - rac_config->smtc_rac_data_result.radio_start_timestamp_ms ) > 0 )
+        {
+            rac_config->smtc_rac_data_result.radio_start_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
+        }
     }
 
     if( rac_config->lbt_context.lbt_enabled == false )
@@ -310,15 +360,15 @@ static void smtc_rac_flrc_tx_callback( void* rp_void )
         smtc_modem_hal_start_radio_tcxo( );
     }
     smtc_modem_hal_set_ant_switch( true );
+    // Need in 2.4GHz at low datarate to avoid crc errors
+    ral_set_fs( &( rp->radio->ral ) );
     SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_set_tx( &( rp->radio->ral ) ) == RAL_STATUS_OK );
     rp_stats_set_tx_timestamp( &rp->stats, smtc_modem_hal_get_time_in_ms( ) );
 
-    RAC_LOG_TX(
-        "FLRC Tx callback - Freq:%u Hz, Power:%d dBm, BR:%u bps, BW:%u "
-        "Hz, length:%u\n",
-        radio_params->tx.flrc.rf_freq_in_hz, radio_params->tx.flrc.output_pwr_in_dbm,
-        radio_params->tx.flrc.mod_params.br_in_bps, radio_params->tx.flrc.mod_params.bw_dsb_in_hz,
-        rp->payload_buffer_size[id] );
+    RAC_LOG_TX( "FLRC Tx callback - Freq:%lu Hz, Power:%d dBm, BR_BW:%s Hz, length:%u\n",
+                flrc_burst_rp_radio_params.tx.flrc.rf_freq_in_hz, flrc_burst_rp_radio_params.tx.flrc.output_pwr_in_dbm,
+                ral_flrc_raw_bit_rate_to_str( flrc_burst_rp_radio_params.tx.flrc.mod_params.raw_bit_rate ),
+                rp->payload_buffer_size[id] );
 }
 
 static void smtc_rac_flrc_rx_callback( void* rp_void )
@@ -329,9 +379,21 @@ static void smtc_rac_flrc_rx_callback( void* rp_void )
     smtc_rac_context_t* rac_config   = smtc_rac_get_context( id );
 
     SMTC_MODEM_HAL_PANIC_ON_FAILURE( ralf_setup_flrc( rp->radio, &radio_params->rx.flrc ) == RAL_STATUS_OK );
+
+#if defined( LR20XX )
+    // Disable IF correlator if the frequency offset was measured with à LoRa Rx
+
+    if( rac_config->radio_params.flrc.rx_frequency_offset_in_hz != 0 )
+    {
+        uint32_t value = 0x000000;
+        lr20xx_regmem_write_regmem32( rp->radio->ral.context, 0x00F30D18, &value, 1 );
+    }
+#endif
+
     SMTC_MODEM_HAL_PANIC_ON_FAILURE(
         ral_set_dio_irq_params( &( rp->radio->ral ), RAL_IRQ_RX_DONE | RAL_IRQ_RX_TIMEOUT | RAL_IRQ_RX_HDR_ERROR |
-                                                         RAL_IRQ_RX_CRC_ERROR ) == RAL_STATUS_OK );
+                                                         RAL_IRQ_RX_CRC_ERROR | RAL_IRQ_RX_LEN_ERROR ) ==
+        RAL_STATUS_OK );
 
     if( rac_config->scheduler_config.callback_pre_radio_transaction != NULL )
     {
@@ -339,17 +401,21 @@ static void smtc_rac_flrc_rx_callback( void* rp_void )
     }
 
     rac_config->smtc_rac_data_result.radio_start_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
-    while( ( int32_t ) ( rp->tasks[id].start_time_ms - rac_config->smtc_rac_data_result.radio_start_timestamp_ms ) > 0 )
+    if( rac_config->scheduler_config.scheduling == SMTC_RAC_SCHEDULED_TRANSACTION )
     {
-        rac_config->smtc_rac_data_result.radio_start_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
+        while( ( int32_t ) ( rp->tasks[id].start_time_ms - rac_config->smtc_rac_data_result.radio_start_timestamp_ms ) >
+               0 )
+        {
+            rac_config->smtc_rac_data_result.radio_start_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
+        }
     }
 
     smtc_modem_hal_start_radio_tcxo( );
     smtc_modem_hal_set_ant_switch( false );
-    SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_set_rx( &( rp->radio->ral ), rac_config->radio_params.flrc.rx_timeout_ms ) ==
-                                     RAL_STATUS_OK );
+    SMTC_MODEM_HAL_PANIC_ON_FAILURE(
+        ral_set_rx( &( rp->radio->ral ), rac_config->radio_params.flrc.rx_timeout_ms ) == RAL_STATUS_OK );
     rp_stats_set_rx_timestamp( &rp->stats, smtc_modem_hal_get_time_in_ms( ) );
 
-    RAC_LOG_RX( "FLRC Rx callback - Freq:%u Hz, BR:%u bps, BW:%u Hz\n", radio_params->rx.flrc.rf_freq_in_hz,
-                radio_params->rx.flrc.mod_params.br_in_bps, radio_params->rx.flrc.mod_params.bw_dsb_in_hz );
+    RAC_LOG_RX( "FLRC Rx callback - Freq:%lu Hz, BR_BW:%s Hz\n", flrc_burst_rp_radio_params.rx.flrc.rf_freq_in_hz,
+                ral_flrc_raw_bit_rate_to_str( flrc_burst_rp_radio_params.rx.flrc.mod_params.raw_bit_rate ) );
 }

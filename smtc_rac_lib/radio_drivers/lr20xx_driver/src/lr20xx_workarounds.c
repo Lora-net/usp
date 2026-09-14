@@ -45,18 +45,12 @@
 #include "lr20xx_system.h"
 #include "lr20xx_radio_ook.h"
 #include "lr20xx_radio_common.h"
+#include "lr20xx_radio_fifo.h"
 
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE MACROS-----------------------------------------------------------
  */
-
-#define LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_SYNCWORDS ( 7 )
-#define LR20XX_WORKAROUND_BLUETOOTH_LE_2MBPS_PREAMBLE_LENGTH_BUFFER_LENGTH ( 7 )
-
-#define LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_FREQUENCY_DRIFT_REGISTER_ADDRESS ( 0x00F30C28 )
-#define LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_FREQUENCY_DRIFT_REGISTER_MASK ( 0x1F << 5 )
-#define LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_FREQUENCY_DRIFT_VALUE ( 30 << 5 )
 
 #define LR20XX_WORKAROUND_LORA_SX1276_COMPATIBILITY_REGISTER_ADDRESS ( 0x00F30A14 )
 #define LR20XX_WORKAROUND_LORA_SX1276_COMPATIBILITY_REGISTER_MASK ( 3 << 18 )
@@ -67,20 +61,6 @@
 #define LR20XX_WORKAROUND_OOK_DETECTION_THRESHOLD_REGISTER_ADDRESS ( 0x00F30E14 )
 #define LR20XX_WORKAROUND_OOK_DETECTION_THRESHOLD_REGISTER_MASK ( 0x7F << 20 )
 
-#define LR20XX_WORKAROUND_RTTOF_RF_FREQ_ADDRESS ( 0x00F40144 )
-#define LR20XX_WORKAROUND_RTTOF_RF_FREQ_MASK ( 0x7F )
-
-#define LR20XX_WORKAROUND_RTTOF_RSSI_MAX_GAIN_REGISTER_ADDRESS ( 0x00F301A4 )
-#define LR20XX_WORKAROUND_RTTOF_RSSI_POWER_OFFSET_REGISTER_ADDRESS ( 0x00F30128 )
-
-#define LR20XX_WORKAROUND_DCDC_ADC_CTRL_REGISTER_ADDRESS ( 0x00F40200 )
-#define LR20XX_WORKAROUND_DCDC_RX_PATH_REGISTER_ADDRESS ( 0x00F40430 )
-#define LR20XX_WORKAROUND_DCDC_SWITCHER_REGISTER_ADDRESS ( 0x00F20024 )
-#define LR20XX_WORKAROUND_DCDC_SWITCHER_RISE_REGISTER_MASK ( 0xF << 20 )
-#define LR20XX_WORKAROUND_DCDC_SWITCHER_FALL_REGISTER_MASK ( 0xF << 16 )
-#define LR20XX_WORKAROUND_DCDC_FREQ_LF_REGISTER_ADDRESS ( 0x80004C )
-#define LR20XX_WORKAROUND_DCDC_RF_FREQ_ADDRESS ( LR20XX_WORKAROUND_RTTOF_RF_FREQ_ADDRESS )
-
 #define LR20XX_WORKAROUND_RESULT_DEVIATION_CHANNEL_FILTER_ADDRESS ( 0xF3013C )
 #define LR20XX_WORKAROUND_RESULT_DEVIATION_CHANNEL_FILTER_MASK ( 0x38 )
 #define LR20XX_WORKAROUND_RESULT_DEVIATION_CHANNEL_FILTER_VALUE ( 0x30 )
@@ -90,10 +70,8 @@
 #define LR20XX_WORKAROUND_RESULT_DEVIATION_DCC_MANAGER_VALUE ( 0x08 )
 #define LR20XX_WORKAROUND_RESULT_DEVIATION_DCC_SUBORDINATE_VALUE ( 0x0A )
 
-#define LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_ADDRESS ( 0x00F30B50 )
-#define LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_MASK ( 0x7 << 24 )
-#define LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_SET_VALUE ( 0x0 << 24 )
-#define LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_RESET_VALUE ( 0x1 << 24 )
+#define LR20XX_WORKAROUND_CFG_IRQ_RX_FIFO_THRESHOLDS_REGISTER ( 0xF2A098 )
+#define LR20XX_WORKAROUND_CFG_IRQ_TX_FIFO_THRESHOLDS_REGISTER ( 0xF2A09C )
 
 /*
  * -----------------------------------------------------------------------------
@@ -146,97 +124,10 @@ static lr20xx_status_t lr20xx_workaround_lora_frequency_hopping_sx1276_compatibi
  */
 static lr20xx_status_t lr20xx_workaround_lora_sx1276_compatibility_read_sf_value( const void* context, uint8_t* sf );
 
-/**
- * @brief Read RTToF max gain and power offset from the LR20xx register
- *
- * @param context Chip implementation context
- * @param [out] max_gain Max gain read from register
- * @param [out] power_offset Power offset read from register
- * @return Operation status
- *
- * @see lr20xx_workarounds_rttof_rssi_computation_apply_correction, lr20xx_workarounds_rttof_rssi_computation
- */
-static lr20xx_status_t lr20xx_workarounds_rttof_rssi_computation_get_gain_power( const void* context,
-                                                                                 uint16_t*   max_gain,
-                                                                                 int16_t*    power_offset );
-
-/**
- * @brief Compute RTToF RSSI correction from max gain, power offset, and raw RSSI value
- *
- * @param max_gain The max gain obtained from reading the LR20xx register
- * @param power_offset The power offset obtained from reading the LR20xx register
- * @param raw_rssi The raw RSSI value typically obtained from SPI response to @ref lr20xx_rttof_get_results, before
- * converting value to dB
- *
- * @return uint8_t The corrected RSSI value
- *
- * @see lr20xx_workarounds_rttof_rssi_computation_get_gain_power, lr20xx_workarounds_rttof_rssi_computation
- */
-static uint8_t lr20xx_workarounds_rttof_rssi_computation_apply_correction( uint16_t max_gain, int16_t power_offset,
-                                                                           uint8_t raw_rssi );
-
-/**
- * @brief Set the DCDC regulator frequency
- *
- * @param context Chip implementation context
- * @param frequency [in] The frequency to set, expressed in Hz
- *
- * @return Operation status
- */
-static lr20xx_status_t lr20xx_workaround_dcdc_set_frequency( const void* context, uint32_t frequency );
-
-/**
- * @brief Get the RF frequency configured
- *
- * This function must be used only in the context of DCDC workaround.
- *
- * @param context Chip implementation context
- * @param [out] frequency The RF frequency, in Hz
- *
- * @return Operation status
- */
-static lr20xx_status_t lr20xx_workaround_dcdc_get_rf_frequency( const void* context, uint32_t* frequency );
-
-static uint32_t pll_step_to_hz( uint32_t pll_steps );
-
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
  */
-
-lr20xx_status_t lr20xx_workarounds_bluetooth_le_phy_coded_syncwords( const void* context )
-{
-    const uint8_t cbuffer[LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_SYNCWORDS] = { 0x02, 0x30, 0x01, 0x20,
-                                                                                  0x00, 0x09, 0x00 };
-
-    return ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_SYNCWORDS,
-                                                 0, 0 );
-}
-
-lr20xx_status_t lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift( const void* context )
-{
-    return lr20xx_regmem_write_regmem32_mask( context,
-                                              LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_FREQUENCY_DRIFT_REGISTER_ADDRESS,
-                                              LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_FREQUENCY_DRIFT_REGISTER_MASK,
-                                              LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_FREQUENCY_DRIFT_VALUE );
-}
-
-lr20xx_status_t lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift_store_retention_mem( const void* context,
-                                                                                               uint8_t     slot )
-{
-    return lr20xx_system_add_register_to_retention_mem(
-        context, slot, LR20XX_WORKAROUND_BLUETOOTH_LE_PHY_CODED_FREQUENCY_DRIFT_REGISTER_ADDRESS );
-}
-
-lr20xx_status_t lr20xx_workarounds_bluetooth_le_2mbps_preamble_length( const void* context )
-{
-    const uint8_t cbuffer[LR20XX_WORKAROUND_BLUETOOTH_LE_2MBPS_PREAMBLE_LENGTH_BUFFER_LENGTH] = { 0x02, 0x30, 0x01,
-                                                                                                  0x21, 0x00, 0x07,
-                                                                                                  0x00 };
-
-    return ( lr20xx_status_t ) lr20xx_hal_write(
-        context, cbuffer, LR20XX_WORKAROUND_BLUETOOTH_LE_2MBPS_PREAMBLE_LENGTH_BUFFER_LENGTH, 0, 0 );
-}
 
 lr20xx_status_t lr20xx_workarounds_lora_enable_sx1276_compatibility_mode( const void* context )
 {
@@ -481,90 +372,6 @@ int16_t lr20xx_workarounds_ook_get_default_detection_threshold_level( lr20xx_rad
     }
 }
 
-lr20xx_status_t lr20xx_workarounds_rttof_truncate_pll_freq_step( const void* context )
-{
-    return lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_RTTOF_RF_FREQ_ADDRESS,
-                                              LR20XX_WORKAROUND_RTTOF_RF_FREQ_MASK, 0 );
-}
-
-lr20xx_status_t lr20xx_workarounds_rttof_rssi_computation( const void* context, uint8_t rssi1_raw_value,
-                                                           uint8_t rssi2_raw_value, uint8_t* rssi1_raw_fixed,
-                                                           uint8_t* rssi2_raw_fixed )
-{
-    uint16_t max_gain     = 0;
-    int16_t  power_offset = 0;
-    RETURN_STATUS_ON_NOT_OK(
-        lr20xx_workarounds_rttof_rssi_computation_get_gain_power( context, &max_gain, &power_offset ) );
-    ( *rssi1_raw_fixed ) =
-        lr20xx_workarounds_rttof_rssi_computation_apply_correction( max_gain, power_offset, rssi1_raw_value );
-    if( rssi2_raw_fixed != 0 )
-    {
-        ( *rssi2_raw_fixed ) =
-            lr20xx_workarounds_rttof_rssi_computation_apply_correction( max_gain, power_offset, rssi2_raw_value );
-    }
-
-    // OK is returned here, as an error would have returned on previous RETURN_STATUS_ON_NOT_OK
-    return LR20XX_STATUS_OK;
-}
-
-lr20xx_status_t lr20xx_workarounds_dcdc_reset( const void* context )
-{
-    RETURN_STATUS_ON_NOT_OK(
-        lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_DCDC_SWITCHER_REGISTER_ADDRESS,
-                                           LR20XX_WORKAROUND_DCDC_SWITCHER_RISE_REGISTER_MASK, 15 << 20 ) );
-    RETURN_STATUS_ON_NOT_OK(
-        lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_DCDC_SWITCHER_REGISTER_ADDRESS,
-                                           LR20XX_WORKAROUND_DCDC_SWITCHER_FALL_REGISTER_MASK, 15 << 16 ) );
-    return lr20xx_workaround_dcdc_set_frequency( context, 2800000 );
-}
-
-lr20xx_status_t lr20xx_workarounds_dcdc_configure( const void* context )
-{
-    uint32_t adc_ctrl_raw = 0;
-    RETURN_STATUS_ON_NOT_OK(
-        lr20xx_regmem_read_regmem32( context, LR20XX_WORKAROUND_DCDC_ADC_CTRL_REGISTER_ADDRESS, &adc_ctrl_raw, 1 ) );
-    const uint32_t ana_dec = ( adc_ctrl_raw >> 8 ) & 0x7;
-
-    uint32_t rx_path_raw = 0;
-    RETURN_STATUS_ON_NOT_OK(
-        lr20xx_regmem_read_regmem32( context, LR20XX_WORKAROUND_DCDC_RX_PATH_REGISTER_ADDRESS, &rx_path_raw, 1 ) );
-    const bool is_rx_hf = ( ( rx_path_raw & 0x3 ) == 1 );
-
-    if( ( is_rx_hf == false ) && ( ( ana_dec == 1 ) || ( ana_dec == 2 ) ) )
-    {
-        RETURN_STATUS_ON_NOT_OK(
-            lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_DCDC_SWITCHER_REGISTER_ADDRESS,
-                                               LR20XX_WORKAROUND_DCDC_SWITCHER_RISE_REGISTER_MASK, 11 << 20 ) );
-        RETURN_STATUS_ON_NOT_OK(
-            lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_DCDC_SWITCHER_REGISTER_ADDRESS,
-                                               LR20XX_WORKAROUND_DCDC_SWITCHER_FALL_REGISTER_MASK, 13 << 16 ) );
-    }
-    else
-    {
-        RETURN_STATUS_ON_NOT_OK(
-            lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_DCDC_SWITCHER_REGISTER_ADDRESS,
-                                               LR20XX_WORKAROUND_DCDC_SWITCHER_RISE_REGISTER_MASK, 15 << 20 ) );
-        RETURN_STATUS_ON_NOT_OK(
-            lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_DCDC_SWITCHER_REGISTER_ADDRESS,
-                                               LR20XX_WORKAROUND_DCDC_SWITCHER_FALL_REGISTER_MASK, 15 << 16 ) );
-    }
-
-    if( ana_dec == 1 )
-    {
-        return lr20xx_workaround_dcdc_set_frequency( context, 4300000 );
-    }
-    else
-    {
-        return lr20xx_workaround_dcdc_set_frequency( context, 2800000 );
-    }
-}
-
-lr20xx_status_t lr20xx_workarounds_dcdc_store_retention_mem( const void* context, uint8_t slot )
-{
-    return lr20xx_system_add_register_to_retention_mem( context, slot,
-                                                        LR20XX_WORKAROUND_DCDC_SWITCHER_REGISTER_ADDRESS );
-}
-
 lr20xx_status_t lr20xx_workarounds_rttof_results_deviation( const void* context, bool is_manager )
 {
     RETURN_STATUS_ON_NOT_OK(
@@ -586,24 +393,30 @@ lr20xx_status_t lr20xx_workarounds_rttof_results_deviation_store_retention_mem( 
                                                         LR20XX_WORKAROUND_RESULT_DEVIATION_DCC_ADDRESS );
 }
 
-lr20xx_status_t lr20xx_workarounds_rttof_extended_stuck_second_request_enable( const void* context )
+lr20xx_status_t lr20xx_workarounds_1024_byte_fifo_cfg_irq(
+    const void* context, lr20xx_radio_fifo_flag_t rx_fifo_irq_enable, lr20xx_radio_fifo_flag_t tx_fifo_irq_enable,
+    uint16_t rx_fifo_high_threshold, uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
+    uint16_t tx_fifo_high_threshold )
 {
-    return lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_ADDRESS,
-                                              LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_MASK,
-                                              LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_SET_VALUE );
+    RETURN_STATUS_ON_NOT_OK( lr20xx_radio_fifo_cfg_irq( context, rx_fifo_irq_enable, tx_fifo_irq_enable,
+                                                        rx_fifo_high_threshold, 0, 0, tx_fifo_high_threshold ) );
+
+    const uint32_t rx_threshold_raw = ( uint32_t ) rx_fifo_low_threshold + ( rx_fifo_high_threshold << 16u );
+    const uint32_t tx_threshold_raw = ( uint32_t ) tx_fifo_low_threshold + ( tx_fifo_high_threshold << 16u );
+    RETURN_STATUS_ON_NOT_OK( lr20xx_regmem_write_regmem32(
+        context, LR20XX_WORKAROUND_CFG_IRQ_RX_FIFO_THRESHOLDS_REGISTER, &rx_threshold_raw, 1 ) );
+    return lr20xx_regmem_write_regmem32( context, LR20XX_WORKAROUND_CFG_IRQ_TX_FIFO_THRESHOLDS_REGISTER,
+                                         &tx_threshold_raw, 1 );
 }
 
-lr20xx_status_t lr20xx_workarounds_rttof_extended_stuck_second_request_disable( const void* context )
+lr20xx_status_t lr20xx_workarounds_1024_byte_fifo_cfg_irq_store_retention_mem( const void* context,
+                                                                               uint8_t     retention_slot_rx_thresholds,
+                                                                               uint8_t retention_slot_tx_thresholds )
 {
-    return lr20xx_regmem_write_regmem32_mask( context, LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_ADDRESS,
-                                              LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_MASK,
-                                              LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_RESET_VALUE );
-}
-
-lr20xx_status_t lr20xx_workarounds_rttof_extended_stuck_second_request_store_retention_mem( const void* context,
-                                                                                            uint8_t     slot )
-{
-    return lr20xx_system_add_register_to_retention_mem( context, slot, LR20XX_WORKAROUND_RTTOF_EXTENDED_STUCK_ADDRESS );
+    RETURN_STATUS_ON_NOT_OK( lr20xx_system_add_register_to_retention_mem(
+        context, retention_slot_rx_thresholds, LR20XX_WORKAROUND_CFG_IRQ_RX_FIFO_THRESHOLDS_REGISTER ) );
+    return lr20xx_system_add_register_to_retention_mem( context, retention_slot_tx_thresholds,
+                                                        LR20XX_WORKAROUND_CFG_IRQ_TX_FIFO_THRESHOLDS_REGISTER );
 }
 
 /*
@@ -636,55 +449,6 @@ lr20xx_status_t lr20xx_workaround_lora_sx1276_compatibility_read_sf_value( const
         *sf = raw_register_value & 0x0f;
     }
     return read_status;
-}
-
-lr20xx_status_t lr20xx_workarounds_rttof_rssi_computation_get_gain_power( const void* context, uint16_t* max_gain,
-                                                                          int16_t* power_offset )
-{
-    uint32_t max_gain_raw = 0;
-    RETURN_STATUS_ON_NOT_OK( lr20xx_regmem_read_regmem32(
-        context, LR20XX_WORKAROUND_RTTOF_RSSI_MAX_GAIN_REGISTER_ADDRESS, &max_gain_raw, 1 ) );
-    ( *max_gain ) = ( uint16_t ) ( max_gain_raw & 0x03FF );
-
-    uint32_t power_offset_raw = 0;
-    RETURN_STATUS_ON_NOT_OK( lr20xx_regmem_read_regmem32(
-        context, LR20XX_WORKAROUND_RTTOF_RSSI_POWER_OFFSET_REGISTER_ADDRESS, &power_offset_raw, 1 ) );
-    const int16_t power_offset_raw_value = ( power_offset_raw >> 6 ) & 0x3F;
-    ( *power_offset ) = ( int16_t ) ( ( ( power_offset_raw_value ) > 32 ) ? ( power_offset_raw_value - ( int16_t ) 64 )
-                                                                          : power_offset_raw_value );
-    return LR20XX_STATUS_OK;
-}
-
-uint8_t lr20xx_workarounds_rttof_rssi_computation_apply_correction( uint16_t max_gain, int16_t power_offset,
-                                                                    uint8_t raw_rssi )
-{
-    return ( uint8_t ) ( 208 + ( max_gain >> 1 ) + power_offset - ( raw_rssi << 1 ) );
-}
-
-lr20xx_status_t lr20xx_workaround_dcdc_set_frequency( const void* context, uint32_t frequency )
-{
-    const uint32_t freq_lf = ( uint32_t ) ( ( float ) frequency * 1.048576f );
-    RETURN_STATUS_ON_NOT_OK(
-        lr20xx_regmem_write_regmem32( context, LR20XX_WORKAROUND_DCDC_FREQ_LF_REGISTER_ADDRESS, &freq_lf, 1 ) );
-    uint32_t rf_frequency = 0;
-    RETURN_STATUS_ON_NOT_OK( lr20xx_workaround_dcdc_get_rf_frequency( context, &rf_frequency ) );
-    return lr20xx_radio_common_set_rf_freq( context, rf_frequency );
-}
-
-lr20xx_status_t lr20xx_workaround_dcdc_get_rf_frequency( const void* context, uint32_t* frequency )
-{
-    uint32_t raw_rf_freq = 0;
-    RETURN_STATUS_ON_NOT_OK(
-        lr20xx_regmem_read_regmem32( context, LR20XX_WORKAROUND_DCDC_RF_FREQ_ADDRESS, &raw_rf_freq, 1 ) );
-    *frequency = pll_step_to_hz( raw_rf_freq );
-    return LR20XX_STATUS_OK;
-}
-
-uint32_t pll_step_to_hz( uint32_t pll_steps )
-{
-    const uint_least64_t numerator   = ( ( uint_least64_t ) pll_steps * ( uint_least64_t ) 15625ULL );
-    const uint_least64_t denominator = ( ( uint_least64_t ) ( 1 << 14 ) );  // 1<<14 is 2**14
-    return ( uint32_t ) ( ( numerator + denominator - 1 ) / denominator );
 }
 
 /* --- EOF ------------------------------------------------------------------ */

@@ -976,7 +976,7 @@ void smtc_real_set_channel_mask( smtc_real_t* real )
         // Copy all unwrapped channels in channel enable
         memcpy( channel_index_enabled_ctx, unwrapped_channel_mask_ctx, real_const.const_number_of_channel_bank );
 
-#if( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
+#if ( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
         {
             char channels_str[real_const.const_number_of_tx_channel * 3 + 1];
             for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
@@ -1223,7 +1223,7 @@ uint8_t smtc_real_decrement_dr_simulation( smtc_real_t* real, uint8_t tx_data_ra
     while( data_rate_simulation > real_const.const_min_tx_dr )
     {
         uint8_t index = ( uplink_dwell_time_ctx * real_const.const_number_of_tx_dr ) + data_rate_simulation;
-        if( index > ( real_const.const_max_tx_dr * ( uplink_dwell_time_ctx + 1 ) ) )
+        if( index >= ( real_const.const_number_of_tx_dr * ( uplink_dwell_time_ctx + 1 ) ) )
         {
             SMTC_MODEM_HAL_PANIC( );
         }

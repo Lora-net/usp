@@ -38,6 +38,11 @@
 extern "C" {
 #endif
 
+// For Linux builds, use the Linux-specific pinout
+#if defined( LINUX_PLATFORM )
+#include "modem_pinout_linux.h"
+#else
+
 /*
  * -----------------------------------------------------------------------------
  * --- DEPENDENCIES ------------------------------------------------------------
@@ -60,6 +65,33 @@ extern "C" {
 /********************************************************************************/
 // clang-format off
 
+#if defined( FPB_RA0E2 )
+// FPB-RA0E2 specific pinout (Renesas RA0E2)
+// Radio on Arduino-compatible pins (LR1110/LR2021)
+// UART0 pins (configured via FSP)
+#define DEBUG_UART_TX P101  // UART0 TX (TXD0)
+#define DEBUG_UART_RX P100  // UART0 RX (RXD0)
+
+#define RADIO_SPI_ID 1
+#define RADIO_NRST P015         // ARDUINO_A0 / RADIO_RESET (active-low)
+#define RADIO_SPI_MOSI P501     // ARDUINO_MOSI (SAU SPI SO00)
+#define RADIO_SPI_MISO P502     // ARDUINO_MISO (SAU SPI SI00)
+#define RADIO_SPI_SCLK P500     // ARDUINO_SCK (SAU SPI SCK00)
+#define RADIO_NSS P115          // ARDUINO_D7 / RADIO_NSS (manual CS, active-low)
+#define RADIO_BUSY_PIN P409     // ARDUINO_D3 / RADIO_BUSY
+#define RADIO_DIO_MAIN P201         // ARDUINO_D5 / RADIO_DIO (IRQ5, active-high, rising edge)
+#define RADIO_LNA_CTRL NC       // TBD if using external LNA for GNSS
+#define SMTC_LED_RX P103        // LED1
+#define SMTC_LED_TX P102        // LED2
+#define SMTC_LED_SCAN NC
+#define EXTI_BUTTON P200        // User button (active-low, falling edge)
+#define HW_MODEM_COMMAND_PIN NC
+#define HW_MODEM_EVENT_PIN NC
+#define SX126X_RADIO_RF_SWITCH_CTRL NC
+#define RADIO_ANTENNA_SWITCH NC
+
+#else
+// STM32 Nucleo board pinout (default)
 // Debug uart specific pinout for debug print
 #define DEBUG_UART_TX PA_2
 #define DEBUG_UART_RX PA_3
@@ -103,13 +135,13 @@ extern "C" {
 #define SMTC_LED_SCAN           PB_5
 
 #if defined( LR20XX )
-    #if defined( LEGACY_EVK_LR20XX )
-        #define RADIO_DIOX PB_4  // Nucleo board
+    #if !(defined( LEGACY_EVK_LR20XX )) // Wio-LR20xx board via LoRa Plus Expansion shield)
+        #define RADIO_DIO_MAIN  PA_1 // DIO8
     #else
-        #define RADIO_DIOX PA_1  // WIO board
-    #endif
+        #define RADIO_DIO_MAIN  PB_4 // DIO9
+    #endif // !LEGACY_EVK_LR20XX
 #else
-    #define RADIO_DIOX PB_4  // Nucleo board
+    #define RADIO_DIO_MAIN  PB_4    // DIO9
 #endif  // LR20XX
 
 #define EXTI_BUTTON PC_13
@@ -120,6 +152,8 @@ extern "C" {
 #define HW_MODEM_BUSY_PIN PC_8
 #define HW_MODEM_TX_LINE PC_10
 #define HW_MODEM_RX_LINE PC_11
+
+#endif  // FPB_RA0E2
 
 // clang-format on
 
@@ -135,5 +169,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
+#endif  // !defined(LINUX_PLATFORM)
 
 #endif  //__MODEM_PIN_NAMES_H__

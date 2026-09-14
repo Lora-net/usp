@@ -100,7 +100,7 @@ static void lpm_enter_sleep_mode( void );
 static void lpm_exit_sleep_mode( void );
 static void sleep_handler( void );
 
-#if( LOW_POWER_MODE == 1 )
+#if ( LOW_POWER_MODE == 1 )
 static void lpm_mcu_deinit( void );
 static void lpm_mcu_reinit( void );
 static void system_clock_re_config_after_stop( void );
@@ -293,7 +293,7 @@ static void system_clock_config( void )
 
 static void mcu_gpio_init( void )
 {
-#if( HW_DEBUG_PROBE == 1 )
+#if ( HW_DEBUG_PROBE == 1 )
     // Enable debug in sleep/stop/standby
     LL_DBGMCU_EnableDBGSleepMode( );
     LL_DBGMCU_EnableDBGStopMode( );
@@ -303,7 +303,7 @@ static void mcu_gpio_init( void )
     hal_gpio_init_out( RADIO_NSS, 1 );
     hal_gpio_init_in( RADIO_BUSY_PIN, BSP_GPIO_PULL_MODE_NONE, BSP_GPIO_IRQ_MODE_OFF, NULL );
     // Here init only the pin as an exti rising and the callback will be attached later
-    hal_gpio_init_in( RADIO_DIOX, BSP_GPIO_PULL_MODE_DOWN, BSP_GPIO_IRQ_MODE_RISING, NULL );
+    hal_gpio_init_in( RADIO_DIO_MAIN, BSP_GPIO_PULL_MODE_DOWN, BSP_GPIO_IRQ_MODE_RISING, NULL );
     hal_gpio_init_out( RADIO_NRST, 1 );
 #if defined( SX128X )
     hal_gpio_init_out( RADIO_ANTENNA_SWITCH, 1 );
@@ -323,7 +323,7 @@ static void mcu_gpio_init( void )
  */
 static void lpm_enter_sleep_mode( void )
 {
-#if( LOW_POWER_MODE == 1 )
+#if ( LOW_POWER_MODE == 1 )
 
     lpm_mcu_deinit( );
 
@@ -352,7 +352,7 @@ static void lpm_enter_sleep_mode( void )
  */
 static void lpm_exit_sleep_mode( void )
 {
-#if( LOW_POWER_MODE == 1 )
+#if ( LOW_POWER_MODE == 1 )
     // Initializes the peripherals
     lpm_mcu_reinit( );
 #endif
@@ -379,7 +379,7 @@ static void sleep_handler( void )
     LL_SYSTICK_EnableIT( );
 }
 
-#if( LOW_POWER_MODE == 1 )
+#if ( LOW_POWER_MODE == 1 )
 
 /**
  * @brief De-init periph begore going in sleep mode

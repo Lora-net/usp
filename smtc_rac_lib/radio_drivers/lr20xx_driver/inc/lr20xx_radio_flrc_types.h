@@ -221,6 +221,7 @@ typedef struct lr20xx_radio_flrc_rx_stats_s
     uint16_t received_packets;  //!< Number of received packets
     uint16_t crc_errors;        //!< Number of received packets with CRC error
     uint16_t length_errors;     //!< Number of received packets with length error
+    uint16_t crc_ok;            //!< Number of received packets with CRC ok
 } lr20xx_radio_flrc_rx_stats_t;
 
 /**

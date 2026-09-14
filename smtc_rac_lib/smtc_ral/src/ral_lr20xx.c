@@ -40,6 +40,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "lr20xx_pram_load.h"
 #include "lr20xx_system.h"
 #include "lr20xx_system_types.h"
 #include "lr20xx_radio_fifo.h"
@@ -51,7 +52,6 @@
 #include "lr20xx_radio_lr_fhss.h"
 #include "lr20xx_rttof.h"
 #include "lr20xx_workarounds.h"
-#include "lr20xx_regmem.h"
 #include "ral_lr20xx.h"
 #include "ral_defs.h"
 #include "ral_lr20xx_bsp.h"
@@ -65,6 +65,14 @@
  * -----------------------------------------------------------------------------
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
+
+const ral_lora_bw_t RAL_LR20XX_SUPPORTED_BW[] = { RAL_LORA_BW_031_KHZ,  RAL_LORA_BW_041_KHZ, RAL_LORA_BW_062_KHZ,
+                                                  RAL_LORA_BW_125_KHZ,  RAL_LORA_BW_200_KHZ, RAL_LORA_BW_250_KHZ,
+                                                  RAL_LORA_BW_400_KHZ,  RAL_LORA_BW_500_KHZ, RAL_LORA_BW_800_KHZ,
+                                                  RAL_LORA_BW_1000_KHZ, RAL_LORA_BW_083_KHZ, RAL_LORA_BW_101_KHZ };
+
+const uint8_t RAL_LR20XX_SUPPORTED_BW_SIZE =
+    ( sizeof( RAL_LR20XX_SUPPORTED_BW ) / sizeof( RAL_LR20XX_SUPPORTED_BW[0] ) );
 
 /*
  * -----------------------------------------------------------------------------
@@ -98,6 +106,25 @@ static ral_irq_t ral_lr20xx_convert_irq_flags_to_ral( lr20xx_system_irq_mask_t l
  * @returns Lr20xx interrupt status
  */
 static lr20xx_system_irq_mask_t ral_lr20xx_convert_irq_flags_from_ral( ral_irq_t ral_irq );
+
+/**
+ * @brief Convert fifo interrupt flags from Lr20xx context to RAL context
+ *
+ * @param [in] lr20xx_fifo_irq_status Lr20xx fifo interrupt status
+ *
+ * @returns Lr20xx interrupt status
+ */
+static ral_radio_fifo_flag_t ral_lr20xx_convert_fifo_irq_flags_to_ral(
+    lr20xx_radio_fifo_flag_t lr20xx_fifo_irq_status );
+
+/**
+ * @brief Convert fifo interrupt flags from RAL context to Lr20xx context
+ *
+ * @param [in] ral_fifo_irq RAL fifo interrupt status
+ *
+ * @returns Lr20xx interrupt status
+ */
+static lr20xx_radio_fifo_flag_t ral_lr20xx_convert_irq_fifo_flags_from_ral( ral_radio_fifo_flag_t ral_fifo_irq );
 
 /**
  * @brief Convert GFSK modulation parameters from RAL context to Lr20xx context
@@ -186,6 +213,14 @@ static ral_status_t ral_lr20xx_convert_flrc_mod_params_from_ral( const ral_flrc_
 static ral_status_t ral_lr20xx_convert_flrc_pkt_params_from_ral( const ral_flrc_pkt_params_t*    ral_pkt_params,
                                                                  lr20xx_radio_flrc_pkt_params_t* radio_pkt_params );
 
+/**
+ * @brief Load and enable LR20xx PRAM
+ *
+ * The behavior of this function is compile definition dependent. It needs to have either LR2012, LR2021 or LR2022
+ * macro defined.
+ */
+static ral_status_t ral_lr20xx_load_pram( const void* context );
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
@@ -210,9 +245,11 @@ ral_status_t ral_lr20xx_init( const void* context )
 {
     ral_status_t status = RAL_STATUS_ERROR;
 
-    // Workaround SIMO
-    const uint32_t freq_val = 2.8e6 * 1.048576;
-    lr20xx_regmem_write_regmem32( context, 0x80004c, &freq_val, 1 );
+    status = ral_lr20xx_load_pram( context );
+    if( status != RAL_STATUS_OK )
+    {
+        return status;
+    }
 
     lr20xx_system_reg_mode_t reg_mode;
     ral_lr20xx_bsp_get_reg_mode( context, &reg_mode );
@@ -233,6 +270,9 @@ ral_status_t ral_lr20xx_init( const void* context )
         {
             return status;
         }
+        // Calibration
+        lr20xx_system_clear_errors( context );     // Clear the errors first
+        lr20xx_system_calibrate( context, 0x6F );  // Must do the calibration after the TCXO works steadily
     }
 
     lr20xx_system_lfclk_cfg_t lfclk_cfg;
@@ -315,6 +355,35 @@ ral_status_t ral_lr20xx_init( const void* context )
     {
         return status;
     }
+
+#if defined( LR20XX_FIFO_SIZE_INCREASE_WORKAROUND_ENABLE )
+    status = ( ral_status_t ) lr20xx_radio_fifo_configure_1024_byte_tx_fifo( context );
+    if( status != RAL_STATUS_OK )
+    {
+        return status;
+    }
+    status = ( ral_status_t ) lr20xx_radio_fifo_configure_1024_byte_rx_fifo( context );
+    if( status != RAL_STATUS_OK )
+    {
+        return status;
+    }
+
+    status = ( ral_status_t ) lr20xx_radio_fifo_1024_byte_tx_fifo_store_retention_mem( context, 0, 1 );
+    if( status != RAL_STATUS_OK )
+    {
+        return status;
+    }
+    status = ( ral_status_t ) lr20xx_radio_fifo_1024_byte_rx_fifo_store_retention_mem( context, 2, 3 );
+    if( status != RAL_STATUS_OK )
+    {
+        return status;
+    }
+    status = ( ral_status_t ) lr20xx_workarounds_1024_byte_fifo_cfg_irq_store_retention_mem( context, 4, 5 );
+    if( status != RAL_STATUS_OK )
+    {
+        return status;
+    }
+#endif  // LR20XX_FIFO_SIZE_INCREASE_WORKAROUND_ENABLE
 
     return status;
 }
@@ -507,7 +576,7 @@ ral_status_t ral_lr20xx_get_pkt_payload( const void* context, uint16_t max_size_
         *size_in_bytes = pkt_len;
     }
 
-    if( pkt_len <= max_size_in_bytes )
+    if( ( pkt_len <= max_size_in_bytes ) && ( pkt_len <= RAL_LR20XX_MAX_DATA_FIFO_BYTES ) )
     {
         status = ( ral_status_t ) lr20xx_radio_fifo_read_rx( context, buffer, pkt_len );
     }
@@ -517,6 +586,35 @@ ral_status_t ral_lr20xx_get_pkt_payload( const void* context, uint16_t max_size_
     }
 
     return status;
+}
+
+ral_status_t ral_lr20xx_get_pkt_size( const void* context, uint16_t* size_in_bytes )
+{
+    if( size_in_bytes == 0 )
+    {
+        return RAL_STATUS_ERROR;
+    }
+
+    return ( ral_status_t ) lr20xx_radio_common_get_rx_packet_length( context, size_in_bytes );
+}
+
+ral_status_t ral_lr20xx_get_data_rx_buffer( const void* context, uint8_t* buffer, uint16_t size_in_bytes )
+{
+    if( size_in_bytes > RAL_LR20XX_MAX_DATA_FIFO_BYTES )
+    {
+        return RAL_STATUS_ERROR;
+    }
+    return ( ral_status_t ) lr20xx_radio_fifo_read_rx( context, buffer, size_in_bytes );
+}
+
+ral_status_t ral_lr20xx_clear_rx_fifo( const void* context )
+{
+    return ( ral_status_t ) lr20xx_radio_fifo_clear_rx( context );
+}
+
+ral_status_t ral_lr20xx_clear_tx_fifo( const void* context )
+{
+    return ( ral_status_t ) lr20xx_radio_fifo_clear_tx( context );
 }
 
 ral_status_t ral_lr20xx_get_tx_fifo_level( const void* context, uint16_t* fifo_level )
@@ -534,16 +632,60 @@ ral_status_t ral_lr20xx_cfg_fifo_irq( const void* context, ral_radio_fifo_flag_t
                                       uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
                                       uint16_t tx_fifo_high_threshold )
 {
-    return ( ral_status_t ) lr20xx_radio_fifo_cfg_irq( context, rx_fifo_irq_enable, tx_fifo_irq_enable,
-                                                       rx_fifo_high_threshold, tx_fifo_low_threshold,
-                                                       rx_fifo_low_threshold, tx_fifo_high_threshold );
+#if defined( LR20XX_FIFO_SIZE_INCREASE_WORKAROUND_ENABLE )
+    return ( ral_status_t ) lr20xx_workarounds_1024_byte_fifo_cfg_irq(
+        context, ral_lr20xx_convert_irq_fifo_flags_from_ral( rx_fifo_irq_enable ),
+        ral_lr20xx_convert_irq_fifo_flags_from_ral( tx_fifo_irq_enable ), rx_fifo_high_threshold, tx_fifo_low_threshold,
+        rx_fifo_low_threshold, tx_fifo_high_threshold );
+#else
+    return ( ral_status_t ) lr20xx_radio_fifo_cfg_irq(
+        context, ral_lr20xx_convert_irq_fifo_flags_from_ral( rx_fifo_irq_enable ),
+        ral_lr20xx_convert_irq_fifo_flags_from_ral( tx_fifo_irq_enable ), rx_fifo_high_threshold, tx_fifo_low_threshold,
+        rx_fifo_low_threshold, tx_fifo_high_threshold );
+#endif  // LR20XX_FIFO_SIZE_INCREASE_WORKAROUND_ENABLE
+}
+
+ral_status_t ral_lr20xx_get_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                      ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    ral_status_t             status = RAL_STATUS_ERROR;
+    lr20xx_radio_fifo_flag_t lr20xx_rx_fifo_flags;
+    lr20xx_radio_fifo_flag_t lr20xx_tx_fifo_flags;
+
+    status = ( ral_status_t ) lr20xx_radio_fifo_get_irq( context, &lr20xx_rx_fifo_flags, &lr20xx_tx_fifo_flags );
+    if( status == RAL_STATUS_OK )
+    {
+        *rx_fifo_flags = ral_lr20xx_convert_fifo_irq_flags_to_ral( lr20xx_rx_fifo_flags );
+        *tx_fifo_flags = ral_lr20xx_convert_fifo_irq_flags_to_ral( lr20xx_tx_fifo_flags );
+    }
+
+    return status;
 }
 
 ral_status_t ral_lr20xx_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_flags_to_clear,
                                         ral_radio_fifo_flag_t tx_fifo_flags_to_clear )
 {
-    return ( ral_status_t ) lr20xx_radio_fifo_clear_irq_flags( context, rx_fifo_flags_to_clear,
-                                                               tx_fifo_flags_to_clear );
+    return ( ral_status_t ) lr20xx_radio_fifo_clear_irq_flags(
+        context, ral_lr20xx_convert_irq_fifo_flags_from_ral( rx_fifo_flags_to_clear ),
+        ral_lr20xx_convert_irq_fifo_flags_from_ral( tx_fifo_flags_to_clear ) );
+}
+
+ral_status_t ral_lr20xx_get_and_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                                ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    ral_status_t             status = RAL_STATUS_ERROR;
+    lr20xx_radio_fifo_flag_t lr20xx_rx_fifo_flags;
+    lr20xx_radio_fifo_flag_t lr20xx_tx_fifo_flags;
+
+    status = ( ral_status_t ) lr20xx_radio_fifo_get_and_clear_irq_flags( context, &lr20xx_rx_fifo_flags,
+                                                                         &lr20xx_tx_fifo_flags );
+    if( status == RAL_STATUS_OK )
+    {
+        *rx_fifo_flags = ral_lr20xx_convert_fifo_irq_flags_to_ral( lr20xx_rx_fifo_flags );
+        *tx_fifo_flags = ral_lr20xx_convert_fifo_irq_flags_to_ral( lr20xx_tx_fifo_flags );
+    }
+
+    return status;
 }
 
 ral_status_t ral_lr20xx_get_irq_status( const void* context, ral_irq_t* irq )
@@ -856,6 +998,7 @@ ral_status_t ral_lr20xx_get_lora_rx_pkt_status( const void* context, ral_lora_rx
     ral_rx_pkt_status->rssi_pkt_in_dbm        = radio_rx_pkt_status.rssi_pkt_in_dbm;
     ral_rx_pkt_status->snr_pkt_in_db          = ( ( ( int8_t ) radio_rx_pkt_status.snr_pkt_raw ) + 2 ) >> 2;
     ral_rx_pkt_status->signal_rssi_pkt_in_dbm = radio_rx_pkt_status.rssi_signal_pkt_in_dbm;
+    ral_rx_pkt_status->freq_offset_hz         = radio_rx_pkt_status.freq_offset_hz;
 
     return status;
 }
@@ -885,41 +1028,33 @@ ral_status_t ral_lr20xx_convert_flrc_mod_params_from_ral( const ral_flrc_mod_par
     lr20xx_radio_flrc_cr_t          cr;     //!< Coding rate
     lr20xx_radio_flrc_pulse_shape_t shape;  //!< Shaping
 
-    // Map bitrate/bandwidth combinations
-    if( ( ral_mod_params->br_in_bps == 2600000 ) && ( ral_mod_params->bw_dsb_in_hz == 2666000 ) )
+    switch( ral_mod_params->raw_bit_rate )
     {
-        br_bw = LR20XX_RADIO_FLRC_BR_2_600_BW_2_666;
-    }
-    else if( ( ral_mod_params->br_in_bps == 2080000 ) && ( ral_mod_params->bw_dsb_in_hz == 2222000 ) )
-    {
-        br_bw = LR20XX_RADIO_FLRC_BR_2_080_BW_2_222;
-    }
-    else if( ( ral_mod_params->br_in_bps == 1300000 ) && ( ral_mod_params->bw_dsb_in_hz == 1333000 ) )
-    {
-        br_bw = LR20XX_RADIO_FLRC_BR_1_300_BW_1_333;
-    }
-    else if( ( ral_mod_params->br_in_bps == 1040000 ) && ( ral_mod_params->bw_dsb_in_hz == 1333000 ) )
-    {
-        br_bw = LR20XX_RADIO_FLRC_BR_1_040_BW_1_333;
-    }
-    else if( ( ral_mod_params->br_in_bps == 650000 ) && ( ral_mod_params->bw_dsb_in_hz == 740000 ) )
-    {
-        br_bw = LR20XX_RADIO_FLRC_BR_0_650_BW_0_740;
-    }
-    else if( ( ral_mod_params->br_in_bps == 520000 ) && ( ral_mod_params->bw_dsb_in_hz == 571000 ) )
-    {
-        br_bw = LR20XX_RADIO_FLRC_BR_0_520_BW_0_571;
-    }
-    else if( ( ral_mod_params->br_in_bps == 325000 ) && ( ral_mod_params->bw_dsb_in_hz == 357000 ) )
-    {
-        br_bw = LR20XX_RADIO_FLRC_BR_0_325_BW_0_357;
-    }
-    else if( ( ral_mod_params->br_in_bps == 260000 ) && ( ral_mod_params->bw_dsb_in_hz == 307000 ) )
-    {
+    case RAL_FLRC_RAW_BIT_RATE_0_260_MBPS:
         br_bw = LR20XX_RADIO_FLRC_BR_0_260_BW_0_307;
-    }
-    else
-    {
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_0_325_MBPS:
+        br_bw = LR20XX_RADIO_FLRC_BR_0_325_BW_0_357;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_0_520_MBPS:
+        br_bw = LR20XX_RADIO_FLRC_BR_0_520_BW_0_571;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_0_650_MBPS:
+        br_bw = LR20XX_RADIO_FLRC_BR_0_650_BW_0_740;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_1_040_MBPS:
+        br_bw = LR20XX_RADIO_FLRC_BR_1_040_BW_1_333;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_1_300_MBPS:
+        br_bw = LR20XX_RADIO_FLRC_BR_1_300_BW_1_333;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_2_080_MBPS:
+        br_bw = LR20XX_RADIO_FLRC_BR_2_080_BW_2_222;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_2_600_MBPS:
+        br_bw = LR20XX_RADIO_FLRC_BR_2_600_BW_2_666;
+        break;
+    default:
         return RAL_STATUS_UNKNOWN_VALUE;
     }
 
@@ -966,16 +1101,35 @@ ral_status_t ral_lr20xx_convert_flrc_mod_params_from_ral( const ral_flrc_mod_par
 ral_status_t ral_lr20xx_convert_flrc_pkt_params_from_ral( const ral_flrc_pkt_params_t*    ral_pkt_params,
                                                           lr20xx_radio_flrc_pkt_params_t* radio_pkt_params )
 {
-    if( ( ral_pkt_params->preamble_len_in_bits % 4 ) != 0 )
+    switch( ral_pkt_params->preamble_len )
     {
+    case RAL_FLRC_PREAMBLE_LENGTH_4_BITS:
+        radio_pkt_params->preamble_len = LR20XX_RADIO_FLRC_PREAMBLE_LEN_04_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_8_BITS:
+        radio_pkt_params->preamble_len = LR20XX_RADIO_FLRC_PREAMBLE_LEN_08_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_12_BITS:
+        radio_pkt_params->preamble_len = LR20XX_RADIO_FLRC_PREAMBLE_LEN_12_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_16_BITS:
+        radio_pkt_params->preamble_len = LR20XX_RADIO_FLRC_PREAMBLE_LEN_16_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_20_BITS:
+        radio_pkt_params->preamble_len = LR20XX_RADIO_FLRC_PREAMBLE_LEN_20_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_24_BITS:
+        radio_pkt_params->preamble_len = LR20XX_RADIO_FLRC_PREAMBLE_LEN_24_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_28_BITS:
+        radio_pkt_params->preamble_len = LR20XX_RADIO_FLRC_PREAMBLE_LEN_28_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_32_BITS:
+        radio_pkt_params->preamble_len = LR20XX_RADIO_FLRC_PREAMBLE_LEN_32_BITS;
+        break;
+    default:
         return RAL_STATUS_UNKNOWN_VALUE;
     }
-    const uint8_t preamble_len_in_nibbles = ( uint8_t ) ( ral_pkt_params->preamble_len_in_bits / 4 );
-    if( ( preamble_len_in_nibbles == 0 ) || ( preamble_len_in_nibbles > 8 ) )
-    {
-        return RAL_STATUS_UNKNOWN_VALUE;
-    }
-    radio_pkt_params->preamble_len = ( lr20xx_radio_flrc_preamble_len_t ) ( preamble_len_in_nibbles - 1 );
 
     switch( ral_pkt_params->sync_word_len )
     {
@@ -1066,6 +1220,17 @@ ral_status_t ral_lr20xx_convert_flrc_pkt_params_from_ral( const ral_flrc_pkt_par
     return RAL_STATUS_OK;
 }
 
+ral_status_t ral_lr20xx_load_pram( const void* context )
+{
+#if defined( LR2021 )
+    return ( ral_status_t ) lr20xx_pram_load_pram_lr2021( context );
+#elif defined( LR2012 ) || defined( LR2022 )
+    return ( ral_status_t ) lr20xx_pram_load_pram_lr20x2( context );
+#else
+#error The radio chip must be selected at compile time with macros LR2012, LR2021 or LR2022
+#endif
+}
+
 ral_status_t ral_lr20xx_get_rssi_inst( const void* context, int16_t* rssi_in_dbm )
 {
     return ( ral_status_t ) lr20xx_radio_common_get_rssi_inst( context, rssi_in_dbm, NULL );
@@ -1108,6 +1273,11 @@ ral_status_t ral_lr20xx_set_gfsk_sync_word( const void* context, const uint8_t* 
 {
     uint8_t syncword[LR20XX_RADIO_FSK_SYNCWORD_LENGTH];
 
+    if( sync_word_len > LR20XX_RADIO_FSK_SYNCWORD_LENGTH )
+    {
+        return RAL_STATUS_ERROR;
+    }
+
     for( int i = 0; i < sync_word_len; i++ )
     {
         syncword[LR20XX_RADIO_FSK_SYNCWORD_LENGTH - i - 1] = sync_word[sync_word_len - i - 1];
@@ -1130,14 +1300,17 @@ ral_status_t ral_lr20xx_set_lora_sync_word( const void* context, const uint8_t s
 ral_status_t ral_lr20xx_set_flrc_sync_word( const void* context, const uint8_t sync_word_id, const uint8_t* sync_word,
                                             const uint8_t sync_word_len )
 {
-    // LR20XX_RADIO_FLRC_SYNCWORD_LENGTH_OFF     = 0x00,
-    // LR20XX_RADIO_FLRC_SYNCWORD_LENGTH_2_BYTES = 0x01,
-    // LR20XX_RADIO_FLRC_SYNCWORD_LENGTH_4_BYTES = 0x02,
+    if( sync_word_len == LR20XX_RADIO_FLRC_SYNCWORD_LENGTH_OFF )
+    {
+        return RAL_STATUS_OK;
+    }
 
-    // if( sync_word_len != LR20XX_RADIO_FLRC_SYNCWORD_LENGTH )
-    // {
-    //     return RAL_STATUS_UNKNOWN_VALUE;
-    // }
+    if( ( sync_word_len != LR20XX_RADIO_FLRC_SYNCWORD_LENGTH_2_BYTES ) &&
+        ( sync_word_len != LR20XX_RADIO_FLRC_SYNCWORD_LENGTH_4_BYTES ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
     return ( ral_status_t ) lr20xx_radio_flrc_set_syncword( context, sync_word_id, sync_word );
 }
 
@@ -1162,6 +1335,22 @@ ral_status_t ral_lr20xx_set_gfsk_whitening_seed( const void* context, const uint
 {
     return ( ral_status_t ) lr20xx_radio_fsk_set_whitening_params(
         context, LR20XX_RADIO_FSK_WHITENING_COMPATIBILITY_SX126X_LR11XX, seed );
+}
+
+ral_status_t ral_lr20xx_set_gfsk_whitening_seed_comp( const void* context, const ral_gfsk_dc_free_t dc_free,
+                                                      const uint16_t seed )
+{
+    switch( dc_free )
+    {
+    case RAL_GFSK_DC_FREE_WHITENING:
+        return ( ral_status_t ) lr20xx_radio_fsk_set_whitening_params(
+            context, LR20XX_RADIO_FSK_WHITENING_COMPATIBILITY_SX126X_LR11XX, seed );
+    case RAL_GFSK_DC_FREE_WHITENING_SX128X_COMP:
+        return ( ral_status_t ) lr20xx_radio_fsk_set_whitening_params(
+            context, LR20XX_RADIO_FSK_WHITENING_COMPATIBILITY_SX128X, seed );
+    default:
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
 }
 
 ral_status_t ral_lr20xx_lr_fhss_init( const void* context, const ral_lr_fhss_params_t* lr_fhss_params )
@@ -1459,6 +1648,14 @@ ral_irq_t ral_lr20xx_convert_irq_flags_to_ral( lr20xx_system_irq_mask_t lr20xx_i
     {
         ral_irq |= RAL_IRQ_RTTOF_TIMEOUT;
     }
+    if( ( lr20xx_irq_status & LR20XX_SYSTEM_IRQ_CMD_ERROR ) != 0 )
+    {
+        ral_irq |= RAL_IRQ_CMD_ERROR;
+    }
+    if( ( lr20xx_irq_status & LR20XX_SYSTEM_IRQ_ERROR ) != 0 )
+    {
+        ral_irq |= RAL_IRQ_ERROR;
+    }
     if( ( lr20xx_irq_status & LR20XX_SYSTEM_IRQ_FIFO_RX ) != 0 )
     {
         ral_irq |= RAL_IRQ_RX_FIFO_LEVEL;
@@ -1474,6 +1671,10 @@ ral_irq_t ral_lr20xx_convert_irq_flags_to_ral( lr20xx_system_irq_mask_t lr20xx_i
     if( ( lr20xx_irq_status & LR20XX_SYSTEM_IRQ_TX_TIMESTAMP ) != 0 )
     {
         ral_irq |= RAL_IRQ_TX_TIMESTAMP;
+    }
+    if( ( lr20xx_irq_status & LR20XX_SYSTEM_IRQ_LEN_ERROR ) != 0 )
+    {
+        ral_irq |= RAL_IRQ_RX_LEN_ERROR;
     }
 
     return ral_irq;
@@ -1555,8 +1756,74 @@ lr20xx_system_irq_mask_t ral_lr20xx_convert_irq_flags_from_ral( ral_irq_t ral_ir
     {
         lr20xx_irq_status |= LR20XX_SYSTEM_IRQ_TX_TIMESTAMP;
     }
+    if( ( ral_irq & RAL_IRQ_RX_LEN_ERROR ) != 0 )
+    {
+        lr20xx_irq_status |= LR20XX_SYSTEM_IRQ_LEN_ERROR;
+    }
 
     return lr20xx_irq_status;
+}
+
+ral_radio_fifo_flag_t ral_lr20xx_convert_fifo_irq_flags_to_ral( lr20xx_radio_fifo_flag_t lr20xx_fifo_irq_status )
+{
+    ral_radio_fifo_flag_t ral_fifo_irq = RAL_RADIO_FIFO_FLAG_NONE;
+
+    if( ( lr20xx_fifo_irq_status & LR20XX_RADIO_FIFO_FLAG_EMPTY ) != 0 )
+    {
+        ral_fifo_irq |= RAL_RADIO_FIFO_FLAG_EMPTY;
+    }
+    if( ( lr20xx_fifo_irq_status & LR20XX_RADIO_FIFO_FLAG_THRESHOLD_LOW ) != 0 )
+    {
+        ral_fifo_irq |= RAL_RADIO_FIFO_FLAG_THRESHOLD_LOW;
+    }
+    if( ( lr20xx_fifo_irq_status & LR20XX_RADIO_FIFO_FLAG_THRESHOLD_HIGH ) != 0 )
+    {
+        ral_fifo_irq |= RAL_RADIO_FIFO_FLAG_THRESHOLD_HIGH;
+    }
+    if( ( lr20xx_fifo_irq_status & LR20XX_RADIO_FIFO_FLAG_FULL ) != 0 )
+    {
+        ral_fifo_irq |= RAL_RADIO_FIFO_FLAG_FULL;
+    }
+    if( ( lr20xx_fifo_irq_status & LR20XX_RADIO_FIFO_FLAG_OVERFLOW ) != 0 )
+    {
+        ral_fifo_irq |= RAL_RADIO_FIFO_FLAG_OVERFLOW;
+    }
+    if( ( lr20xx_fifo_irq_status & LR20XX_RADIO_FIFO_FLAG_UNDERFLOW ) != 0 )
+    {
+        ral_fifo_irq |= RAL_RADIO_FIFO_FLAG_UNDERFLOW;
+    }
+    return ral_fifo_irq;
+}
+
+lr20xx_radio_fifo_flag_t ral_lr20xx_convert_irq_fifo_flags_from_ral( ral_radio_fifo_flag_t ral_fifo_irq )
+{
+    lr20xx_radio_fifo_flag_t lr20xx_fifo_irq_status = LR20XX_RADIO_FIFO_FLAG_NONE;
+
+    if( ( ral_fifo_irq & RAL_RADIO_FIFO_FLAG_EMPTY ) != 0 )
+    {
+        lr20xx_fifo_irq_status |= LR20XX_RADIO_FIFO_FLAG_EMPTY;
+    }
+    if( ( ral_fifo_irq & RAL_RADIO_FIFO_FLAG_THRESHOLD_LOW ) != 0 )
+    {
+        lr20xx_fifo_irq_status |= LR20XX_RADIO_FIFO_FLAG_THRESHOLD_LOW;
+    }
+    if( ( ral_fifo_irq & RAL_RADIO_FIFO_FLAG_THRESHOLD_HIGH ) != 0 )
+    {
+        lr20xx_fifo_irq_status |= LR20XX_RADIO_FIFO_FLAG_THRESHOLD_HIGH;
+    }
+    if( ( ral_fifo_irq & RAL_RADIO_FIFO_FLAG_FULL ) != 0 )
+    {
+        lr20xx_fifo_irq_status |= LR20XX_RADIO_FIFO_FLAG_FULL;
+    }
+    if( ( ral_fifo_irq & RAL_RADIO_FIFO_FLAG_OVERFLOW ) != 0 )
+    {
+        lr20xx_fifo_irq_status |= LR20XX_RADIO_FIFO_FLAG_OVERFLOW;
+    }
+    if( ( ral_fifo_irq & RAL_RADIO_FIFO_FLAG_UNDERFLOW ) != 0 )
+    {
+        lr20xx_fifo_irq_status |= LR20XX_RADIO_FIFO_FLAG_UNDERFLOW;
+    }
+    return lr20xx_fifo_irq_status;
 }
 
 ral_status_t ral_lr20xx_convert_gfsk_mod_params_from_ral( const ral_gfsk_mod_params_t*   ral_mod_params,
@@ -1730,6 +1997,21 @@ ral_status_t ral_lr20xx_convert_gfsk_pkt_params_from_ral( const ral_gfsk_pkt_par
         radio_pkt_params->crc = LR20XX_RADIO_FSK_CRC_3_BYTES;
         break;
     }
+    case RAL_GFSK_CRC_3_BYTES_INV:
+    {
+        radio_pkt_params->crc = LR20XX_RADIO_FSK_CRC_3_BYTES_INVERTED;
+        break;
+    }
+    case RAL_GFSK_CRC_4_BYTES:
+    {
+        radio_pkt_params->crc = LR20XX_RADIO_FSK_CRC_4_BYTES;
+        break;
+    }
+    case RAL_GFSK_CRC_4_BYTES_INV:
+    {
+        radio_pkt_params->crc = LR20XX_RADIO_FSK_CRC_4_BYTES_INVERTED;
+        break;
+    }
     default:
     {
         return RAL_STATUS_UNKNOWN_VALUE;
@@ -1777,6 +2059,16 @@ ral_status_t ral_lr20xx_convert_lora_mod_params_from_ral( const ral_lora_mod_par
     case RAL_LORA_BW_062_KHZ:
     {
         radio_mod_params->bw = LR20XX_RADIO_LORA_BW_62;
+        break;
+    }
+    case RAL_LORA_BW_083_KHZ:
+    {
+        radio_mod_params->bw = LR20XX_RADIO_LORA_BW_83;
+        break;
+    }
+    case RAL_LORA_BW_101_KHZ:
+    {
+        radio_mod_params->bw = LR20XX_RADIO_LORA_BW_101;
         break;
     }
     case RAL_LORA_BW_125_KHZ:
@@ -2118,4 +2410,61 @@ ral_status_t ral_lr20xx_rttof_get_raw_result( const void* context, ral_lora_bw_t
     return RAL_STATUS_OK;
 }
 
+ral_status_t ral_lr20xx_check_lora_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                               const ral_lora_pkt_params_t* pkt_params,
+                                               const ral_lora_mod_params_t* mod_params )
+{
+    if( ( rf_freq_in_hz < RAL_LR20XX_LF_HZ_MIN ) || ( rf_freq_in_hz > RAL_LR20XX_LF_HZ_MAX ) )
+    {
+        if( SUPPORT_2G4 )
+        {
+            if( ( rf_freq_in_hz < RAL_LR20XX_HF_HZ_MIN ) || ( rf_freq_in_hz > RAL_LR20XX_HF_HZ_MAX ) )
+            {
+                return RAL_STATUS_UNKNOWN_VALUE;
+            }
+        }
+        else
+        {
+            return RAL_STATUS_UNKNOWN_VALUE;
+        }
+    }
+
+    bool bw_supported = false;
+    for( uint8_t i = 0; i < RAL_LR20XX_SUPPORTED_BW_SIZE; i++ )
+    {
+        if( RAL_LR20XX_SUPPORTED_BW[i] == mod_params->bw )
+        {
+            bw_supported = true;
+            break;
+        }
+    }
+    if( !bw_supported )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( ( mod_params->sf < RAL_LORA_SF5 ) || ( mod_params->sf > RAL_LORA_SF12 ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( ( mod_params->cr < RAL_LORA_CR_4_5 ) || ( mod_params->cr > RAL_LORA_CR_LI_CONVOLUTIONAL_4_8 ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( pkt_params->header_type > RAL_LORA_PKT_IMPLICIT )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    return RAL_STATUS_OK;
+}
+
+ral_status_t ral_lr20xx_check_rttof_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                                const ral_lora_pkt_params_t* pkt_params,
+                                                const ral_lora_mod_params_t* mod_params )
+{
+    return ral_lr20xx_check_lora_parameters( context, rf_freq_in_hz, pkt_params, mod_params );
+}
 /* --- EOF ------------------------------------------------------------------ */

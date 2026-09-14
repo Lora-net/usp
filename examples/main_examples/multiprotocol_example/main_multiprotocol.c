@@ -38,11 +38,13 @@
  */
 #include <stdint.h>   // C99 types
 #include <stdbool.h>  // bool type
+#include <string.h>
 
-#include "main.h"
 
 #include "smtc_modem_test_api.h"
 #include "smtc_modem_api.h"
+#include "smtc_modem_relay_api.h"
+#include "smtc_rac_api.h"
 #include "smtc_modem_utilities.h"
 
 #include "smtc_modem_hal.h"
@@ -50,20 +52,17 @@
 #include "example_options.h"
 
 // Use unified logging system
-#define RAC_LOG_APP_PREFIX "PERIODICAL"
+#define RAC_LOG_APP_PREFIX "MULTIPROTOCOL"
 #include "smtc_rac_log.h"
 
 #include "smtc_hal_mcu.h"
-#include "smtc_hal_gpio.h"
+#include "smtc_hal_led.h"
+#include "smtc_hal_button.h"
 #include "smtc_hal_watchdog.h"
 
-#include "modem_pinout.h"
-#include "smtc_modem_relay_api.h"
-#include <string.h>
 #include "app_ranging_hopping.h"
 #include "apps_configuration.h"
 #include "main_ranging_demo.h"
-#include "smtc_rac_api.h"
 #include "main_multiprotocol.h"
 
 /*
@@ -178,8 +177,6 @@ static uint8_t                  rx_payload_size = 0;      // Size of the payload
 static smtc_modem_dl_metadata_t rx_metadata     = { 0 };  // Metadata of downlink
 static uint8_t                  rx_remaining    = 0;      // Remaining downlink payload in modem
 
-static volatile bool user_button_is_press = false;  // Flag for button status
-
 #if defined( USE_RELAY_TX )
 static smtc_modem_relay_tx_config_t relay_config = { 0 };
 #endif
@@ -212,13 +209,6 @@ static multiprotocol_uplink_t multiprotocol_uplink = { 0 };  // Ranging result u
 static void modem_event_callback( void );
 
 /**
- * @brief User callback for button EXTI
- *
- * @param context Define by the user at the init
- */
-static void user_button_callback( void* context );
-
-/**
  * @brief User callback for ranging result
  *
  *  This callback is fired every time a ranging result is available.
@@ -231,23 +221,12 @@ static void ranging_results_callback( smtc_rac_radio_lora_params_t* radio_lora_p
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
  */
-static void set_led( uint8_t led, bool state )
-{
-    if( state == true )
-    {
-        hal_gpio_init_out( led, 1 );
-    }
-    else
-    {
-        hal_gpio_init_out( led, 0 );
-    }
-}
 
 /**
  * @brief Example to send a user payload on an external event
  *
  */
-void main_multiprotocol( void )
+int main( void )
 {
     uint32_t sleep_time_ms = 0;
 
@@ -257,19 +236,15 @@ void main_multiprotocol( void )
     // Configure all the µC periph (clock, gpio, timer, ...)
     hal_mcu_init( );
 
+    // Initialize LEDs and button
+    hal_led_init( );
+    hal_button_init( NULL, NULL );
+
     // Init the modem and use modem_event_callback as event callback, please note that the callback will be
     // called immediately after the first call to smtc_modem_run_engine because of the reset detection
     smtc_rac_init( );
 
     smtc_modem_init( &modem_event_callback );
-
-    // Configure Nucleo blue button as EXTI
-    hal_gpio_irq_t nucleo_blue_button = {
-        .pin      = EXTI_BUTTON,
-        .context  = NULL,                  // context pass to the callback - not used in this example
-        .callback = user_button_callback,  // callback called when EXTI is triggered
-    };
-    hal_gpio_init_in( EXTI_BUTTON, BSP_GPIO_PULL_MODE_NONE, BSP_GPIO_IRQ_MODE_FALLING, &nucleo_blue_button );
 
     // Init done: enable interruption
     hal_mcu_enable_irq( );
@@ -278,14 +253,12 @@ void main_multiprotocol( void )
 
     app_radio_ranging_params_init( is_manager, RAC_VERY_LOW_PRIORITY );
     app_radio_ranging_set_user_callback( ranging_results_callback );
-    set_led( SMTC_LED_TX, true );
-    set_led( SMTC_LED_RX, false );
     while( 1 )
     {
         // Check button
-        if( user_button_is_press == true )
+        if( hal_button_is_pressed( ) )
         {
-            user_button_is_press = false;
+            hal_button_clear( );
             start_ranging_exchange( NOW, is_manager );
         }
 
@@ -295,7 +268,7 @@ void main_multiprotocol( void )
         smtc_rac_run_engine( );
         // Atomically check sleep conditions (button was not pressed and no modem flags pending)
         hal_mcu_disable_irq( );
-        if( ( user_button_is_press == false ) && ( smtc_modem_is_irq_flag_pending( ) == false ) )
+        if( ( !hal_button_is_pressed( ) ) && ( smtc_modem_is_irq_flag_pending( ) == false ) )
         {
             hal_watchdog_reload( );
             hal_mcu_set_sleep_for_ms( MIN( sleep_time_ms, WATCHDOG_RELOAD_PERIOD_MS ) );
@@ -545,22 +518,6 @@ static void modem_event_callback( void )
             break;
         }
     } while( event_pending_count > 0 );
-}
-
-static void user_button_callback( void* context )
-{
-    SMTC_HAL_TRACE_INFO( "Button pushed\n" );
-
-    ( void ) context;  // Not used in the example - avoid warning
-
-    static uint32_t last_press_timestamp_ms = 0;
-
-    // Debounce the button press, avoid multiple triggers
-    if( ( int32_t ) ( smtc_modem_hal_get_time_in_ms( ) - last_press_timestamp_ms ) > 500 )
-    {
-        last_press_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
-        user_button_is_press    = true;
-    }
 }
 
 static void ranging_results_callback( smtc_rac_radio_lora_params_t* radio_lora_params,

@@ -187,7 +187,10 @@ static inline const char* ral_status_to_str( const ral_status_t status )
     X( RAL_GFSK_CRC_2_BYTES, 3 )     \
     X( RAL_GFSK_CRC_1_BYTE_INV, 4 )  \
     X( RAL_GFSK_CRC_2_BYTES_INV, 5 ) \
-    X( RAL_GFSK_CRC_3_BYTES, 6 )
+    X( RAL_GFSK_CRC_3_BYTES, 6 )     \
+    X( RAL_GFSK_CRC_3_BYTES_INV, 7 ) \
+    X( RAL_GFSK_CRC_4_BYTES, 8 )     \
+    X( RAL_GFSK_CRC_4_BYTES_INV, 9 )
 
 typedef enum ral_gfsk_crc_type_e
 {
@@ -281,7 +284,9 @@ static inline const char* ral_lora_sf_to_str( const ral_lora_sf_t sf )
     X( RAL_LORA_BW_500_KHZ, 11 /* All except SX128X */ )           \
     X( RAL_LORA_BW_800_KHZ, 12 /* LR112X and SX128X only */ )      \
     X( RAL_LORA_BW_1000_KHZ, 13 /* LR20XX only */ )                \
-    X( RAL_LORA_BW_1600_KHZ, 14 /* SX128X only */ )
+    X( RAL_LORA_BW_1600_KHZ, 14 /* SX128X only */ )                \
+    X( RAL_LORA_BW_083_KHZ, 15 /* LR20XX only */ )                 \
+    X( RAL_LORA_BW_101_KHZ, 16 /* LR20XX only */ )
 
 typedef enum ral_lora_bw_e
 {
@@ -303,15 +308,16 @@ static inline const char* ral_lora_bw_to_str( const ral_lora_bw_t bw )
     return "UNKNOWN_RAL_LORA_BW";
 }
 
-#define RAL_LORA_CR( X )       \
-    X( RAL_LORA_CR_4_5, 1 )    \
-    X( RAL_LORA_CR_4_6, 2 )    \
-    X( RAL_LORA_CR_4_7, 3 )    \
-    X( RAL_LORA_CR_4_8, 4 )    \
-    X( RAL_LORA_CR_LI_4_5, 5 ) \
-    X( RAL_LORA_CR_LI_4_6, 6 ) \
-    X( RAL_LORA_CR_LI_4_8, 7 )
-
+#define RAL_LORA_CR( X )                     \
+    X( RAL_LORA_CR_4_5, 1 )                  \
+    X( RAL_LORA_CR_4_6, 2 )                  \
+    X( RAL_LORA_CR_4_7, 3 )                  \
+    X( RAL_LORA_CR_4_8, 4 )                  \
+    X( RAL_LORA_CR_LI_4_5, 5 )               \
+    X( RAL_LORA_CR_LI_4_6, 6 )               \
+    X( RAL_LORA_CR_LI_4_8, 7 )               \
+    X( RAL_LORA_CR_LI_CONVOLUTIONAL_4_6, 8 ) \
+    X( RAL_LORA_CR_LI_CONVOLUTIONAL_4_8, 9 )
 typedef enum ral_lora_cr_e
 {
 #define X( identifier, value ) identifier = value,
@@ -488,6 +494,36 @@ static inline const char* ral_flrc_rx_match_sync_word_to_str( const ral_flrc_rx_
 #undef X
     }
     return "UNKNOWN_RAL_FLRC_RX_MATCH_SYNCWORD";
+}
+
+#define RAL_FLRC_PREAMBLE_LENGTH( X )        \
+    X( RAL_FLRC_PREAMBLE_LENGTH_4_BITS, 0 )  \
+    X( RAL_FLRC_PREAMBLE_LENGTH_8_BITS, 1 )  \
+    X( RAL_FLRC_PREAMBLE_LENGTH_12_BITS, 2 ) \
+    X( RAL_FLRC_PREAMBLE_LENGTH_16_BITS, 3 ) \
+    X( RAL_FLRC_PREAMBLE_LENGTH_20_BITS, 4 ) \
+    X( RAL_FLRC_PREAMBLE_LENGTH_24_BITS, 5 ) \
+    X( RAL_FLRC_PREAMBLE_LENGTH_28_BITS, 6 ) \
+    X( RAL_FLRC_PREAMBLE_LENGTH_32_BITS, 7 )
+
+typedef enum ral_flrc_preamble_length_e
+{
+#define X( identifier, value ) identifier = value,
+    RAL_FLRC_PREAMBLE_LENGTH( X )
+#undef X
+} ral_flrc_preamble_length_t;
+
+static inline const char* ral_flrc_preamble_length_to_str( const ral_flrc_preamble_length_t len )
+{
+    switch( len )
+    {
+#define X( identifier, _ ) \
+    case identifier:       \
+        return #identifier;
+        RAL_FLRC_PREAMBLE_LENGTH( X )
+#undef X
+    }
+    return "UNKNOWN_RAL_FLRC_PREAMBLE_LENGTH";
 }
 
 /**
@@ -708,6 +744,7 @@ typedef struct ral_lora_rx_pkt_status_s
     int16_t rssi_pkt_in_dbm;
     int16_t snr_pkt_in_db;
     int16_t signal_rssi_pkt_in_dbm;  // Last packet received LoRa signal RSSI power in dB (after despreading)
+    int32_t freq_offset_hz;          // Frequency offset of the last packet received in Hz
 } ral_lora_rx_pkt_status_t;
 
 typedef struct ral_flrc_rx_pkt_status_s
@@ -741,6 +778,36 @@ typedef enum ral_lora_cad_exit_modes_e
     RAL_LORA_CAD_RX,
     RAL_LORA_CAD_LBT,
 } ral_lora_cad_exit_modes_t;
+
+#define RAL_FLRC_RAW_BIT_RATE( X )           \
+    X( RAL_FLRC_RAW_BIT_RATE_0_260_MBPS, 0 ) \
+    X( RAL_FLRC_RAW_BIT_RATE_0_325_MBPS, 1 ) \
+    X( RAL_FLRC_RAW_BIT_RATE_0_520_MBPS, 2 ) \
+    X( RAL_FLRC_RAW_BIT_RATE_0_650_MBPS, 3 ) \
+    X( RAL_FLRC_RAW_BIT_RATE_1_040_MBPS, 4 ) \
+    X( RAL_FLRC_RAW_BIT_RATE_1_300_MBPS, 5 ) \
+    X( RAL_FLRC_RAW_BIT_RATE_2_080_MBPS, 6 ) \
+    X( RAL_FLRC_RAW_BIT_RATE_2_600_MBPS, 7 )
+
+typedef enum ral_flrc_raw_bit_rate_e
+{
+#define X( identifier, value ) identifier = value,
+    RAL_FLRC_RAW_BIT_RATE( X )
+#undef X
+} ral_flrc_raw_bit_rate_t;
+
+static inline const char* ral_flrc_raw_bit_rate_to_str( const ral_flrc_raw_bit_rate_t raw_bit_rate )
+{
+    switch( raw_bit_rate )
+    {
+#define X( identifier, _ ) \
+    case identifier:       \
+        return #identifier;
+        RAL_FLRC_RAW_BIT_RATE( X )
+#undef X
+    }
+    return "UNKNOWN_RAL_FLRC_RAW_BIT_RATE";
+}
 
 /**
  * @brief GFSK modulation parameters structure definition
@@ -808,10 +875,9 @@ typedef struct ral_lora_cad_param_s
  */
 typedef struct ral_flrc_mod_params_s
 {
-    uint32_t               br_in_bps;
-    uint32_t               bw_dsb_in_hz;
-    ral_flrc_cr_t          cr;
-    ral_flrc_pulse_shape_t pulse_shape;
+    ral_flrc_raw_bit_rate_t raw_bit_rate;
+    ral_flrc_cr_t           cr;
+    ral_flrc_pulse_shape_t  pulse_shape;
 } ral_flrc_mod_params_t;
 
 /**
@@ -819,7 +885,7 @@ typedef struct ral_flrc_mod_params_s
  */
 typedef struct ral_flrc_pkt_params_s
 {
-    uint16_t                      preamble_len_in_bits;
+    ral_flrc_preamble_length_t    preamble_len;
     ral_flrc_sync_word_len_t      sync_word_len;
     ral_flrc_tx_syncword_t        tx_syncword;
     ral_flrc_rx_match_sync_word_t match_sync_word;
@@ -877,11 +943,15 @@ enum ral_irq_e
     RAL_IRQ_RTTOF_RESP_DONE      = ( 1 << 18 ),
     RAL_IRQ_RTTOF_EXCH_VALID     = ( 1 << 19 ),
     RAL_IRQ_RTTOF_TIMEOUT        = ( 1 << 20 ),
+    RAL_IRQ_CMD_ERROR            = ( 1 << 21 ),
+    RAL_IRQ_ERROR                = ( 1 << 22 ),
+    RAL_IRQ_RX_LEN_ERROR         = ( 1 << 23 ),
     RAL_IRQ_ALL = RAL_IRQ_TX_DONE | RAL_IRQ_RX_DONE | RAL_IRQ_RX_TIMEOUT | RAL_IRQ_RX_PREAMBLE_DETECTED |
                   RAL_IRQ_RX_HDR_OK | RAL_IRQ_RX_HDR_ERROR | RAL_IRQ_RX_CRC_ERROR | RAL_IRQ_CAD_DONE | RAL_IRQ_CAD_OK |
                   RAL_IRQ_LR_FHSS_HOP | RAL_IRQ_WIFI_SCAN_DONE | RAL_IRQ_GNSS_SCAN_DONE | RAL_IRQ_RX_FIFO_LEVEL |
                   RAL_IRQ_TX_FIFO_LEVEL | RAL_IRQ_RX_TIMESTAMP | RAL_IRQ_TX_TIMESTAMP | RAL_IRQ_RTTOF_REQ_DISCARDED |
-                  RAL_IRQ_RTTOF_RESP_DONE | RAL_IRQ_RTTOF_EXCH_VALID | RAL_IRQ_RTTOF_TIMEOUT,
+                  RAL_IRQ_RTTOF_RESP_DONE | RAL_IRQ_RTTOF_EXCH_VALID | RAL_IRQ_RTTOF_TIMEOUT | RAL_IRQ_CMD_ERROR |
+                  RAL_IRQ_ERROR | RAL_IRQ_RX_LEN_ERROR,
 };
 
 typedef uint32_t ral_irq_t;
@@ -912,6 +982,7 @@ static inline uint8_t ral_compute_lora_ldro( const ral_lora_sf_t sf, const ral_l
 {
     switch( bw )
     {
+    case RAL_LORA_BW_1000_KHZ:
     case RAL_LORA_BW_500_KHZ:
         return 0;
     case RAL_LORA_BW_250_KHZ:
@@ -953,6 +1024,8 @@ static inline uint8_t ral_compute_lora_ldro( const ral_lora_sf_t sf, const ral_l
         {
             return 0;
         }
+    case RAL_LORA_BW_083_KHZ:
+    case RAL_LORA_BW_101_KHZ:
     case RAL_LORA_BW_031_KHZ:
     case RAL_LORA_BW_020_KHZ:
     case RAL_LORA_BW_015_KHZ:

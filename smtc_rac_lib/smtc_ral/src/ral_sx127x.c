@@ -49,10 +49,55 @@
  * --- PRIVATE MACROS-----------------------------------------------------------
  */
 
+#define RAL_SX127X_BAND1_HZ_MIN 0UL
+#define RAL_SX127X_BAND1_HZ_MAX 0UL
+#define RAL_SX127X_BAND2_HZ_MIN 0UL
+#define RAL_SX127X_BAND2_HZ_MAX 0UL
+#define RAL_SX127X_BAND3_HZ_MIN 862000000UL
+#define RAL_SX127X_BAND3_HZ_MAX 960000000UL
+
+#if defined( SX1272 ) || defined( SX1273 )
+#define RAL_SX127X_BAND3_HZ_MIN 860000000UL
+#define RAL_SX127X_BAND3_HZ_MAX 1020000000UL
+#endif
+
+#if defined( SX1276 ) || defined( SX1277 ) || defined( SX1278 )
+#define RAL_SX127X_BAND1_HZ_MIN 137000000UL
+#define RAL_SX127X_BAND1_HZ_MAX 175000000UL
+#define RAL_SX127X_BAND2_HZ_MIN 410000000UL
+#define RAL_SX127X_BAND2_HZ_MAX 525000000UL
+#define RAL_SX127X_BAND3_HZ_MIN 862000000UL
+#define RAL_SX127X_BAND3_HZ_MAX 1020000000UL
+#endif
+
+#if defined( SX1279 )
+#define RAL_SX127X_BAND1_HZ_MIN 137000000UL
+#define RAL_SX127X_BAND1_HZ_MAX 160000000UL
+#define RAL_SX127X_BAND2_HZ_MIN 410000000UL
+#define RAL_SX127X_BAND2_HZ_MAX 480000000UL
+#define RAL_SX127X_BAND3_HZ_MIN 862000000UL
+#define RAL_SX127X_BAND3_HZ_MAX 960000000UL
+#endif
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
+
+#define BASE_BW_LIST RAL_LORA_BW_125_KHZ, RAL_LORA_BW_250_KHZ, RAL_LORA_BW_500_KHZ
+
+#if defined( SX1276 ) || defined( SX1277 ) || defined( SX1278 ) || defined( SX1279 )
+#define EXTRA_BW_LIST                                                                                        \
+    RAL_LORA_BW_007_KHZ, RAL_LORA_BW_010_KHZ, RAL_LORA_BW_015_KHZ, RAL_LORA_BW_020_KHZ, RAL_LORA_BW_031_KHZ, \
+        RAL_LORA_BW_041_KHZ, RAL_LORA_BW_062_KHZ,
+#else
+#define EXTRA_BW_LIST
+#endif
+
+const ral_lora_bw_t RAL_SX127X_SUPPORTED_BW[] = { EXTRA_BW_LIST BASE_BW_LIST };
+
+const uint8_t RAL_SX127X_SUPPORTED_BW_SIZE =
+    ( sizeof( RAL_SX127X_SUPPORTED_BW ) / sizeof( RAL_SX127X_SUPPORTED_BW[0] ) );
 
 /*
  * -----------------------------------------------------------------------------
@@ -335,6 +380,89 @@ ral_status_t ral_sx127x_get_irq_status( const void* context, ral_irq_t* irq )
     *irq = ral_sx127x_convert_irq_flags_to_ral( sx127x_irq_mask );
 
     return status;
+}
+
+ral_status_t ral_sx127x_get_pkt_size( const void* context, uint16_t* size_in_bytes )
+{
+    ( void ) context;        // Unused parameter
+    ( void ) size_in_bytes;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_get_data_rx_buffer( const void* context, uint8_t* buffer, uint16_t size_in_bytes )
+{
+    ( void ) context;        // Unused parameter
+    ( void ) buffer;         // Unused parameter
+    ( void ) size_in_bytes;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_clear_rx_fifo( const void* context )
+{
+    ( void ) context;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_clear_tx_fifo( const void* context )
+{
+    ( void ) context;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_get_tx_fifo_level( const void* context, uint16_t* fifo_level )
+{
+    ( void ) context;     // Unused parameter
+    ( void ) fifo_level;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_get_rx_fifo_level( const void* context, uint16_t* fifo_level )
+{
+    ( void ) context;     // Unused parameter
+    ( void ) fifo_level;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_cfg_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_irq_enable,
+                                      ral_radio_fifo_flag_t tx_fifo_irq_enable, uint16_t rx_fifo_high_threshold,
+                                      uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
+                                      uint16_t tx_fifo_high_threshold )
+{
+    ( void ) context;                 // Unused parameter
+    ( void ) rx_fifo_irq_enable;      // Unused parameter
+    ( void ) tx_fifo_irq_enable;      // Unused parameter
+    ( void ) rx_fifo_high_threshold;  // Unused parameter
+    ( void ) tx_fifo_low_threshold;   // Unused parameter
+    ( void ) rx_fifo_low_threshold;   // Unused parameter
+    ( void ) tx_fifo_high_threshold;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_get_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                      ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    ( void ) context;        // Unused parameter
+    ( void ) rx_fifo_flags;  // Unused parameter
+    ( void ) tx_fifo_flags;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_flags_to_clear,
+                                        ral_radio_fifo_flag_t tx_fifo_flags_to_clear )
+{
+    ( void ) context;                 // Unused parameter
+    ( void ) rx_fifo_flags_to_clear;  // Unused parameter
+    ( void ) tx_fifo_flags_to_clear;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx127x_get_and_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                                ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    ( void ) context;        // Unused parameter
+    ( void ) rx_fifo_flags;  // Unused parameter
+    ( void ) tx_fifo_flags;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
 }
 
 ral_status_t ral_sx127x_clear_irq_status( const void* context, const ral_irq_t irq )
@@ -1159,4 +1287,69 @@ ral_status_t ral_sx127x_rttof_get_raw_result( const void* context, ral_lora_bw_t
     return RAL_STATUS_UNSUPPORTED_FEATURE;
 }
 
+ral_status_t ral_sx127x_check_lora_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                               const ral_lora_pkt_params_t* pkt_params,
+                                               const ral_lora_mod_params_t* mod_params )
+{
+    if( ( rf_freq_in_hz < RAL_SX127X_BAND3_HZ_MIN ) || ( rf_freq_in_hz > RAL_SX127X_BAND3_HZ_MAX ) )
+    {
+        if( ( rf_freq_in_hz < RAL_SX127X_BAND2_HZ_MIN ) || ( rf_freq_in_hz > RAL_SX127X_BAND2_HZ_MAX ) )
+        {
+            if( ( rf_freq_in_hz < RAL_SX127X_BAND1_HZ_MIN ) || ( rf_freq_in_hz > RAL_SX127X_BAND1_HZ_MAX ) )
+            {
+                return RAL_STATUS_UNKNOWN_VALUE;
+            }
+        }
+    }
+
+    bool bw_supported = false;
+    for( uint8_t i = 0; i < RAL_SX127X_SUPPORTED_BW_SIZE; i++ )
+    {
+        if( RAL_SX127X_SUPPORTED_BW[i] == mod_params->bw )
+        {
+            bw_supported = true;
+            break;
+        }
+    }
+    if( !bw_supported )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    bool is_extra_bw = ( mod_params->bw == RAL_LORA_BW_250_KHZ ) || ( mod_params->bw == RAL_LORA_BW_500_KHZ );
+
+    if( is_extra_bw )
+    {
+        bool is_band1 = ( rf_freq_in_hz >= RAL_SX127X_BAND1_HZ_MIN ) && ( rf_freq_in_hz <= RAL_SX127X_BAND1_HZ_MAX );
+
+        if( !is_band1 )
+        {
+            return RAL_STATUS_UNKNOWN_VALUE;
+        }
+    }
+
+    if( ( mod_params->sf < RAL_LORA_SF6 ) || ( mod_params->sf > RAL_LORA_SF12 ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( ( mod_params->cr < RAL_LORA_CR_4_5 ) || ( mod_params->cr > RAL_LORA_CR_4_8 ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( pkt_params->header_type > RAL_LORA_PKT_IMPLICIT )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    return RAL_STATUS_OK;
+}
+
+ral_status_t ral_sx127x_check_rttof_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                                const ral_lora_pkt_params_t* pkt_params,
+                                                const ral_lora_mod_params_t* mod_params )
+{
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
 /* --- EOF ------------------------------------------------------------------ */

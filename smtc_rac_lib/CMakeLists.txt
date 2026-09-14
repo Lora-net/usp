@@ -2,15 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 project(smtc_rac_lib VERSION 1.0.0 LANGUAGES C)
 
-################################################################################
-# Radio Planner Configuration
-################################################################################
 
-# RP_MARGIN_DELAY can be overridden from parent cmake or command line
-if(NOT DEFINED RP_MARGIN_DELAY)
-    set(RP_MARGIN_DELAY "8")
-endif()
-message(STATUS "smtc_rac_lib: RP_MARGIN_DELAY=${RP_MARGIN_DELAY}")
 
 ################################################################################
 # RAC Library Logging Configuration
@@ -57,9 +49,12 @@ add_subdirectory(smtc_ral)
 add_subdirectory(smtc_ralf)
 add_subdirectory(smtc_rac)
 
-target_link_libraries(smtc_ral_${RADIO_FAMILY} PRIVATE
-    ${RADIO_FAMILY}_driver
-)
+# Link driver only if not UDP virtual radio (which has no real driver)
+if(NOT ${RADIO_FAMILY} STREQUAL "udp_pf")
+    target_link_libraries(smtc_ral_${RADIO_FAMILY} PRIVATE
+        ${RADIO_FAMILY}_driver
+    )
+endif()
 
 if(${RADIO_FAMILY} MATCHES "lr20xx")
     target_link_libraries(smtc_ral_lr20xx PRIVATE

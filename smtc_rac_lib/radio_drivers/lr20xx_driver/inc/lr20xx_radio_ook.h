@@ -71,18 +71,10 @@ extern "C" {
 /**
  * @brief Set the modulation parameters for OOK packets
  *
- * The workaround @ref lr20xx_workarounds_dcdc_configure must be called for Rx sub-GHz operations with regulator @ref
- * LR20XX_SYSTEM_REG_MODE_DCDC after this function to avoid possible RF sensitivity degradation.
- *
- * @note This function automatically applies the workaround @ref lr20xx_workarounds_dcdc_configure unless the macro @p
- * LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_DCDC_CONFIGURE is defined at compile time.
- *
  * @param[in] context Chip implementation context
  * @param[in] params Structure of OOK modulation configuration
  *
  * @return lr20xx_status_t Operation status
- *
- * @see lr20xx_workarounds_dcdc_configure
  */
 lr20xx_status_t lr20xx_radio_ook_set_modulation_params( const void*                          context,
                                                         const lr20xx_radio_ook_mod_params_t* params );

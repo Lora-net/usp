@@ -6,13 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -94,7 +93,7 @@ typedef struct
   */
 
 /** @defgroup PKA_LL_EC_MODE Operation Mode
-  * @brief    List of opearation mode.
+  * @brief    List of operation mode.
   * @{
   */
 #define LL_PKA_MODE_MONTGOMERY_PARAM_MOD_EXP ((uint32_t)0x00000000U) /*!< Compute Montgomery parameter and modular exponentiation */
@@ -173,9 +172,9 @@ typedef struct
   * @param  PKAx PKA Instance.
   * @param  Mode This parameter can be one of the following values:
   *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_MOD_EXP
+  *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_ECC
   *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM
   *         @arg @ref LL_PKA_MODE_MODULAR_EXP
-  *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_ECC
   *         @arg @ref LL_PKA_MODE_ECC_KP_PRIMITIVE
   *         @arg @ref LL_PKA_MODE_ECDSA_SIGNATURE
   *         @arg @ref LL_PKA_MODE_ECDSA_VERIFICATION
@@ -224,7 +223,7 @@ __STATIC_INLINE void LL_PKA_Disable(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_PKA_IsEnabled(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_IsEnabled(const PKA_TypeDef *PKAx)
 {
   return ((READ_BIT(PKAx->CR, PKA_CR_EN) == (PKA_CR_EN)) ? 1UL : 0UL);
 }
@@ -235,9 +234,9 @@ __STATIC_INLINE uint32_t LL_PKA_IsEnabled(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @param  Mode This parameter can be one of the following values:
   *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_MOD_EXP
+  *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_ECC
   *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM
   *         @arg @ref LL_PKA_MODE_MODULAR_EXP
-  *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_ECC
   *         @arg @ref LL_PKA_MODE_ECC_KP_PRIMITIVE
   *         @arg @ref LL_PKA_MODE_ECDSA_SIGNATURE
   *         @arg @ref LL_PKA_MODE_ECDSA_VERIFICATION
@@ -265,9 +264,9 @@ __STATIC_INLINE void LL_PKA_SetMode(PKA_TypeDef *PKAx, uint32_t Mode)
   * @param  PKAx PKA Instance.
   * @retval Returned value can be one of the following values:
   *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_MOD_EXP
+  *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_ECC
   *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM
   *         @arg @ref LL_PKA_MODE_MODULAR_EXP
-  *         @arg @ref LL_PKA_MODE_MONTGOMERY_PARAM_ECC
   *         @arg @ref LL_PKA_MODE_ECC_KP_PRIMITIVE
   *         @arg @ref LL_PKA_MODE_ECDSA_SIGNATURE
   *         @arg @ref LL_PKA_MODE_ECDSA_VERIFICATION
@@ -283,7 +282,7 @@ __STATIC_INLINE void LL_PKA_SetMode(PKA_TypeDef *PKAx, uint32_t Mode)
   *         @arg @ref LL_PKA_MODE_MODULAR_SUB
   *         @arg @ref LL_PKA_MODE_MONTGOMERY_MUL
   */
-__STATIC_INLINE uint32_t LL_PKA_GetMode(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_GetMode(const PKA_TypeDef *PKAx)
 {
   return (uint32_t)(READ_BIT(PKAx->CR, PKA_CR_MODE) >> PKA_CR_MODE_Pos);
 }
@@ -380,7 +379,7 @@ __STATIC_INLINE void LL_PKA_DisableIT_PROCEND(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_ADDRERR(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_ADDRERR(const PKA_TypeDef *PKAx)
 {
   return ((READ_BIT(PKAx->CR, PKA_CR_ADDRERRIE) == (PKA_CR_ADDRERRIE)) ? 1UL : 0UL);
 }
@@ -391,7 +390,7 @@ __STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_ADDRERR(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_RAMERR(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_RAMERR(const PKA_TypeDef *PKAx)
 {
   return ((READ_BIT(PKAx->CR, PKA_CR_RAMERRIE) == (PKA_CR_RAMERRIE)) ? 1UL : 0UL);
 }
@@ -403,7 +402,7 @@ __STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_RAMERR(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_PROCEND(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_PROCEND(const PKA_TypeDef *PKAx)
 {
   return ((READ_BIT(PKAx->CR, PKA_CR_PROCENDIE) == (PKA_CR_PROCENDIE)) ? 1UL : 0UL);
 }
@@ -422,7 +421,7 @@ __STATIC_INLINE uint32_t LL_PKA_IsEnabledIT_PROCEND(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_ADDRERR(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_ADDRERR(const PKA_TypeDef *PKAx)
 {
   return ((READ_BIT(PKAx->SR, PKA_SR_ADDRERRF) == (PKA_SR_ADDRERRF)) ? 1UL : 0UL);
 }
@@ -433,7 +432,7 @@ __STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_ADDRERR(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_RAMERR(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_RAMERR(const PKA_TypeDef *PKAx)
 {
   return ((READ_BIT(PKAx->SR, PKA_SR_RAMERRF) == (PKA_SR_RAMERRF)) ? 1UL : 0UL);
 }
@@ -445,7 +444,7 @@ __STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_RAMERR(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_PROCEND(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_PROCEND(const PKA_TypeDef *PKAx)
 {
   return ((READ_BIT(PKAx->SR, PKA_SR_PROCENDF) == (PKA_SR_PROCENDF)) ? 1UL : 0UL);
 }
@@ -456,11 +455,22 @@ __STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_PROCEND(PKA_TypeDef *PKAx)
   * @param  PKAx PKA Instance.
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_BUSY(PKA_TypeDef *PKAx)
+__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_BUSY(const PKA_TypeDef *PKAx)
 {
   return ((READ_BIT(PKAx->SR, PKA_SR_BUSY) == (PKA_SR_BUSY)) ? 1UL : 0UL);
 }
-
+#if defined(PKA_SR_INITOK)
+/**
+  * @brief  Get PKA init ok flag.
+  * @rmtoll SR           INITOK          LL_PKA_IsActiveFlag_INITOK
+  * @param  PKAx PKA Instance.
+  * @retval State of bit (1 or 0).
+  */
+__STATIC_INLINE uint32_t LL_PKA_IsActiveFlag_INITOK(const PKA_TypeDef *PKAx)
+{
+  return ((READ_BIT(PKAx->SR, PKA_SR_INITOK) == (PKA_SR_INITOK)) ? 1UL : 0UL);
+}
+#endif /* PKA_SR_INITOK */
 /**
   * @brief  Clear PKA address error flag.
   * @rmtoll CLRFR        ADDRERRFC     LL_PKA_ClearFlag_ADDERR
@@ -505,7 +515,7 @@ __STATIC_INLINE void LL_PKA_ClearFlag_PROCEND(PKA_TypeDef *PKAx)
   * @{
   */
 
-ErrorStatus LL_PKA_DeInit(PKA_TypeDef *PKAx);
+ErrorStatus LL_PKA_DeInit(const PKA_TypeDef *PKAx);
 ErrorStatus LL_PKA_Init(PKA_TypeDef *PKAx, LL_PKA_InitTypeDef *PKA_InitStruct);
 void LL_PKA_StructInit(LL_PKA_InitTypeDef *PKA_InitStruct);
 
@@ -533,5 +543,3 @@ void LL_PKA_StructInit(LL_PKA_InitTypeDef *PKA_InitStruct);
 #endif
 
 #endif /* STM32L4xx_LL_PKA_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

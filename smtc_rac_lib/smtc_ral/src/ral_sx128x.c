@@ -53,7 +53,14 @@
  * -----------------------------------------------------------------------------
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
-
+const ral_lora_bw_t RAL_SX128X_SUPPORTED_BW[] = {
+    RAL_LORA_BW_200_KHZ,
+    RAL_LORA_BW_400_KHZ,
+    RAL_LORA_BW_800_KHZ,
+    RAL_LORA_BW_1600_KHZ,
+};
+const uint8_t RAL_SX128X_SUPPORTED_BW_SIZE =
+    ( sizeof( RAL_SX128X_SUPPORTED_BW ) / sizeof( RAL_SX128X_SUPPORTED_BW[0] ) );
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE TYPES -----------------------------------------------------------
@@ -390,11 +397,42 @@ ral_status_t ral_sx128x_set_pkt_payload( const void* context, const uint8_t* buf
 ral_status_t ral_sx128x_get_pkt_payload( const void* context, uint16_t max_size_in_bytes, uint8_t* buffer,
                                          uint16_t* size_in_bytes )
 {
-    uint8_t pkt_len;
+    uint16_t pkt_len;
 
     sx128x_rx_buffer_status_t sx_buf_status;
-    ral_status_t              status = ( ral_status_t ) sx128x_get_rx_buffer_status( context, &sx_buf_status );
+    ral_status_t              status = ral_sx128x_get_pkt_size( context, &pkt_len );
 
+    if( status == RAL_STATUS_OK )
+    {
+        if( size_in_bytes != 0 )
+        {
+            *size_in_bytes = pkt_len;
+        }
+        if( pkt_len <= max_size_in_bytes )
+        {
+            status =
+                ( ral_status_t ) sx128x_read_buffer( context, sx_buf_status.buffer_start_pointer, buffer, pkt_len );
+        }
+        else
+        {
+            status = RAL_STATUS_ERROR;
+        }
+    }
+    return status;
+}
+
+ral_status_t ral_sx128x_get_pkt_size( const void* context, uint16_t* size_in_bytes )
+{
+    ral_status_t              status = RAL_STATUS_ERROR;
+    sx128x_rx_buffer_status_t sx_buf_status;
+    uint8_t                   pkt_len;
+
+    if( size_in_bytes == 0 )
+    {
+        return RAL_STATUS_ERROR;
+    }
+
+    status = ( ral_status_t ) sx128x_get_rx_buffer_status( context, &sx_buf_status );
     if( status == RAL_STATUS_OK )
     {
         sx128x_pkt_type_t           pkt_type     = SX128X_PKT_TYPE_GFSK;
@@ -418,26 +456,98 @@ ral_status_t ral_sx128x_get_pkt_payload( const void* context, uint16_t max_size_
                 pkt_len = sx_buf_status.pld_len_in_bytes;
             }
 
-            if( size_in_bytes != 0 )
-            {
-                *size_in_bytes = pkt_len;
-            }
-
-            if( status == RAL_STATUS_OK )
-            {
-                if( pkt_len <= max_size_in_bytes )
-                {
-                    status = ( ral_status_t ) sx128x_read_buffer( context, sx_buf_status.buffer_start_pointer, buffer,
-                                                                  pkt_len );
-                }
-                else
-                {
-                    status = RAL_STATUS_ERROR;
-                }
-            }
+            *size_in_bytes = ( uint16_t ) pkt_len;
         }
     }
+
     return status;
+}
+
+ral_status_t ral_sx128x_get_data_rx_buffer( const void* context, uint8_t* buffer, uint16_t size_in_bytes )
+{
+    ral_status_t              status = RAL_STATUS_ERROR;
+    sx128x_rx_buffer_status_t sx_buf_status;
+
+    if( size_in_bytes > UINT8_MAX )
+    {
+        return RAL_STATUS_ERROR;
+    }
+
+    status = ( ral_status_t ) sx128x_get_rx_buffer_status( context, &sx_buf_status );
+    if( status != RAL_STATUS_OK )
+    {
+        return status;
+    }
+
+    return ( ral_status_t ) sx128x_read_buffer( context, sx_buf_status.buffer_start_pointer, buffer, size_in_bytes );
+}
+
+ral_status_t ral_sx128x_clear_rx_fifo( const void* context )
+{
+    ( void ) context;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx128x_clear_tx_fifo( const void* context )
+{
+    ( void ) context;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx128x_get_tx_fifo_level( const void* context, uint16_t* fifo_level )
+{
+    ( void ) context;     // Unused parameter
+    ( void ) fifo_level;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx128x_get_rx_fifo_level( const void* context, uint16_t* fifo_level )
+{
+    ( void ) context;     // Unused parameter
+    ( void ) fifo_level;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx128x_cfg_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_irq_enable,
+                                      ral_radio_fifo_flag_t tx_fifo_irq_enable, uint16_t rx_fifo_high_threshold,
+                                      uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
+                                      uint16_t tx_fifo_high_threshold )
+{
+    ( void ) context;                 // Unused parameter
+    ( void ) rx_fifo_irq_enable;      // Unused parameter
+    ( void ) tx_fifo_irq_enable;      // Unused parameter
+    ( void ) rx_fifo_high_threshold;  // Unused parameter
+    ( void ) tx_fifo_low_threshold;   // Unused parameter
+    ( void ) rx_fifo_low_threshold;   // Unused parameter
+    ( void ) tx_fifo_high_threshold;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx128x_get_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                      ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    ( void ) context;        // Unused parameter
+    ( void ) rx_fifo_flags;  // Unused parameter
+    ( void ) tx_fifo_flags;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx128x_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_flags_to_clear,
+                                        ral_radio_fifo_flag_t tx_fifo_flags_to_clear )
+{
+    ( void ) context;                 // Unused parameter
+    ( void ) rx_fifo_flags_to_clear;  // Unused parameter
+    ( void ) tx_fifo_flags_to_clear;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_sx128x_get_and_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                                ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    ( void ) context;        // Unused parameter
+    ( void ) rx_fifo_flags;  // Unused parameter
+    ( void ) tx_fifo_flags;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
 }
 
 ral_status_t ral_sx128x_get_irq_status( const void* context, ral_irq_t* irq )
@@ -1401,11 +1511,28 @@ ral_status_t ral_sx128x_convert_flrc_mod_params_from_ral( const ral_flrc_mod_par
     sx128x_flrc_br_bw_t                br_bw_dsb_param;
     sx128x_gfsk_flrc_ble_pulse_shape_t pulse_shape;
 
-    status = ( ral_status_t ) sx128x_get_flrc_br_bw_param( ral_mod_params->br_in_bps, ral_mod_params->bw_dsb_in_hz,
-                                                           &br_bw_dsb_param );
-    if( status != RAL_STATUS_OK )
+    switch( ral_mod_params->raw_bit_rate )
     {
-        return status;
+    case RAL_FLRC_RAW_BIT_RATE_0_260_MBPS:
+        br_bw_dsb_param = SX128X_FLRC_BR_0_260_BW_0_3;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_0_325_MBPS:
+        br_bw_dsb_param = SX128X_FLRC_BR_0_325_BW_0_3;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_0_520_MBPS:
+        br_bw_dsb_param = SX128X_FLRC_BR_0_520_BW_0_6;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_0_650_MBPS:
+        br_bw_dsb_param = SX128X_FLRC_BR_0_650_BW_0_6;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_1_040_MBPS:
+        br_bw_dsb_param = SX128X_FLRC_BR_1_040_BW_1_2;
+        break;
+    case RAL_FLRC_RAW_BIT_RATE_1_300_MBPS:
+        br_bw_dsb_param = SX128X_FLRC_BR_1_300_BW_1_2;
+        break;
+    default:
+        return RAL_STATUS_UNKNOWN_VALUE;
     }
 
     switch( ral_mod_params->pulse_shape )
@@ -1435,19 +1562,8 @@ ral_status_t ral_sx128x_convert_flrc_mod_params_from_ral( const ral_flrc_mod_par
 ral_status_t ral_sx128x_convert_flrc_pkt_params_from_ral( const ral_flrc_pkt_params_t* ral_pkt_params,
                                                           sx128x_pkt_params_flrc_t*    radio_pkt_params )
 {
-    unsigned int preamble_len_in_nibbles = ral_pkt_params->preamble_len_in_bits / 4;
-    if( ral_pkt_params->preamble_len_in_bits % 4 != 0 )
-    {
-        return RAL_STATUS_UNKNOWN_VALUE;
-    }
-
-    if( preamble_len_in_nibbles > 8 || preamble_len_in_nibbles == 0 )
-    {
-        return RAL_STATUS_UNKNOWN_VALUE;
-    }
-
     *radio_pkt_params = ( sx128x_pkt_params_flrc_t ){
-        .preamble_len    = ( sx128x_gfsk_preamble_len_t ) ( ( preamble_len_in_nibbles - 1 ) << 4 ),
+        .preamble_len    = SX128X_GFSK_FLRC_PREAMBLE_LEN_04_BITS,
         .sync_word_len   = ( ral_pkt_params->sync_word_len == RAL_FLRC_SYNCWORD_LENGTH_OFF ) ? SX128X_FLRC_SYNC_WORD_OFF
                                                                                              : SX128X_FLRC_SYNC_WORD_ON,
         .match_sync_word = SX128X_GFSK_FLRC_RX_MATCH_SYNCWORD_1,
@@ -1455,6 +1571,37 @@ ral_status_t ral_sx128x_convert_flrc_pkt_params_from_ral( const ral_flrc_pkt_par
         .pld_len_in_bytes = ral_pkt_params->pld_len_in_bytes,
         .crc_type         = SX128X_FLRC_CRC_OFF,
     };
+
+    // For sx128x, the preamble length value are the same for FLRC and GFSK
+    switch( ral_pkt_params->preamble_len )
+    {
+    case RAL_FLRC_PREAMBLE_LENGTH_4_BITS:
+        radio_pkt_params->preamble_len = SX128X_GFSK_FLRC_PREAMBLE_LEN_04_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_8_BITS:
+        radio_pkt_params->preamble_len = SX128X_GFSK_FLRC_PREAMBLE_LEN_08_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_12_BITS:
+        radio_pkt_params->preamble_len = SX128X_GFSK_FLRC_PREAMBLE_LEN_12_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_16_BITS:
+        radio_pkt_params->preamble_len = SX128X_GFSK_FLRC_PREAMBLE_LEN_16_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_20_BITS:
+        radio_pkt_params->preamble_len = SX128X_GFSK_FLRC_PREAMBLE_LEN_20_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_24_BITS:
+        radio_pkt_params->preamble_len = SX128X_GFSK_FLRC_PREAMBLE_LEN_24_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_28_BITS:
+        radio_pkt_params->preamble_len = SX128X_GFSK_FLRC_PREAMBLE_LEN_28_BITS;
+        break;
+    case RAL_FLRC_PREAMBLE_LENGTH_32_BITS:
+        radio_pkt_params->preamble_len = SX128X_GFSK_FLRC_PREAMBLE_LEN_32_BITS;
+        break;
+    default:
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
 
     switch( ral_pkt_params->crc_type )
     {
@@ -1517,4 +1664,49 @@ ral_status_t ral_sx128x_rttof_get_raw_result( const void* context, ral_lora_bw_t
     return RAL_STATUS_UNSUPPORTED_FEATURE;
 }
 
+ral_status_t ral_sx128x_check_lora_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                               const ral_lora_pkt_params_t* pkt_params,
+                                               const ral_lora_mod_params_t* mod_params )
+{
+    if( ( rf_freq_in_hz < RAL_SX128X_HF_HZ_MIN ) || ( rf_freq_in_hz > RAL_SX128X_HF_HZ_MAX ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    bool bw_supported = false;
+    for( uint8_t i = 0; i < RAL_SX128X_SUPPORTED_BW_SIZE; i++ )
+    {
+        if( RAL_SX128X_SUPPORTED_BW[i] == mod_params->bw )
+        {
+            bw_supported = true;
+            break;
+        }
+    }
+    if( !bw_supported )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+    if( ( mod_params->sf < RAL_LORA_SF5 ) || ( mod_params->sf > RAL_LORA_SF12 ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( ( mod_params->cr < RAL_LORA_CR_4_5 ) || ( mod_params->cr > RAL_LORA_CR_LI_4_8 ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( pkt_params->header_type > RAL_LORA_PKT_IMPLICIT )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+    return RAL_STATUS_OK;
+}
+
+ral_status_t ral_sx128x_check_rttof_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                                const ral_lora_pkt_params_t* pkt_params,
+                                                const ral_lora_mod_params_t* mod_params )
+{
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
 /* --- EOF ------------------------------------------------------------------ */

@@ -64,12 +64,18 @@ extern "C" {
         .set_tx_cw = ral_lr11xx_set_tx_cw, .set_tx_infinite_preamble = ral_lr11xx_set_tx_infinite_preamble,           \
         .cal_img = ral_lr11xx_cal_img, .set_tx_cfg = ral_lr11xx_set_tx_cfg,                                           \
         .set_pkt_payload = ral_lr11xx_set_pkt_payload, .get_pkt_payload = ral_lr11xx_get_pkt_payload,                 \
+        .get_pkt_size = ral_lr11xx_get_pkt_size, .get_data_rx_buffer = ral_lr11xx_get_data_rx_buffer,                 \
+        .clear_rx_fifo = ral_lr11xx_clear_rx_fifo, .clear_tx_fifo = ral_lr11xx_clear_tx_fifo,                         \
+        .get_tx_fifo_level = ral_lr11xx_get_tx_fifo_level, .get_rx_fifo_level = ral_lr11xx_get_rx_fifo_level,         \
+        .cfg_fifo_irq = ral_lr11xx_cfg_fifo_irq, .get_fifo_irq = ral_lr11xx_get_fifo_irq,                             \
+        .clear_fifo_irq = ral_lr11xx_clear_fifo_irq, .get_and_clear_fifo_irq = ral_lr11xx_get_and_clear_fifo_irq,     \
         .get_irq_status = ral_lr11xx_get_irq_status, .clear_irq_status = ral_lr11xx_clear_irq_status,                 \
         .get_and_clear_irq_status = ral_lr11xx_get_and_clear_irq_status,                                              \
         .set_dio_irq_params = ral_lr11xx_set_dio_irq_params, .set_rf_freq = ral_lr11xx_set_rf_freq,                   \
         .set_pkt_type = ral_lr11xx_set_pkt_type, .get_pkt_type = ral_lr11xx_get_pkt_type,                             \
         .set_gfsk_mod_params = ral_lr11xx_set_gfsk_mod_params, .set_gfsk_pkt_params = ral_lr11xx_set_gfsk_pkt_params, \
         .set_lora_mod_params = ral_lr11xx_set_lora_mod_params, .set_lora_pkt_params = ral_lr11xx_set_lora_pkt_params, \
+        .set_gfsk_pkt_address     = ral_lr11xx_set_gfsk_pkt_address,                                                  \
         .set_lora_cad_params      = ral_lr11xx_set_lora_cad_params,                                                   \
         .set_lora_symb_nb_timeout = ral_lr11xx_set_lora_symb_nb_timeout,                                              \
         .set_flrc_mod_params = ral_lr11xx_set_flrc_mod_params, .set_flrc_pkt_params = ral_lr11xx_set_flrc_pkt_params, \
@@ -98,6 +104,8 @@ extern "C" {
         .rttof_set_request_address       = ral_lr11xx_rttof_set_request_address,                                      \
         .rttof_set_rx_tx_delay_indicator = ral_lr11xx_rttof_set_rx_tx_delay_indicator,                                \
         .rttof_get_raw_result            = ral_lr11xx_rttof_get_raw_result,                                           \
+        .check_lora_parameters           = ral_lr11xx_check_lora_parameters,                                          \
+        .check_rttof_parameters          = ral_lr11xx_check_rttof_parameters,                                         \
     }
 
 #define RAL_LR11XX_INSTANTIATE( ctx )                         \
@@ -105,11 +113,33 @@ extern "C" {
         .context = ctx, .driver = RAL_LR11XX_DRV_INSTANTIATE, \
     }
 
+#define RAL_LR11XX_LF_HZ_MIN 150000000UL
+#define RAL_LR11XX_LF_HZ_MAX 960000000UL
+#define SUPPORT_2G4 false
+#define SUPPORT_RTTOF_LF false
+#define SUPPORT_RTTOF_HF false
+#define RAL_LR11XX_HF_HZ_MIN 0UL
+#define RAL_LR11XX_HF_HZ_MAX 0UL
+
+#if defined( LR1110 )
+#define SUPPORT_RTTOF_LF true
+#endif
+#if defined( LR1120 )
+#define SUPPORT_RTTOF_LF true
+#define SUPPORT_RTTOF_HF true
+#endif
+#if defined( LR1120 ) || defined( LR1121 )
+#define SUPPORT_2G4 true
+#define RAL_LR11XX_HF_HZ_MIN 1900000000UL
+#define RAL_LR11XX_HF_HZ_MAX 2500000000UL
+#endif
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC CONSTANTS --------------------------------------------------------
  */
 
+extern const ral_lora_bw_t RAL_LR11XX_SUPPORTED_BW[];
+extern const uint8_t       RAL_LR11XX_SUPPORTED_BW_SIZE;
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC TYPES ------------------------------------------------------------
@@ -217,16 +247,66 @@ ral_status_t ral_lr11xx_set_tx_cfg( const void* context, const int8_t output_pwr
 ral_status_t ral_lr11xx_set_pkt_payload( const void* context, const uint8_t* buffer, const uint16_t size );
 
 /**
- * @see ral_set_gfsk_pkt_address
- */
-ral_status_t ral_lr11xx_set_gfsk_pkt_address( const void* context, const uint8_t node_address,
-                                              const uint8_t braodcast_address );
-
-/**
  * @see ral_get_pkt_payload
  */
 ral_status_t ral_lr11xx_get_pkt_payload( const void* context, uint16_t max_size_in_bytes, uint8_t* buffer,
                                          uint16_t* size_in_bytes );
+
+/**
+ * @see ral_get_pkt_size
+ */
+ral_status_t ral_lr11xx_get_pkt_size( const void* context, uint16_t* size_in_bytes );
+
+/**
+ * @see ral_get_data_rx_buffer
+ */
+ral_status_t ral_lr11xx_get_data_rx_buffer( const void* context, uint8_t* buffer, uint16_t size_in_bytes );
+
+/**
+ * @see ral_clear_rx_fifo
+ */
+ral_status_t ral_lr11xx_clear_rx_fifo( const void* context );
+
+/**
+ * @see ral_clear_tx_fifo
+ */
+ral_status_t ral_lr11xx_clear_tx_fifo( const void* context );
+
+/**
+ * @see ral_get_tx_fifo_level
+ */
+ral_status_t ral_lr11xx_get_tx_fifo_level( const void* context, uint16_t* fifo_level );
+
+/**
+ * @see ral_get_rx_fifo_level
+ */
+ral_status_t ral_lr11xx_get_rx_fifo_level( const void* context, uint16_t* fifo_level );
+
+/**
+ * @see ral_cfg_fifo_irq
+ */
+ral_status_t ral_lr11xx_cfg_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_irq_enable,
+                                      ral_radio_fifo_flag_t tx_fifo_irq_enable, uint16_t rx_fifo_high_threshold,
+                                      uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
+                                      uint16_t tx_fifo_high_threshold );
+
+/**
+ * @see ral_get_fifo_irq
+ */
+ral_status_t ral_lr11xx_get_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                      ral_radio_fifo_flag_t* tx_fifo_flags );
+
+/**
+ * @see ral_clear_fifo_irq
+ */
+ral_status_t ral_lr11xx_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_flags_to_clear,
+                                        ral_radio_fifo_flag_t tx_fifo_flags_to_clear );
+
+/**
+ * @see ral_get_and_clear_fifo_irq
+ */
+ral_status_t ral_lr11xx_get_and_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                                ral_radio_fifo_flag_t* tx_fifo_flags );
 
 /**
  * @see ral_get_irq_status
@@ -282,6 +362,12 @@ ral_status_t ral_lr11xx_set_lora_mod_params( const void* context, const ral_lora
  * @see ral_set_lora_pkt_params
  */
 ral_status_t ral_lr11xx_set_lora_pkt_params( const void* context, const ral_lora_pkt_params_t* params );
+
+/**
+ * @see ral_set_gfsk_pkt_address
+ */
+ral_status_t ral_lr11xx_set_gfsk_pkt_address( const void* context, const uint8_t node_address,
+                                              const uint8_t braodcast_address );
 
 /**
  * @see ral_set_lora_cad_params
@@ -483,6 +569,20 @@ ral_status_t ral_lr11xx_rttof_set_rx_tx_delay_indicator( const void* context, co
  */
 ral_status_t ral_lr11xx_rttof_get_raw_result( const void* context, ral_lora_bw_t rttof_bw, int32_t* raw_results,
                                               int32_t* meter_results, int8_t* rssi_result );
+
+/**
+ * @see ral_check_lora_parameters
+ */
+ral_status_t ral_lr11xx_check_lora_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                               const ral_lora_pkt_params_t* pkt_params,
+                                               const ral_lora_mod_params_t* mod_params );
+
+/**
+ * @see ral_check_rttof_parameters
+ */
+ral_status_t ral_lr11xx_check_rttof_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                                const ral_lora_pkt_params_t* pkt_params,
+                                                const ral_lora_mod_params_t* mod_params );
 
 #ifdef __cplusplus
 }

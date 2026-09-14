@@ -73,7 +73,7 @@ static hal_lp_timer_irq_t lptim_tmr_irq[HAL_LP_TIMER_NB] = {
         .context  = NULL,
         .callback = NULL,
     },
-#if( HAL_LP_TIMER_NB > 1 )
+#if ( HAL_LP_TIMER_NB > 1 )
     {
         .context  = NULL,
         .callback = NULL,
@@ -95,7 +95,7 @@ void hal_lp_timer_init( hal_lp_timer_id_t id )
 {
     lptim_handle[id].Instance             = ( id == 0 ) ? LPTIM1 : LPTIM2;
     lptim_handle[id].Init.Clock.Source    = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
-    lptim_handle[id].Init.Clock.Prescaler = LPTIM_PRESCALER_DIV16;
+    lptim_handle[id].Init.Clock.Prescaler = LPTIM_PRESCALER_DIV1;
     lptim_handle[id].Init.Trigger.Source  = LPTIM_TRIGSOURCE_SOFTWARE;
     lptim_handle[id].Init.OutputPolarity  = LPTIM_OUTPUTPOLARITY_HIGH;
     lptim_handle[id].Init.UpdateMode      = LPTIM_UPDATE_IMMEDIATE;
@@ -105,30 +105,59 @@ void hal_lp_timer_init( hal_lp_timer_id_t id )
     {
         mcu_panic( );
     }
-    lptim_tmr_irq[id] = ( hal_lp_timer_irq_t ){ .context = NULL, .callback = NULL };
+    lptim_tmr_irq[id] = ( hal_lp_timer_irq_t ) { .context = NULL, .callback = NULL };
 }
 
 void hal_lp_timer_start( hal_lp_timer_id_t id, const uint32_t milliseconds, const hal_lp_timer_irq_t* tmr_irq )
 {
     uint32_t delay_ms_2_tick = 0;
 
-    // Remark LSE_VALUE / LPTIM_PRESCALER_DIV16
-    delay_ms_2_tick = ( uint32_t ) ( ( ( uint64_t ) milliseconds * ( LSE_VALUE >> 4 ) ) / 1000 );
+    // Remark LSE_VALUE / LPTIM_PRESCALER_DIV1
+    delay_ms_2_tick = ( uint32_t ) ( ( ( uint64_t ) milliseconds * ( LSE_VALUE ) ) / 1000 );
 
-    // check if delay_ms_2_tick is not greater than 0xFFFF and clamp it if it is the case
+    // Clamp value if greater than 0xFFFF
     if( delay_ms_2_tick > 0xFFFF )
     {
         delay_ms_2_tick = 0xFFFF;
     }
 
-    // Auto reload period is set to max value 0xFFFF
-    HAL_LPTIM_TimeOut_Start_IT( &lptim_handle[id], 0xFFFF, delay_ms_2_tick );
     lptim_tmr_irq[id] = *tmr_irq;
+
+    /* Enable the Peripheral */
+    __HAL_LPTIM_ENABLE( &lptim_handle[id] );
+
+    /* Clear flag */
+    __HAL_LPTIM_CLEAR_FLAG( &lptim_handle[id], LPTIM_FLAG_CMPOK );
+
+    /* Load the Timeout value in the compare register */
+    __HAL_LPTIM_COMPARE_SET( &lptim_handle[id], delay_ms_2_tick );
+
+    /* Wait for the completion of the write operation to the LPTIM_CMP register, without this the compare match
+     * interrupt will not be triggered */
+    while( !( __HAL_LPTIM_GET_FLAG( &lptim_handle[id], LPTIM_FLAG_CMPOK ) ) )
+    {
+    }
+
+    /* Disable the Peripheral */
+    __HAL_LPTIM_DISABLE( &lptim_handle[id] );
+
+    /* Enable Compare match interrupt */
+    __HAL_LPTIM_ENABLE_IT( &lptim_handle[id], LPTIM_IT_CMPM );
+
+    /* Enable the Peripheral */
+    __HAL_LPTIM_ENABLE( &lptim_handle[id] );
+
+    // /* Start the LPTIM peripheral in single mode. */
+    __HAL_LPTIM_START_SINGLE( &lptim_handle[id] );
 }
 
 void hal_lp_timer_stop( hal_lp_timer_id_t id )
 {
-    HAL_LPTIM_TimeOut_Stop_IT( &lptim_handle[id] );
+    // HAL_LPTIM_TimeOut_Stop_IT( &lptim_handle[id] );
+    // hal_lp_timer_irq_disable( id );
+
+    /* Disable the Peripheral */
+    __HAL_LPTIM_DISABLE( &lptim_handle[id] );
 }
 
 void hal_lp_timer_irq_enable( hal_lp_timer_id_t id )
@@ -141,15 +170,31 @@ void hal_lp_timer_irq_disable( hal_lp_timer_id_t id )
     HAL_NVIC_DisableIRQ( ( id == 0 ) ? LPTIM1_IRQn : LPTIM2_IRQn );
 }
 
+void HAL_LPTIM_CompareMatchCallback( LPTIM_HandleTypeDef* hlptim )
+{
+    if( hlptim->Instance == LPTIM1 )
+    {
+        if( lptim_tmr_irq[HAL_LP_TIMER_ID_1].callback != NULL )
+        {
+            lptim_tmr_irq[HAL_LP_TIMER_ID_1].callback( lptim_tmr_irq[HAL_LP_TIMER_ID_1].context );
+        }
+    }
+}
+void HAL_LPTIM_AutoReloadMatchCallback( LPTIM_HandleTypeDef* hlptim )
+{
+    if( hlptim->Instance == LPTIM1 )
+    {
+        // HAL_LPTIM_Counter_Stop_IT( hlptim );
+    }
+}
 void LPTIM1_IRQHandler( void )
 {
     HAL_LPTIM_IRQHandler( &lptim_handle[HAL_LP_TIMER_ID_1] );
-    HAL_LPTIM_TimeOut_Stop( &lptim_handle[HAL_LP_TIMER_ID_1] );
 
-    if( lptim_tmr_irq[HAL_LP_TIMER_ID_1].callback != NULL )
-    {
-        lptim_tmr_irq[HAL_LP_TIMER_ID_1].callback( lptim_tmr_irq[HAL_LP_TIMER_ID_1].context );
-    }
+    // /* Disable the Peripheral */
+    __HAL_LPTIM_DISABLE( &lptim_handle[HAL_LP_TIMER_ID_1] );
+    __HAL_LPTIM_DISABLE_IT( &lptim_handle[HAL_LP_TIMER_ID_1], LPTIM_IT_CMPM );
+    __HAL_LPTIM_CLEAR_FLAG( &lptim_handle[HAL_LP_TIMER_ID_1], LPTIM_FLAG_CMPM );
 }
 
 void LPTIM2_IRQHandler( void )

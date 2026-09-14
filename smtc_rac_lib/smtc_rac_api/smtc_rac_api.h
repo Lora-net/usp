@@ -82,10 +82,11 @@ typedef struct smtc_rac_context_s
     smtc_rac_modulation_type_t modulation_type; /*!< Type of modulation (LoRa, FSK, or LR-FHSS). */
     union
     {
-        smtc_rac_radio_lora_params_t   lora;                 /*!< LoRa radio parameters. */
-        smtc_rac_radio_fsk_params_t    fsk;                  /*!< FSK radio parameters. */
-        smtc_rac_radio_lrfhss_params_t lrfhss;               /*!< LR-FHSS radio parameters. */
-        smtc_rac_radio_flrc_params_t   flrc;                 /*!< FLRC radio parameters. */
+        smtc_rac_radio_lora_params_t       lora;             /*!< LoRa radio parameters. */
+        smtc_rac_radio_fsk_params_t        fsk;              /*!< FSK radio parameters. */
+        smtc_rac_radio_lrfhss_params_t     lrfhss;           /*!< LR-FHSS radio parameters. */
+        smtc_rac_radio_flrc_params_t       flrc;             /*!< FLRC radio parameters. */
+        smtc_rac_radio_flrc_burst_params_t flrc_burst;       /*!< FLRC burst radio parameters. */
     } radio_params;                                          /*!< Radio parameters union for the transaction. */
     smtc_rac_data_buffer_setup_t smtc_rac_data_buffer_setup; /*!< Data buffer setup for the transaction. */
     smtc_rac_scheduler_config_t  scheduler_config;           /*!< Scheduling and callback configuration. */
@@ -96,6 +97,7 @@ typedef struct smtc_rac_context_s
     smtc_rac_cad_radio_params_t cad_context; /*!< CAD context for Channel Activity Detection operations. */
     smtc_rac_cw_context_t       cw_context;  /*!< CW context for Continuous Wave operations. */
 
+    bool keep_radio_awake; /*!< Flag to indicate if the radio should stay alive after the transaction is completed. */
 } smtc_rac_context_t;
 
 /**
@@ -103,9 +105,11 @@ typedef struct smtc_rac_context_s
  */
 typedef struct smtc_usp_rac_version_s
 {
-    uint8_t major;  //!< Major value
-    uint8_t minor;  //!< Minor value
-    uint8_t patch;  //!< Patch value
+    uint8_t major;        //!< Major value
+    uint8_t minor;        //!< Minor value
+    uint8_t patch;        //!< Patch value
+    char*   pre_release;  //!< Pre release value with hyphen for start for example "-rc6"
+    char*   metadata;  //!< Metadata value with plus for start for example "+d670460b4b4aece5915caf5c68d12f560a9fe3e4"
 } smtc_usp_rac_version_t;
 
 /*
@@ -246,6 +250,18 @@ ralf_t* smtc_rac_get_radio( void );
  */
 smtc_rac_context_t* smtc_rac_get_context( uint8_t radio_access_id );
 
+/*!
+ * \brief Get the actual radio_id in rac post callback. Warning the value is
+ * only valid in rac post callback.
+ *
+ *
+ * \param [in] void
+ *
+ * \return Return the actual value of radio_id.
+ */
+
+uint8_t smtc_rac_get_callback_radio_id( void );
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC API - SPECIALIZED OPERATIONS ------------------------------------
@@ -280,7 +296,7 @@ smtc_rac_return_code_t smtc_rac_lock_radio_access( uint8_t                     r
  *needed.
  * \note  if you unlock the radio access without locking it first, the behavior is the same as if you have locked it
  *first and then unlocked it. as a consequence the callback_post_radio_transaction will called with the status
- *RP_STATUS_TASK_UNLOCKED.
+ *RP_STATUS_RADIO_UNLOCKED.
  * \param [in] radio_access_id The radio access ID obtained from
  * smtc_rac_open_radio.
  *\return Return code indicating success or error.
@@ -292,6 +308,45 @@ smtc_rac_return_code_t smtc_rac_unlock_radio_access( uint8_t radio_access_id );
  * \return Pointer to the radio driver context instance.
  */
 void* smtc_rac_get_radio_driver_context( void );
+
+/*!
+ * \brief Get immediate access to the radio.
+ *
+ * This function requests an immediate and unlimited access to the radio, given a priority. If there is no existing
+ * radio task, the access is granted. If the priority is higher than a existing radio task currently managed, the
+ * current task is aborted and the access is granted. Else, the request is refused.
+ * \note No other concurrent access is possible whatever the priority until smtc_rac_release_immediate_radio_access() is
+ * called
+ * \param [in] priority The request priority.
+ * \param [in] irq_callback The callback that will be called just after the radio transaction (can be NULL).
+ * \return Return code indicating success or error.
+ */
+smtc_rac_return_code_t smtc_rac_immediate_radio_access( smtc_rac_priority_t priority, void ( *irq_callback )( void ) );
+
+/*!
+ * \brief Release the immediate access to the radio.
+ *
+ * This function release the immediate radio access. This function should be called when the radio access get with
+ * smtc_rac_immediate_radio_access is no longer needed.
+ * \return Return code indicating success or error.
+ */
+smtc_rac_return_code_t smtc_rac_release_immediate_radio_access( void );
+
+/*!
+ * \brief Gets the context private for a specific radio access ID.
+ *
+ * \return Pointer to the context private instance.
+ */
+void* smtc_rac_get_context_private( uint8_t radio_access_id );
+
+/*!
+ * \brief Sets the context private for a specific radio access ID.
+ *
+ * \param [in] radio_access_id The radio access ID obtained from
+ * smtc_rac_open_radio.
+ * \param [in] context_private The context private instance.
+ */
+void smtc_rac_set_context_private( uint8_t radio_access_id, void* context_private );
 
 /*
  * -----------------------------------------------------------------------------

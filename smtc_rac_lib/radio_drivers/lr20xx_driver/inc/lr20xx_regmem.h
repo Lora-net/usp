@@ -81,7 +81,7 @@ extern "C" {
  * @param [in] context Chip implementation context
  * @param [in] address The register memory address to start writing operation (only the 3 bytes LSB are relevant)
  * @param [in] buffer The buffer of words to write into memory. Its size must be enough to contain length words.
- * @param [in] length Number of words to write into memory
+ * @param [in] length Number of words to write into memory. Must be inferior or equal to 32.
  *
  * @returns Operation status
  *
@@ -111,7 +111,7 @@ lr20xx_status_t lr20xx_regmem_write_regmem32_mask( const void* context, const ui
  *
  * @param [in] context Chip implementation context
  * @param [in] address The register memory address to start reading operation (only the 3 bytes LSB are relevant)
- * @param [in] length Number of words to read from memory
+ * @param [in] length Number of words to read from memory. Must be inferior or equal to 32.
  * @param [out] buffer Pointer to a words array to be filled with content from memory. Its size must be enough to
  * contain at least length words.
  *

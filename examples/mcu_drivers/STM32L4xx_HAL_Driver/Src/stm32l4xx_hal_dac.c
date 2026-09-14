@@ -6,11 +6,21 @@
   *         This file provides firmware functions to manage the following
   *         functionalities of the Digital to Analog Converter (DAC) peripheral:
   *           + Initialization and de-initialization functions
-  *           + IO operation functions
   *           + Peripheral Control functions
   *           + Peripheral State and Errors functions
   *
   *
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   @verbatim
   ==============================================================================
                       ##### DAC Peripheral features #####
@@ -161,14 +171,14 @@
        A DMA1 request can be generated when an external trigger (but not a software trigger)
        occurs if DMA1 requests are enabled using HAL_DAC_Start_DMA().
        DMA requests are mapped as following:
-       (#) When DMAMUX is NOT present: 
+       (#) When DMAMUX is NOT present:
            DMA1 requests are mapped as following:
              (+) DAC channel1 mapped on DMA1 request 6 / channel3
              (+) DAC channel2 mapped on DMA1 request 5 / channel4
            DMA2 requests are mapped as following:
              (+) DAC channel1 mapped on DMA2 request 3 / channel4
              (+) DAC channel2 mapped on DMA2 request 3 / channel5
-       (#) When DMAMUX is present: 
+       (#) When DMAMUX is present:
              (+) DAC channel1 mapped on DMA1/DMA2 request 6 (can be any DMA channel)
              (+) DAC channel2 mapped on DMA1/DMA2 request 7 (can be any DMA channel)
 
@@ -238,7 +248,7 @@
       The compilation define  USE_HAL_DAC_REGISTER_CALLBACKS when set to 1
       allows the user to configure dynamically the driver callbacks.
 
-    Use Functions @ref HAL_DAC_RegisterCallback() to register a user callback,
+    Use Functions HAL_DAC_RegisterCallback() to register a user callback,
       it allows to register following callbacks:
       (+) ConvCpltCallbackCh1     : callback when a half transfer is completed on Ch1.
       (+) ConvHalfCpltCallbackCh1 : callback when a transfer is completed on Ch1.
@@ -253,8 +263,8 @@
       This function takes as parameters the HAL peripheral handle, the Callback ID
       and a pointer to the user callback function.
 
-    Use function @ref HAL_DAC_UnRegisterCallback() to reset a callback to the default
-      weak (surcharged) function. It allows to reset following callbacks:
+    Use function HAL_DAC_UnRegisterCallback() to reset a callback to the default
+      weak (overridden) function. It allows to reset following callbacks:
       (+) ConvCpltCallbackCh1     : callback when a half transfer is completed on Ch1.
       (+) ConvHalfCpltCallbackCh1 : callback when a transfer is completed on Ch1.
       (+) ErrorCallbackCh1        : callback when an error occurs on Ch1.
@@ -268,12 +278,12 @@
       (+) All Callbacks
       This function) takes as parameters the HAL peripheral handle and the Callback ID.
 
-      By default, after the @ref HAL_DAC_Init and if the state is HAL_DAC_STATE_RESET
-      all callbacks are reset to the corresponding legacy weak (surcharged) functions.
+      By default, after the HAL_DAC_Init and if the state is HAL_DAC_STATE_RESET
+      all callbacks are reset to the corresponding legacy weak (overridden) functions.
       Exception done for MspInit and MspDeInit callbacks that are respectively
-      reset to the legacy weak (surcharged) functions in the @ref HAL_DAC_Init
-      and @ref  HAL_DAC_DeInit only when these callbacks are null (not registered beforehand).
-      If not, MspInit or MspDeInit are not null, the @ref HAL_DAC_Init and @ref HAL_DAC_DeInit
+      reset to the legacy weak (overridden) functions in the HAL_DAC_Init
+      and HAL_DAC_DeInit only when these callbacks are null (not registered beforehand).
+      If not, MspInit or MspDeInit are not null, the HAL_DAC_Init and HAL_DAC_DeInit
       keep and use the user MspInit/MspDeInit callbacks (registered beforehand)
 
       Callbacks can be registered/unregistered in READY state only.
@@ -281,12 +291,12 @@
       in READY or RESET state, thus registered (user) MspInit/DeInit callbacks can be used
       during the Init/DeInit.
       In that case first register the MspInit/MspDeInit user callbacks
-      using @ref HAL_DAC_RegisterCallback before calling @ref HAL_DAC_DeInit
-      or @ref HAL_DAC_Init function.
+      using HAL_DAC_RegisterCallback before calling HAL_DAC_DeInit
+      or HAL_DAC_Init function.
 
       When The compilation define USE_HAL_DAC_REGISTER_CALLBACKS is set to 0 or
       not defined, the callback registering feature is not available
-      and weak (surcharged) callbacks are used.
+      and weak (overridden) callbacks are used.
 
      *** DAC HAL driver macros list ***
      =============================================
@@ -302,17 +312,6 @@
       (@) You can refer to the DAC HAL driver header file for more useful macros
 
  @endverbatim
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
   ******************************************************************************
   */
 
@@ -397,7 +396,7 @@ HAL_StatusTypeDef HAL_DAC_Init(DAC_HandleTypeDef *hdac)
 #if defined (STM32L431xx) || defined (STM32L432xx) || defined (STM32L433xx) || defined (STM32L442xx) || defined (STM32L443xx) || \
     defined (STM32L471xx) || defined (STM32L475xx) || defined (STM32L476xx) || defined (STM32L485xx) || defined (STM32L486xx) || defined (STM32L496xx) || defined (STM32L4A6xx) || \
     defined (STM32L4P5xx) || defined (STM32L4Q5xx) || \
-    defined (STM32L4R5xx) || defined (STM32L4R7xx) || defined (STM32L4R9xx) || defined (STM32L4S5xx) || defined (STM32L4S7xx) || defined(STM32L4S9xx)   
+    defined (STM32L4R5xx) || defined (STM32L4R7xx) || defined (STM32L4R9xx) || defined (STM32L4S5xx) || defined (STM32L4S7xx) || defined(STM32L4S9xx)
     hdac->ConvCpltCallbackCh2           = HAL_DACEx_ConvCpltCallbackCh2;
     hdac->ConvHalfCpltCallbackCh2       = HAL_DACEx_ConvHalfCpltCallbackCh2;
     hdac->ErrorCallbackCh2              = HAL_DACEx_ErrorCallbackCh2;
@@ -406,7 +405,7 @@ HAL_StatusTypeDef HAL_DAC_Init(DAC_HandleTypeDef *hdac)
         /* STM32L471xx STM32L475xx STM32L476xx STM32L485xx STM32L486xx STM32L496xx STM32L4A6xx */
         /* STM32L4P5xx STM32L4Q5xx                                                             */
         /* STM32L4R5xx STM32L4R7xx STM32L4R9xx STM32L4S5xx STM32L4S7xx STM32L4S9xx             */
-    
+
     if (hdac->MspInitCallback == NULL)
     {
       hdac->MspInitCallback             = HAL_DAC_MspInit;
@@ -588,7 +587,7 @@ HAL_StatusTypeDef HAL_DAC_Start(DAC_HandleTypeDef *hdac, uint32_t Channel)
   if(Channel == DAC_CHANNEL_1)
   {
     /* Check if software trigger enabled */
-    if ((hdac->Instance->CR & (DAC_CR_TEN1 | DAC_CR_TSEL1)) == DAC_CR_TEN1)
+    if ((hdac->Instance->CR & (DAC_CR_TEN1 | DAC_CR_TSEL1)) == (DAC_CR_TEN1 | DAC_CR_TSEL1))
     {
       /* Enable the selected DAC software conversion */
       SET_BIT(hdac->Instance->SWTRIGR, DAC_SWTRIGR_SWTRIG1);
@@ -597,7 +596,7 @@ HAL_StatusTypeDef HAL_DAC_Start(DAC_HandleTypeDef *hdac, uint32_t Channel)
   else
   {
     /* Check if software trigger enabled */
-    if ((hdac->Instance->CR & (DAC_CR_TEN2 | DAC_CR_TSEL2)) == DAC_CR_TEN2)
+    if ((hdac->Instance->CR & (DAC_CR_TEN2 | DAC_CR_TSEL2)) == (DAC_CR_TEN2 | DAC_CR_TSEL2))
     {
       /* Enable the selected DAC software conversion*/
       SET_BIT(hdac->Instance->SWTRIGR, DAC_SWTRIGR_SWTRIG2);
@@ -1250,13 +1249,17 @@ HAL_StatusTypeDef HAL_DAC_ConfigChannel(DAC_HandleTypeDef *hdac, DAC_ChannelConf
         /* Check for the Timeout */
         if ((HAL_GetTick() - tickstart) > TIMEOUT_DAC_CALIBCONFIG)
         {
-          /* Update error code */
-          SET_BIT(hdac->ErrorCode, HAL_DAC_ERROR_TIMEOUT);
+          /* New check to avoid false timeout detection in case of preemption */
+          if(((hdac->Instance->SR) & DAC_SR_BWST1) != 0UL)
+          {
+            /* Update error code */
+            SET_BIT(hdac->ErrorCode, HAL_DAC_ERROR_TIMEOUT);
 
-          /* Change the DMA state */
-          hdac->State = HAL_DAC_STATE_TIMEOUT;
+            /* Change the DMA state */
+            hdac->State = HAL_DAC_STATE_TIMEOUT;
 
-          return HAL_TIMEOUT;
+            return HAL_TIMEOUT;
+          }
         }
       }
       HAL_Delay(1);
@@ -1272,13 +1275,17 @@ HAL_StatusTypeDef HAL_DAC_ConfigChannel(DAC_HandleTypeDef *hdac, DAC_ChannelConf
         /* Check for the Timeout */
         if ((HAL_GetTick() - tickstart) > TIMEOUT_DAC_CALIBCONFIG)
         {
-          /* Update error code */
-          SET_BIT(hdac->ErrorCode, HAL_DAC_ERROR_TIMEOUT);
+          /* New check to avoid false timeout detection in case of preemption */
+          if(((hdac->Instance->SR) & DAC_SR_BWST2) != 0UL)
+          {
+            /* Update error code */
+            SET_BIT(hdac->ErrorCode, HAL_DAC_ERROR_TIMEOUT);
 
-          /* Change the DMA state */
-          hdac->State = HAL_DAC_STATE_TIMEOUT;
+            /* Change the DMA state */
+            hdac->State = HAL_DAC_STATE_TIMEOUT;
 
-          return HAL_TIMEOUT;
+            return HAL_TIMEOUT;
+          }
         }
       }
       HAL_Delay(1U);
@@ -1438,7 +1445,7 @@ uint32_t HAL_DAC_GetError(DAC_HandleTypeDef *hdac)
 #if (USE_HAL_DAC_REGISTER_CALLBACKS == 1)
 /**
   * @brief  Register a User DAC Callback
-  *         To be used instead of the weak (surcharged) predefined callback
+  *         To be used instead of the weak (overridden) predefined callback
   * @param  hdac DAC handle
   * @param  CallbackID ID of the callback to be registered
   *         This parameter can be one of the following values:
@@ -1547,11 +1554,11 @@ HAL_StatusTypeDef HAL_DAC_RegisterCallback(DAC_HandleTypeDef *hdac, HAL_DAC_Call
 
 /**
   * @brief  Unregister a User DAC Callback
-  *         DAC Callback is redirected to the weak (surcharged) predefined callback
+  *         DAC Callback is redirected to the weak (overridden) predefined callback
   * @param  hdac DAC handle
   * @param  CallbackID ID of the callback to be unregistered
   *         This parameter can be one of the following values:
-  *          @arg @ref HAL_DAC_CH1_COMPLETE_CB_ID          DAC CH1 tranfer Complete Callback ID
+  *          @arg @ref HAL_DAC_CH1_COMPLETE_CB_ID          DAC CH1 transfer Complete Callback ID
   *          @arg @ref HAL_DAC_CH1_HALF_COMPLETE_CB_ID     DAC CH1 Half Complete Callback ID
   *          @arg @ref HAL_DAC_CH1_ERROR_ID                DAC CH1 Error Callback ID
   *          @arg @ref HAL_DAC_CH1_UNDERRUN_CB_ID          DAC CH1 UnderRun Callback ID
@@ -1759,4 +1766,3 @@ void DAC_DMAErrorCh1(DMA_HandleTypeDef *hdma)
   * @}
   */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

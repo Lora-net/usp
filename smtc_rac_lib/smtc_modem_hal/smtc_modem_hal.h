@@ -117,7 +117,7 @@ typedef enum
 /**
  * @brief Resets the MCU
  */
-void smtc_modem_hal_reset_mcu( void );
+_Noreturn void smtc_modem_hal_reset_mcu( void );
 
 /* ------------ Watchdog management ------------*/
 
@@ -189,6 +189,13 @@ void smtc_modem_hal_disable_modem_irq( void );
  */
 void smtc_modem_hal_enable_modem_irq( void );
 
+/**
+ * @brief Checks (polls) if FIFO interrupt has been triggered
+ *
+ * @note Workaround to use when standard interrupt can't trigger (see port P2 on nRF54L15 IC)
+ */
+bool smtc_modem_hal_check_modem_fifo_irq( void );
+
 /* ------------ Context saving management ------------*/
 
 /**
@@ -240,7 +247,7 @@ void smtc_modem_hal_context_flash_pages_erase( const modem_context_type_t ctx_ty
  * @param [in] fmt  String Format
  * @param ...  String Arguments
  */
-void smtc_modem_hal_on_panic( uint8_t* func, uint32_t line, const char* fmt, ... );
+_Noreturn void smtc_modem_hal_on_panic( uint8_t* func, uint32_t line, const char* fmt, ... );
 
 /* ------------ Random management ------------*/
 

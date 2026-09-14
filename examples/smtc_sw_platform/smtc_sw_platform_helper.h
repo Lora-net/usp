@@ -1,9 +1,9 @@
 /**
  * @file      smtc_sw_platform_helper.h
  *
- * @brief     Platform specific helper
+ * @brief     Software platform helper
  *
- * This file provides platform specific macros and functions to be used in examples.
+ * This file provides software platform specific macros to be used in examples.
  *
  * The Clear BSD License
  * Copyright Semtech Corporation 2025. All rights reserved.
@@ -34,8 +34,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PLATFORM_HELPER_H
-#define PLATFORM_HELPER_H
+#ifndef SMTC_SW_PLATFORM_HELPER_H
+#define SMTC_SW_PLATFORM_HELPER_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,12 +52,13 @@ extern "C" {
  * -----------------------------------------------------------------------------
  * --- PUBLIC MACROS -----------------------------------------------------------
  */
+
 /**
  * @brief Encapsulates SMTC RAC API calls
  *
- * Bare-metal implementation typically do not requires additional operations when calling SMTC RAC API.
- * However multi-threaded platform requires inter-thread call synchronisation mechanism. This macro can be redefined in
- * these situations to modify all examples SMTC RAC API calls.
+ * Bare-metal implementation typically do not require additional operations when calling SMTC RAC API.
+ * However multi-threaded platforms require inter-thread call synchronization mechanisms. This macro
+ * can be redefined in these situations to modify all examples SMTC RAC API calls.
  */
 #define SMTC_SW_PLATFORM( call ) call
 
@@ -70,34 +71,16 @@ extern "C" {
  * -----------------------------------------------------------------------------
  * --- PUBLIC TYPES ------------------------------------------------------------
  */
-typedef enum
-{
-    SMTC_PF_LED_RX,
-    SMTC_PF_LED_TX,
-    SMTC_PF_LED_SCAN,
-    SMTC_PF_LED_MAX
-} smtc_led_pin_e;
 
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS PROTOTYPES ---------------------------------------------
  */
-/*!
- * @brief Toggle the state of the TX and RX LEDs
- */
-void toggle_led( void );
-
-/*!
- * @brief Set the state of a specific LED
- * @param led The LED identifier
- * @param state true to turn on, false to turn off
- */
-void set_led( smtc_led_pin_e led, bool state );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // PLATFORM_HELPER_H
+#endif  // SMTC_SW_PLATFORM_HELPER_H
 
 /* --- EOF ------------------------------------------------------------------ */

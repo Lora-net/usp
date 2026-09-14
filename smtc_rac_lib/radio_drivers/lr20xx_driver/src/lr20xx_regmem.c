@@ -37,6 +37,7 @@
  * --- DEPENDENCIES ------------------------------------------------------------
  */
 
+#include <stdbool.h>
 #include "lr20xx_regmem.h"
 #include "lr20xx_hal.h"
 
@@ -132,6 +133,15 @@ static void lr20xx_regmem_fill_cbuffer_cdata_opcode_address_data( uint8_t* cbuff
 static void lr20xx_regmem_fill_out_buffer_from_raw_buffer( uint32_t* out_buffer, const uint8_t* raw_buffer,
                                                            uint8_t out_buffer_length );
 
+/**
+ * @brief Check buffer length is appropriate for read/write regmem32 operations
+ *
+ * @param buffer_length The buffer length
+ * @return true The buffer length is correct for the operation
+ * @return false The buffer length is incorrect and the operation should not be executed
+ */
+static inline bool lr20xx_regmem_buffer_length_is_correct( uint8_t buffer_length );
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
@@ -143,7 +153,7 @@ lr20xx_status_t lr20xx_regmem_write_regmem32( const void* context, const uint32_
     uint8_t cbuffer[LR20XX_REGMEM_WRITE_REGMEM32_CMD_LENGTH];
     uint8_t cdata[LR20XX_REGMEM_BUFFER_SIZE_MAX];
 
-    if( length > LR20XX_REGMEM_MAX_WRITE_READ_WORDS )
+    if( !lr20xx_regmem_buffer_length_is_correct( length ) )
     {
         return LR20XX_STATUS_ERROR;
     }
@@ -180,7 +190,7 @@ lr20xx_status_t lr20xx_regmem_read_regmem32( const void* context, const uint32_t
 {
     uint8_t cbuffer[LR20XX_REGMEM_READ_REGMEM32_CMD_LENGTH];
 
-    if( length > LR20XX_REGMEM_MAX_WRITE_READ_WORDS )
+    if( !lr20xx_regmem_buffer_length_is_correct( length ) )
     {
         return LR20XX_STATUS_ERROR;
     }
@@ -252,6 +262,11 @@ void lr20xx_regmem_fill_out_buffer_from_raw_buffer( uint32_t* out_buffer, const 
                                 ( ( uint32_t ) raw_buffer_local[1] << 16 ) + ( ( uint32_t ) raw_buffer_local[2] << 8 ) +
                                 ( ( uint32_t ) raw_buffer_local[3] << 0 );
     }
+}
+
+bool lr20xx_regmem_buffer_length_is_correct( uint8_t buffer_length )
+{
+    return buffer_length <= LR20XX_REGMEM_MAX_WRITE_READ_WORDS;
 }
 
 /* --- EOF ------------------------------------------------------------------ */

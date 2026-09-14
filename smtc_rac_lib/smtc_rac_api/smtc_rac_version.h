@@ -59,8 +59,13 @@ extern "C" {
  * --- PUBLIC TYPES ------------------------------------------------------------
  */
 #define USP_RAC_VERSION_MAJOR 1
-#define USP_RAC_VERSION_MINOR 0
-#define USP_RAC_VERSION_PATCH 0
+#define USP_RAC_VERSION_MINOR 2
+#define USP_RAC_VERSION_PATCH 1
+// A pre-release version may be denoted by appending a hyphen and must comprise only ASCII alphanumerics and hyphens
+// [0-9A-Za-z-]
+#define USP_RAC_VERSION_PRE_RELEASE ""
+// Metadata may be denoted by appending a plus sign must comprise only ASCII alphanumerics and hyphens [0-9A-Za-z-].
+#define USP_RAC_VERSION_METADATA ""
 
 /*
  * -----------------------------------------------------------------------------

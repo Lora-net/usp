@@ -22,7 +22,32 @@
  *   - Build and flash to a supported board with LR11xx or LR1120 radio.
  *
  * The Clear BSD License
- * Copyright Semtech Corporation 2025. All rights reserved.
+ * Copyright Semtech Corporation 2026. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the disclaimer
+ * below) provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the Semtech corporation nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY
+ * THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+ * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
+ * NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL SEMTECH CORPORATION BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 /*
@@ -45,15 +70,17 @@
 #include "smtc_hal_mcu.h"
 #include "smtc_hal_gpio.h"
 #include "smtc_hal_watchdog.h"
+#include "smtc_hal_led.h"
+#include "smtc_hal_button.h"
 
 #include "modem_pinout.h"
+
 #include "smtc_sw_platform_helper.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "MAIN-RANGING"
 #include "smtc_rac_log.h"
 
-#include <string.h>
 #include "app_ranging_hopping.h"
 #include "apps_configuration.h"
 #include "main_ranging_demo.h"
@@ -73,9 +100,7 @@
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE TYPES -----------------------------------------------------------
- * Defines a volatile flag for user button press detection.
  */
-static volatile bool user_button_is_press = false;  // Flag for button status
 
 /*
  * -----------------------------------------------------------------------------
@@ -102,7 +127,7 @@ static uint8_t             periodic_tx_handle;               // Radio access han
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
  * Prototypes for internal helper functions.
  */
-static void user_button_callback( void* context );
+
 static void periodic_tx_handle_callback( rp_status_t status );
 static void periodic_tx_handle_config( void );
 static void periodic_tx_handle_start( void );
@@ -121,7 +146,7 @@ static void periodic_tx_handle_start( void );
  *
  * @return int (not used, as this is an embedded application)
  */
-int main_ranging_demo( void )
+int main( void )
 {
     // Disable IRQ to avoid unwanted behavior during init
     hal_mcu_disable_irq( );
@@ -129,26 +154,21 @@ int main_ranging_demo( void )
     // Configure all the µC peripherals (clock, gpio, timer, ...)
     hal_mcu_init( );
 
+    // Initialize LEDs and button
+    hal_led_init( );
+    hal_button_init( NULL, NULL );
+
     // Initialize the RAC
     SMTC_SW_PLATFORM( smtc_rac_init( ) );
+
     hal_mcu_enable_irq( );
 
     SMTC_HAL_TRACE_INFO( "===== ranging and frequency hopping example =====\r\n" );
 
-    set_led( SMTC_PF_LED_SCAN, true );
-    // Configure Nucleo blue button as EXTI (external interrupt)
-    hal_gpio_irq_t nucleo_blue_button = {
-        .pin      = EXTI_BUTTON,
-        .context  = NULL,                  // context passed to the callback - not used in this example
-        .callback = user_button_callback,  // callback called when EXTI is triggered
-    };
-    hal_gpio_init_in( EXTI_BUTTON, BSP_GPIO_PULL_MODE_NONE, BSP_GPIO_IRQ_MODE_FALLING, &nucleo_blue_button );
-
-    hal_mcu_enable_irq( );
     if( is_manager == true )
     {
-        set_led( SMTC_PF_LED_TX, true );
-        set_led( SMTC_PF_LED_RX, false );
+        hal_led_set( HAL_LED_TX, true );
+        hal_led_set( HAL_LED_RX, false );
         SMTC_HAL_TRACE_INFO( "Running in ranging manager mode\n" );
         app_radio_ranging_params_init( is_manager, RAC_HIGH_PRIORITY );
 #if defined( CONTINUOUS_RANGING ) && ( CONTINUOUS_RANGING == true )
@@ -157,13 +177,15 @@ int main_ranging_demo( void )
     }
     else
     {
-        set_led( SMTC_PF_LED_TX, false );
-        set_led( SMTC_PF_LED_RX, true );
+        hal_led_set( HAL_LED_TX, false );
+        hal_led_set( HAL_LED_RX, true );
         SMTC_HAL_TRACE_INFO( "Running in ranging subordinate mode\n" );
         app_radio_ranging_params_init( is_manager, RAC_HIGH_PRIORITY );
         start_ranging_exchange( 0, is_manager );
     }
+
     // If periodic uplink is enabled, configure and start periodic transmissions
+    SMTC_HAL_TRACE_INFO( "Periodic uplink enabled: %d\n", PERIODIC_UPLINK_ENABLED );
     if( PERIODIC_UPLINK_ENABLED == true )
     {
         periodic_tx_handle = SMTC_SW_PLATFORM( smtc_rac_open_radio( RAC_VERY_HIGH_PRIORITY ) );
@@ -171,18 +193,20 @@ int main_ranging_demo( void )
         periodic_tx_handle_config( );
         periodic_tx_handle_start( );
     }
+
     // Main application loop
     while( 1 )
     {
-        if( user_button_is_press == true )
+        if( hal_button_is_pressed( ) )
         {
-            user_button_is_press = false;
+            hal_button_clear( );
+            start_ranging_exchange( 0, is_manager );
         }
+
         // Atomically check sleep conditions (button was not pressed and no modem flags pending)
         hal_mcu_disable_irq( );
         smtc_rac_run_engine( );
-
-        if( ( user_button_is_press == false ) )
+        if( !hal_button_is_pressed( ) )
         {
             hal_watchdog_reload( );
             hal_mcu_set_sleep_for_ms( 1000 );
@@ -196,25 +220,6 @@ int main_ranging_demo( void )
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTION DEFINITIONS --------------------------------------------
  */
-
-/**
- * @brief Callback for user button press (EXTI interrupt).
- *
- * Debounces the button and sets the user_button_is_press flag.
- * Also triggers a new ranging exchange.
- *
- * @param context Not used in this example.
- */
-static void user_button_callback( void* context )
-{
-    static uint32_t last_press_timestamp_ms = 0;
-    if( ( int32_t ) ( smtc_modem_hal_get_time_in_ms( ) - last_press_timestamp_ms ) > 500 )
-    {
-        last_press_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
-        user_button_is_press    = true;
-    }
-    start_ranging_exchange( 0, is_manager );
-}
 
 /**
  * @brief Callback for periodic uplink transmission.

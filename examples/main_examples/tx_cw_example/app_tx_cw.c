@@ -40,10 +40,10 @@
 #include <inttypes.h>
 
 #include "app_tx_cw.h"
-#include "main_tx_cw.h"
 
 #include <stddef.h>
 #include "smtc_rac_api.h"
+#include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
 #include "smtc_modem_hal.h"
 
@@ -123,7 +123,7 @@ void tx_cw_init( void )
     tx_cw.radio_access_id = SMTC_SW_PLATFORM( smtc_rac_open_radio( RAC_VERY_HIGH_PRIORITY ) );
     tx_cw.transaction     = smtc_rac_get_context( tx_cw.radio_access_id );
     tx_cw.transaction->scheduler_config.callback_post_radio_transaction     = post_tx_callback;
-    tx_cw.transaction->modulation_type                                      = PACKET_TYPE;
+    tx_cw.transaction->modulation_type                                      = SMTC_RAC_MODULATION_LORA;
     tx_cw.transaction->radio_params.lora.is_tx                              = true;
     tx_cw.transaction->radio_params.lora.is_ranging_exchange                = false;
     tx_cw.transaction->radio_params.lora.frequency_in_hz                    = RF_FREQ_IN_HZ;
@@ -176,14 +176,15 @@ void tx_cw_start( void )
         {
             TX_CW_PRINT( "Continuous wave\n" );
         }
-        TX_CW_PRINT( "Modulation type: %s\n", PACKET_TYPE == SMTC_RAC_MODULATION_LORA ? "LORA" : "FSK" );
-        TX_CW_PRINT( "Frequency: %u Hz\n", RF_FREQ_IN_HZ );
-        TX_CW_PRINT( "Power: %d dBm\n", TX_OUTPUT_POWER_DBM );
-        TX_CW_PRINT( "Spread factor: %s\n", LORA_SPREADING_FACTOR == RAL_LORA_SF7 ? "SF7" : "SF9" );
-        TX_CW_PRINT( "Bandwidth: %s\n", LORA_BANDWIDTH == RAL_LORA_BW_125_KHZ ? "125 kHz" : "500 kHz" );
-        TX_CW_PRINT( "Coding rate: %s\n", LORA_CODING_RATE == RAL_LORA_CR_4_5 ? "4/5" : "4/6" );
-        TX_CW_PRINT( "Preamble length: %u\n", LORA_PREAMBLE_LENGTH );
-        TX_CW_PRINT( "Packet length mode: %s\n", LORA_PKT_LEN_MODE == RAL_LORA_PKT_EXPLICIT ? "Explicit" : "Implicit" );
+        TX_CW_PRINT( "Modulation type: LORA\n" );
+        TX_CW_PRINT( "Frequency: %" PRIu32 " Hz\n", tx_cw.transaction->radio_params.lora.frequency_in_hz );
+        TX_CW_PRINT( "Power: %" PRIu8 " dBm\n", tx_cw.transaction->radio_params.lora.tx_power_in_dbm );
+        TX_CW_PRINT( "Spread factor: %s\n", ral_lora_sf_to_str( tx_cw.transaction->radio_params.lora.sf ) );
+        TX_CW_PRINT( "Bandwidth: %s\n", ral_lora_bw_to_str( tx_cw.transaction->radio_params.lora.bw ) );
+        TX_CW_PRINT( "Coding rate: %s\n", ral_lora_cr_to_str( tx_cw.transaction->radio_params.lora.cr ) );
+        TX_CW_PRINT( "Preamble length: %" PRIu16 "\n", tx_cw.transaction->radio_params.lora.preamble_len_in_symb );
+        TX_CW_PRINT( "Packet length mode: %s\n",
+                     ral_lora_pkt_len_modes_to_str( tx_cw.transaction->radio_params.lora.header_type ) );
         tx_cw_send_packet( );
     }
 }
@@ -211,21 +212,18 @@ static void tx_cw_send_packet( void )
     }
 
     tx_cw.transaction->scheduler_config.start_time_ms = smtc_modem_hal_get_time_in_ms( ) + TX_DELAY;
-    if( PACKET_TYPE == SMTC_RAC_MODULATION_LORA || PACKET_TYPE == SMTC_RAC_MODULATION_FSK )
-    {
-        SMTC_SW_PLATFORM( smtc_rac_submit_radio_transaction( tx_cw.radio_access_id ) );
-    }
+    SMTC_SW_PLATFORM( smtc_rac_submit_radio_transaction( tx_cw.radio_access_id ) );
 }
 
 static void pre_tx_callback( void )
 {
     TX_CW_PRINT( "usp/rac: transmission #%" PRIu32 " starting\n", tx_cw.packet_count );
-    set_led( SMTC_PF_LED_TX, true );
+    hal_led_set( HAL_LED_TX, true );
 }
 
 static void post_tx_callback( rp_status_t status )
 {
-    set_led( SMTC_PF_LED_TX, false );
+    hal_led_set( HAL_LED_TX, false );
 
     // Schedule next transmission if still running
     if( tx_cw.is_running )

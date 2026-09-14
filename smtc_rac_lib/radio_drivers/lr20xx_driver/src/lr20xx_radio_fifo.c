@@ -39,11 +39,18 @@
 
 #include "lr20xx_radio_fifo.h"
 #include "lr20xx_hal.h"
+#include "lr20xx_regmem.h"
+#include "lr20xx_system.h"
 
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE MACROS-----------------------------------------------------------
  */
+
+#define LR20XX_RADIO_FIFO_TX_FIFO_ADDRESS ( 0x00F3002C )
+#define LR20XX_RADIO_FIFO_TX_FIFO_SIZE_ADDRESS ( 0x00F30034 )
+#define LR20XX_RADIO_FIFO_RX_FIFO_ADDRESS ( 0x00F30028 )
+#define LR20XX_RADIO_FIFO_RX_FIFO_SIZE_ADDRESS ( 0x00F30030 )
 
 /*
  * -----------------------------------------------------------------------------
@@ -255,6 +262,52 @@ lr20xx_status_t lr20xx_radio_fifo_get_and_clear_irq_flags( const void* context, 
     }
 
     return status;
+}
+
+lr20xx_status_t lr20xx_radio_fifo_configure_1024_byte_tx_fifo( const void* context )
+{
+    const uint32_t tx_fifo_1024_memory_address = 0x00804000;
+    RETURN_STATUS_ON_NOT_OK(
+        lr20xx_regmem_write_regmem32( context, LR20XX_RADIO_FIFO_TX_FIFO_ADDRESS, &tx_fifo_1024_memory_address, 1 ) );
+
+    const uint32_t tx_fifo_size = 0x000003FC;
+    return lr20xx_regmem_write_regmem32( context, LR20XX_RADIO_FIFO_TX_FIFO_SIZE_ADDRESS, &tx_fifo_size, 1 );
+}
+
+lr20xx_status_t lr20xx_radio_fifo_1024_byte_tx_fifo_store_retention_mem( const void* context,
+                                                                         uint8_t     retention_slot_address,
+                                                                         uint8_t     retention_slot_size )
+{
+    // Store the registers configuration for the TX FIFOs location in retention
+    RETURN_STATUS_ON_NOT_OK( lr20xx_system_add_register_to_retention_mem( context, retention_slot_address,
+                                                                          LR20XX_RADIO_FIFO_TX_FIFO_ADDRESS ) );
+
+    // Store the registers configuration for the TX FIFOs size in retention
+    return lr20xx_system_add_register_to_retention_mem( context, retention_slot_size,
+                                                        LR20XX_RADIO_FIFO_TX_FIFO_SIZE_ADDRESS );
+}
+
+lr20xx_status_t lr20xx_radio_fifo_configure_1024_byte_rx_fifo( const void* context )
+{
+    const uint32_t rx_fifo_1024_memory_address = 0x00804400;
+    RETURN_STATUS_ON_NOT_OK(
+        lr20xx_regmem_write_regmem32( context, LR20XX_RADIO_FIFO_RX_FIFO_ADDRESS, &rx_fifo_1024_memory_address, 1 ) );
+
+    const uint32_t rx_fifo_size = 0x000003E8;
+    return lr20xx_regmem_write_regmem32( context, LR20XX_RADIO_FIFO_RX_FIFO_SIZE_ADDRESS, &rx_fifo_size, 1 );
+}
+
+lr20xx_status_t lr20xx_radio_fifo_1024_byte_rx_fifo_store_retention_mem( const void* context,
+                                                                         uint8_t     retention_slot_address,
+                                                                         uint8_t     retention_slot_size )
+{
+    // Store the registers configuration for the RX FIFOs location in retention
+    RETURN_STATUS_ON_NOT_OK( lr20xx_system_add_register_to_retention_mem( context, retention_slot_address,
+                                                                          LR20XX_RADIO_FIFO_RX_FIFO_ADDRESS ) );
+
+    // Store the registers configuration for the RX FIFOs size in retention
+    return lr20xx_system_add_register_to_retention_mem( context, retention_slot_size,
+                                                        LR20XX_RADIO_FIFO_RX_FIFO_SIZE_ADDRESS );
 }
 
 /*

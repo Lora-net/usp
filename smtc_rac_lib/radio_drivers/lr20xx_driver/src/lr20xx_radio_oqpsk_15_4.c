@@ -102,7 +102,8 @@ lr20xx_status_t lr20xx_radio_oqpsk_15_4_set_params( const void*                 
         params->payload_length,
         ( uint8_t )( params->pbl_len_tx_in_bit >> 8 ),
         ( uint8_t )( params->pbl_len_tx_in_bit >> 0 ),
-        ( uint8_t )( ( params->address_filtering << 2 ) | params->fcs_mode ),
+        ( uint8_t )( ( params->address_filtering << 2 ) | ( params->bypass_rx_length_check == true ? 0x02 : 0x00 ) |
+                     params->fcs_mode ),
     };
 
     return ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_RADIO_OQPSK_15_4_SET_PKT_PARAMS_CMD_LENGTH, 0,

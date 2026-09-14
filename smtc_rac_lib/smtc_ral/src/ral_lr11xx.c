@@ -58,6 +58,19 @@
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
 
+#define BASE_BW_LIST RAL_LORA_BW_062_KHZ, RAL_LORA_BW_125_KHZ, RAL_LORA_BW_250_KHZ, RAL_LORA_BW_500_KHZ
+
+#if defined( LR1120 ) || defined( LR1121 )
+#define EXTRA_BW_LIST , RAL_LORA_BW_200_KHZ, RAL_LORA_BW_400_KHZ, RAL_LORA_BW_800_KHZ
+#else
+#define EXTRA_BW_LIST
+#endif
+
+const ral_lora_bw_t RAL_LR11XX_SUPPORTED_BW[] = { BASE_BW_LIST EXTRA_BW_LIST };
+
+const uint8_t RAL_LR11XX_SUPPORTED_BW_SIZE =
+    ( sizeof( RAL_LR11XX_SUPPORTED_BW ) / sizeof( RAL_LR11XX_SUPPORTED_BW[0] ) );
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE TYPES -----------------------------------------------------------
@@ -447,6 +460,113 @@ ral_status_t ral_lr11xx_get_pkt_payload( const void* context, uint16_t max_size_
     return status;
 }
 
+ral_status_t ral_lr11xx_get_pkt_size( const void* context, uint16_t* size_in_bytes )
+{
+    ral_status_t                    status                 = RAL_STATUS_ERROR;
+    lr11xx_radio_rx_buffer_status_t radio_rx_buffer_status = { 0 };
+
+    if( size_in_bytes == 0 )
+    {
+        return RAL_STATUS_ERROR;
+    }
+
+    status = ( ral_status_t ) lr11xx_radio_get_rx_buffer_status( context, &radio_rx_buffer_status );
+    if( status == RAL_STATUS_OK )
+    {
+        *size_in_bytes = radio_rx_buffer_status.pld_len_in_bytes;
+    }
+
+    return status;
+}
+
+ral_status_t ral_lr11xx_get_data_rx_buffer( const void* context, uint8_t* buffer, uint16_t size_in_bytes )
+{
+    ral_status_t                    status                 = RAL_STATUS_ERROR;
+    lr11xx_radio_rx_buffer_status_t radio_rx_buffer_status = { 0 };
+
+    if( size_in_bytes > UINT8_MAX )
+    {
+        return RAL_STATUS_ERROR;
+    }
+
+    status = ( ral_status_t ) lr11xx_radio_get_rx_buffer_status( context, &radio_rx_buffer_status );
+    if( status != RAL_STATUS_OK )
+    {
+        return status;
+    }
+
+    return ( ral_status_t ) lr11xx_regmem_read_buffer8( context, buffer, radio_rx_buffer_status.buffer_start_pointer,
+                                                        size_in_bytes );
+}
+
+ral_status_t ral_lr11xx_clear_rx_fifo( const void* context )
+{
+    ( void ) context;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_lr11xx_clear_tx_fifo( const void* context )
+{
+    ( void ) context;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_lr11xx_get_tx_fifo_level( const void* context, uint16_t* fifo_level )
+{
+    ( void ) context;     // Unused parameter
+    ( void ) fifo_level;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_lr11xx_get_rx_fifo_level( const void* context, uint16_t* fifo_level )
+{
+    ( void ) context;     // Unused parameter
+    ( void ) fifo_level;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_lr11xx_cfg_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_irq_enable,
+                                      ral_radio_fifo_flag_t tx_fifo_irq_enable, uint16_t rx_fifo_high_threshold,
+                                      uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
+                                      uint16_t tx_fifo_high_threshold )
+{
+    ( void ) context;                 // Unused parameter
+    ( void ) rx_fifo_irq_enable;      // Unused parameter
+    ( void ) tx_fifo_irq_enable;      // Unused parameter
+    ( void ) rx_fifo_high_threshold;  // Unused parameter
+    ( void ) tx_fifo_low_threshold;   // Unused parameter
+    ( void ) rx_fifo_low_threshold;   // Unused parameter
+    ( void ) tx_fifo_high_threshold;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_lr11xx_get_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                      ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    ( void ) context;        // Unused parameter
+    ( void ) rx_fifo_flags;  // Unused parameter
+    ( void ) tx_fifo_flags;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_lr11xx_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t rx_fifo_flags_to_clear,
+                                        ral_radio_fifo_flag_t tx_fifo_flags_to_clear )
+{
+    ( void ) context;                 // Unused parameter
+    ( void ) rx_fifo_flags_to_clear;  // Unused parameter
+    ( void ) tx_fifo_flags_to_clear;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
+ral_status_t ral_lr11xx_get_and_clear_fifo_irq( const void* context, ral_radio_fifo_flag_t* rx_fifo_flags,
+                                                ral_radio_fifo_flag_t* tx_fifo_flags )
+{
+    ( void ) context;        // Unused parameter
+    ( void ) rx_fifo_flags;  // Unused parameter
+    ( void ) tx_fifo_flags;  // Unused parameter
+    return RAL_STATUS_UNSUPPORTED_FEATURE;
+}
+
 ral_status_t ral_lr11xx_get_irq_status( const void* context, ral_irq_t* irq )
 {
     ral_status_t             status         = RAL_STATUS_ERROR;
@@ -758,6 +878,11 @@ uint32_t ral_lr11xx_get_flrc_time_on_air_in_us( const ral_flrc_pkt_params_t* pkt
 ral_status_t ral_lr11xx_set_gfsk_sync_word( const void* context, const uint8_t* sync_word, const uint8_t sync_word_len )
 {
     uint8_t sync_word_loc[8] = { 0 };
+
+    if( sync_word_len > sizeof( sync_word_loc ) )
+    {
+        return RAL_STATUS_ERROR;
+    }
 
     for( uint8_t i = 0; i < sync_word_len; i++ )
     {
@@ -1690,5 +1815,79 @@ ral_status_t ral_lr11xx_rttof_get_raw_result( const void* context, ral_lora_bw_t
 ral_status_t ral_lr11xx_rttof_set_address( const void* context, const uint32_t address, const uint8_t check_length )
 {
     return ( ral_status_t ) lr11xx_rttof_set_address( context, address, check_length );
+}
+
+ral_status_t ral_lr11xx_check_lora_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                               const ral_lora_pkt_params_t* pkt_params,
+                                               const ral_lora_mod_params_t* mod_params )
+{
+    if( ( rf_freq_in_hz < RAL_LR11XX_LF_HZ_MIN ) || ( rf_freq_in_hz > RAL_LR11XX_LF_HZ_MAX ) )
+    {
+        if( SUPPORT_2G4 )
+        {
+            if( ( rf_freq_in_hz < RAL_LR11XX_HF_HZ_MIN ) || ( rf_freq_in_hz > RAL_LR11XX_HF_HZ_MAX ) )
+            {
+                return RAL_STATUS_UNKNOWN_VALUE;
+            }
+        }
+        else
+        {
+            return RAL_STATUS_UNKNOWN_VALUE;
+        }
+    }
+
+    bool bw_supported = false;
+    for( uint8_t i = 0; i < RAL_LR11XX_SUPPORTED_BW_SIZE; i++ )
+    {
+        if( RAL_LR11XX_SUPPORTED_BW[i] == mod_params->bw )
+        {
+            bw_supported = true;
+            break;
+        }
+    }
+    if( !bw_supported )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    bool is_extra_bw = ( mod_params->bw == RAL_LORA_BW_200_KHZ ) || ( mod_params->bw == RAL_LORA_BW_400_KHZ ) ||
+                       ( mod_params->bw == RAL_LORA_BW_800_KHZ );
+
+    if( is_extra_bw )
+    {
+        bool is_hf_band = ( rf_freq_in_hz >= RAL_LR11XX_HF_HZ_MIN ) && ( rf_freq_in_hz <= RAL_LR11XX_HF_HZ_MAX );
+
+        if( !is_hf_band )
+        {
+            return RAL_STATUS_UNKNOWN_VALUE;
+        }
+    }
+
+    if( ( mod_params->sf < RAL_LORA_SF5 ) || ( mod_params->sf > RAL_LORA_SF12 ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( ( mod_params->cr < RAL_LORA_CR_4_5 ) || ( mod_params->cr > RAL_LORA_CR_LI_4_8 ) )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+
+    if( pkt_params->header_type > RAL_LORA_PKT_IMPLICIT )
+    {
+        return RAL_STATUS_UNKNOWN_VALUE;
+    }
+    return RAL_STATUS_OK;
+}
+
+ral_status_t ral_lr11xx_check_rttof_parameters( const void* context, const uint32_t rf_freq_in_hz,
+                                                const ral_lora_pkt_params_t* pkt_params,
+                                                const ral_lora_mod_params_t* mod_params )
+{
+    if( ( !SUPPORT_RTTOF_HF ) && ( !SUPPORT_RTTOF_LF ) )
+    {
+        return RAL_STATUS_UNSUPPORTED_FEATURE;
+    }
+    return ral_lr11xx_check_lora_parameters( context, rf_freq_in_hz, pkt_params, mod_params );
 }
 /* --- EOF ------------------------------------------------------------------ */

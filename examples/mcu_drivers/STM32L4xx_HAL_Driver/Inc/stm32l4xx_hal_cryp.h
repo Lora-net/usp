@@ -6,14 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
+  * This software is licensed under terms that can be found in the LICENSE file in
+  * the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   ******************************************************************************
   */
 
@@ -151,7 +149,11 @@ typedef enum
 /**
   * @brief  CRYP handle Structure definition
   */
+#if (USE_HAL_CRYP_REGISTER_CALLBACKS == 1)
 typedef struct __CRYP_HandleTypeDef
+#else
+typedef struct
+#endif /* USE_HAL_CRYP_REGISTER_CALLBACKS */
 {
       AES_TypeDef              *Instance;        /*!< Register base address        */
 
@@ -703,8 +705,8 @@ void HAL_CRYP_IRQHandler(CRYP_HandleTypeDef *hcryp);
   */
 
 /* Peripheral State functions  ************************************************/
-HAL_CRYP_STATETypeDef HAL_CRYP_GetState(CRYP_HandleTypeDef *hcryp);
-uint32_t              HAL_CRYP_GetError(CRYP_HandleTypeDef *hcryp);
+HAL_CRYP_STATETypeDef HAL_CRYP_GetState(const CRYP_HandleTypeDef *hcryp);
+uint32_t              HAL_CRYP_GetError(const CRYP_HandleTypeDef *hcryp);
 
 /**
   * @}
@@ -729,5 +731,3 @@ uint32_t              HAL_CRYP_GetError(CRYP_HandleTypeDef *hcryp);
 #endif
 
 #endif /* STM32L4xx_HAL_CRYP_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

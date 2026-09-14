@@ -71,6 +71,7 @@
 #define LORA_CODING_RATE RAL_LORA_CR_4_5
 #endif
 
+// Use 12 in case SF is 5 or 6
 #ifndef LORA_PREAMBLE_LENGTH
 #define LORA_PREAMBLE_LENGTH 8
 #endif

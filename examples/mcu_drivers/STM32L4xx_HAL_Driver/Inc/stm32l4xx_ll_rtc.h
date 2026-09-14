@@ -6,13 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -1525,7 +1524,7 @@ __STATIC_INLINE void LL_RTC_TIME_SetFormat(RTC_TypeDef *RTCx, uint32_t TimeForma
 
 /**
   * @brief  Get time format (AM or PM notation)
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note Read either RTC_SSR or RTC_TR locks the values in the higher-order calendar
   *       shadow registers until RTC_DR is read (LL_RTC_ReadReg(RTC, DR)).
@@ -1559,7 +1558,7 @@ __STATIC_INLINE void LL_RTC_TIME_SetHour(RTC_TypeDef *RTCx, uint32_t Hours)
 
 /**
   * @brief  Get Hours in BCD format
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note Read either RTC_SSR or RTC_TR locks the values in the higher-order calendar
   *       shadow registers until RTC_DR is read (LL_RTC_ReadReg(RTC, DR)).
@@ -1594,7 +1593,7 @@ __STATIC_INLINE void LL_RTC_TIME_SetMinute(RTC_TypeDef *RTCx, uint32_t Minutes)
 
 /**
   * @brief  Get Minutes in BCD format
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note Read either RTC_SSR or RTC_TR locks the values in the higher-order calendar
   *       shadow registers until RTC_DR is read (LL_RTC_ReadReg(RTC, DR)).
@@ -1629,7 +1628,7 @@ __STATIC_INLINE void LL_RTC_TIME_SetSecond(RTC_TypeDef *RTCx, uint32_t Seconds)
 
 /**
   * @brief  Get Seconds in BCD format
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note Read either RTC_SSR or RTC_TR locks the values in the higher-order calendar
   *       shadow registers until RTC_DR is read (LL_RTC_ReadReg(RTC, DR)).
@@ -1679,7 +1678,7 @@ __STATIC_INLINE void LL_RTC_TIME_Config(RTC_TypeDef *RTCx, uint32_t Format12_24,
 
 /**
   * @brief  Get time (hour, minute and second) in BCD format
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note Read either RTC_SSR or RTC_TR locks the values in the higher-order calendar
   *       shadow registers until RTC_DR is read (LL_RTC_ReadReg(RTC, DR)).
@@ -1826,7 +1825,7 @@ __STATIC_INLINE void LL_RTC_DATE_SetYear(RTC_TypeDef *RTCx, uint32_t Year)
 
 /**
   * @brief  Get Year in BCD format
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note helper macro __LL_RTC_CONVERT_BCD2BIN is available to convert Year from BCD to Binary format
   * @rmtoll RTC_DR           YT            LL_RTC_DATE_GetYear\n
@@ -1860,7 +1859,7 @@ __STATIC_INLINE void LL_RTC_DATE_SetWeekDay(RTC_TypeDef *RTCx, uint32_t WeekDay)
 
 /**
   * @brief  Get Week day
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @rmtoll RTC_DR           WDU           LL_RTC_DATE_GetWeekDay
   * @param  RTCx RTC Instance
@@ -1907,7 +1906,7 @@ __STATIC_INLINE void LL_RTC_DATE_SetMonth(RTC_TypeDef *RTCx, uint32_t Month)
 
 /**
   * @brief  Get Month in BCD format
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note helper macro __LL_RTC_CONVERT_BCD2BIN is available to convert Month from BCD to Binary format
   * @rmtoll RTC_DR           MT            LL_RTC_DATE_GetMonth\n
@@ -1949,7 +1948,7 @@ __STATIC_INLINE void LL_RTC_DATE_SetDay(RTC_TypeDef *RTCx, uint32_t Day)
 
 /**
   * @brief  Get Day in BCD format
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note helper macro __LL_RTC_CONVERT_BCD2BIN is available to convert Day from BCD to Binary format
   * @rmtoll RTC_DR           DT            LL_RTC_DATE_GetDay\n
@@ -2011,7 +2010,7 @@ __STATIC_INLINE void LL_RTC_DATE_Config(RTC_TypeDef *RTCx, uint32_t WeekDay, uin
 
 /**
   * @brief  Get date (WeekDay, Day, Month and Year) in BCD format
-  * @note if shadow mode is disabled (BYPSHAD=0), need to check if RSF flag is set
+  * @note if RTC shadow registers are not bypassed (BYPSHAD=0), need to check if RSF flag is set
   *       before reading this bit
   * @note helper macros __LL_RTC_GET_WEEKDAY, __LL_RTC_GET_YEAR, __LL_RTC_GET_MONTH,
   * and __LL_RTC_GET_DAY are available to get independently each parameter.
@@ -5573,5 +5572,3 @@ ErrorStatus LL_RTC_WaitForSynchro(RTC_TypeDef *RTCx);
 #endif
 
 #endif /* STM32L4xx_LL_RTC_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -6,13 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2017 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2017 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -58,6 +57,10 @@ static const uint16_t LPUART_PRESCALER_TAB[] =
   (uint16_t)32,
   (uint16_t)64,
   (uint16_t)128,
+  (uint16_t)256,
+  (uint16_t)256,
+  (uint16_t)256,
+  (uint16_t)256,
   (uint16_t)256
 };
 /**
@@ -103,37 +106,44 @@ typedef struct
   uint32_t PrescalerValue;            /*!< Specifies the Prescaler to compute the communication baud rate.
                                            This parameter can be a value of @ref LPUART_LL_EC_PRESCALER.
 
-                                           This feature can be modified afterwards using unitary function @ref LL_LPUART_SetPrescaler().*/
+                                           This feature can be modified afterwards using unitary
+                                           function @ref LL_LPUART_SetPrescaler().*/
 
 #endif /* USART_PRESC_PRESCALER */
   uint32_t BaudRate;                  /*!< This field defines expected LPUART communication baud rate.
 
-                                           This feature can be modified afterwards using unitary function @ref LL_LPUART_SetBaudRate().*/
+                                           This feature can be modified afterwards using unitary
+                                           function @ref LL_LPUART_SetBaudRate().*/
 
   uint32_t DataWidth;                 /*!< Specifies the number of data bits transmitted or received in a frame.
                                            This parameter can be a value of @ref LPUART_LL_EC_DATAWIDTH.
 
-                                           This feature can be modified afterwards using unitary function @ref LL_LPUART_SetDataWidth().*/
+                                           This feature can be modified afterwards using unitary
+                                           function @ref LL_LPUART_SetDataWidth().*/
 
   uint32_t StopBits;                  /*!< Specifies the number of stop bits transmitted.
                                            This parameter can be a value of @ref LPUART_LL_EC_STOPBITS.
 
-                                           This feature can be modified afterwards using unitary function @ref LL_LPUART_SetStopBitsLength().*/
+                                           This feature can be modified afterwards using unitary
+                                           function @ref LL_LPUART_SetStopBitsLength().*/
 
   uint32_t Parity;                    /*!< Specifies the parity mode.
                                            This parameter can be a value of @ref LPUART_LL_EC_PARITY.
 
-                                           This feature can be modified afterwards using unitary function @ref LL_LPUART_SetParity().*/
+                                           This feature can be modified afterwards using unitary
+                                           function @ref LL_LPUART_SetParity().*/
 
   uint32_t TransferDirection;         /*!< Specifies whether the Receive and/or Transmit mode is enabled or disabled.
                                            This parameter can be a value of @ref LPUART_LL_EC_DIRECTION.
 
-                                           This feature can be modified afterwards using unitary function @ref LL_LPUART_SetTransferDirection().*/
+                                           This feature can be modified afterwards using unitary
+                                           function @ref LL_LPUART_SetTransferDirection().*/
 
   uint32_t HardwareFlowControl;       /*!< Specifies whether the hardware flow control mode is enabled or disabled.
                                            This parameter can be a value of @ref LPUART_LL_EC_HWCONTROL.
 
-                                           This feature can be modified afterwards using unitary function @ref LL_LPUART_SetHWFlowCtrl().*/
+                                           This feature can be modified afterwards using unitary
+                                           function @ref LL_LPUART_SetHWFlowCtrl().*/
 
 } LL_LPUART_InitTypeDef;
 
@@ -151,18 +161,15 @@ typedef struct
   * @brief    Flags defines which can be used with LL_LPUART_WriteReg function
   * @{
   */
-#define LL_LPUART_ICR_PECF                 USART_ICR_PECF                /*!< Parity error flag */
-#define LL_LPUART_ICR_FECF                 USART_ICR_FECF                /*!< Framing error flag */
-#define LL_LPUART_ICR_NCF                  USART_ICR_NECF                /*!< Noise error detected flag */
-#define LL_LPUART_ICR_ORECF                USART_ICR_ORECF               /*!< Overrun error flag */
-#define LL_LPUART_ICR_IDLECF               USART_ICR_IDLECF              /*!< Idle line detected flag */
-#if defined(USART_CR1_FIFOEN)
-#define LL_LPUART_ICR_TXFECF               USART_ICR_TXFECF              /*!< TX FIFO Empty Clear flag */
-#endif /* USART_CR1_FIFOEN */
-#define LL_LPUART_ICR_TCCF                 USART_ICR_TCCF                /*!< Transmission complete flag */
-#define LL_LPUART_ICR_CTSCF                USART_ICR_CTSCF               /*!< CTS flag */
-#define LL_LPUART_ICR_CMCF                 USART_ICR_CMCF                /*!< Character match flag */
-#define LL_LPUART_ICR_WUCF                 USART_ICR_WUCF                /*!< Wakeup from Stop mode flag */
+#define LL_LPUART_ICR_PECF                 USART_ICR_PECF                /*!< Parity error clear flag */
+#define LL_LPUART_ICR_FECF                 USART_ICR_FECF                /*!< Framing error clear flag */
+#define LL_LPUART_ICR_NCF                  USART_ICR_NECF                /*!< Noise error detected clear flag */
+#define LL_LPUART_ICR_ORECF                USART_ICR_ORECF               /*!< Overrun error clear flag */
+#define LL_LPUART_ICR_IDLECF               USART_ICR_IDLECF              /*!< Idle line detected clear flag */
+#define LL_LPUART_ICR_TCCF                 USART_ICR_TCCF                /*!< Transmission complete clear flag */
+#define LL_LPUART_ICR_CTSCF                USART_ICR_CTSCF               /*!< CTS clear flag */
+#define LL_LPUART_ICR_CMCF                 USART_ICR_CMCF                /*!< Character match clear flag */
+#define LL_LPUART_ICR_WUCF                 USART_ICR_WUCF                /*!< Wakeup from Stop mode clear flag */
 /**
   * @}
   */
@@ -171,36 +178,36 @@ typedef struct
   * @brief    Flags defines which can be used with LL_LPUART_ReadReg function
   * @{
   */
-#define LL_LPUART_ISR_PE                   USART_ISR_PE                  /*!< Parity error flag */
-#define LL_LPUART_ISR_FE                   USART_ISR_FE                  /*!< Framing error flag */
-#define LL_LPUART_ISR_NE                   USART_ISR_NE                  /*!< Noise detected flag */
-#define LL_LPUART_ISR_ORE                  USART_ISR_ORE                 /*!< Overrun error flag */
-#define LL_LPUART_ISR_IDLE                 USART_ISR_IDLE                /*!< Idle line detected flag */
+#define LL_LPUART_ISR_PE               USART_ISR_PE         /*!< Parity error flag */
+#define LL_LPUART_ISR_FE               USART_ISR_FE         /*!< Framing error flag */
+#define LL_LPUART_ISR_NE               USART_ISR_NE         /*!< Noise detected flag */
+#define LL_LPUART_ISR_ORE              USART_ISR_ORE        /*!< Overrun error flag */
+#define LL_LPUART_ISR_IDLE             USART_ISR_IDLE       /*!< Idle line detected flag */
 #if defined(USART_CR1_FIFOEN)
-#define LL_LPUART_ISR_RXNE_RXFNE           USART_ISR_RXNE_RXFNE          /*!< Read data register or RX FIFO not empty flag */
+#define LL_LPUART_ISR_RXNE_RXFNE       USART_ISR_RXNE_RXFNE /*!< Read data register or RX FIFO not empty flag */
 #else
-#define LL_LPUART_ISR_RXNE                 USART_ISR_RXNE                /*!< Read data register not empty flag */
+#define LL_LPUART_ISR_RXNE             USART_ISR_RXNE       /*!< Read data register not empty flag */
 #endif /* USART_CR1_FIFOEN */
-#define LL_LPUART_ISR_TC                   USART_ISR_TC                  /*!< Transmission complete flag */
+#define LL_LPUART_ISR_TC               USART_ISR_TC         /*!< Transmission complete flag */
 #if defined(USART_CR1_FIFOEN)
-#define LL_LPUART_ISR_TXE_TXFNF            USART_ISR_TXE_TXFNF           /*!< Transmit data register empty or TX FIFO Not Full flag*/
+#define LL_LPUART_ISR_TXE_TXFNF        USART_ISR_TXE_TXFNF  /*!< Transmit data register empty or TX FIFO Not Full flag*/
 #else
-#define LL_LPUART_ISR_TXE                  USART_ISR_TXE                 /*!< Transmit data register empty flag */
+#define LL_LPUART_ISR_TXE              USART_ISR_TXE        /*!< Transmit data register empty flag */
 #endif /* USART_CR1_FIFOEN */
-#define LL_LPUART_ISR_CTSIF                USART_ISR_CTSIF               /*!< CTS interrupt flag */
-#define LL_LPUART_ISR_CTS                  USART_ISR_CTS                 /*!< CTS flag */
-#define LL_LPUART_ISR_BUSY                 USART_ISR_BUSY                /*!< Busy flag */
-#define LL_LPUART_ISR_CMF                  USART_ISR_CMF                 /*!< Character match flag */
-#define LL_LPUART_ISR_SBKF                 USART_ISR_SBKF                /*!< Send break flag */
-#define LL_LPUART_ISR_RWU                  USART_ISR_RWU                 /*!< Receiver wakeup from Mute mode flag */
-#define LL_LPUART_ISR_WUF                  USART_ISR_WUF                 /*!< Wakeup from Stop mode flag */
-#define LL_LPUART_ISR_TEACK                USART_ISR_TEACK               /*!< Transmit enable acknowledge flag */
-#define LL_LPUART_ISR_REACK                USART_ISR_REACK               /*!< Receive enable acknowledge flag */
+#define LL_LPUART_ISR_CTSIF            USART_ISR_CTSIF      /*!< CTS interrupt flag */
+#define LL_LPUART_ISR_CTS              USART_ISR_CTS        /*!< CTS flag */
+#define LL_LPUART_ISR_BUSY             USART_ISR_BUSY       /*!< Busy flag */
+#define LL_LPUART_ISR_CMF              USART_ISR_CMF        /*!< Character match flag */
+#define LL_LPUART_ISR_SBKF             USART_ISR_SBKF       /*!< Send break flag */
+#define LL_LPUART_ISR_RWU              USART_ISR_RWU        /*!< Receiver wakeup from Mute mode flag */
+#define LL_LPUART_ISR_WUF              USART_ISR_WUF        /*!< Wakeup from Stop mode flag */
+#define LL_LPUART_ISR_TEACK            USART_ISR_TEACK      /*!< Transmit enable acknowledge flag */
+#define LL_LPUART_ISR_REACK            USART_ISR_REACK      /*!< Receive enable acknowledge flag */
 #if defined(USART_CR1_FIFOEN)
-#define LL_LPUART_ISR_TXFE                 USART_ISR_TXFE                /*!< TX FIFO empty flag */
-#define LL_LPUART_ISR_RXFF                 USART_ISR_RXFF                /*!< RX FIFO full flag */
-#define LL_LPUART_ISR_RXFT                 USART_ISR_RXFT                /*!< RX FIFO threshold flag */
-#define LL_LPUART_ISR_TXFT                 USART_ISR_TXFT                /*!< TX FIFO threshold flag */
+#define LL_LPUART_ISR_TXFE             USART_ISR_TXFE       /*!< TX FIFO empty flag */
+#define LL_LPUART_ISR_RXFF             USART_ISR_RXFF       /*!< RX FIFO full flag */
+#define LL_LPUART_ISR_RXFT             USART_ISR_RXFT       /*!< RX FIFO threshold flag */
+#define LL_LPUART_ISR_TXFT             USART_ISR_TXFT       /*!< TX FIFO threshold flag */
 #endif /* USART_CR1_FIFOEN */
 /**
   * @}
@@ -210,30 +217,32 @@ typedef struct
   * @brief    IT defines which can be used with LL_LPUART_ReadReg and  LL_LPUART_WriteReg functions
   * @{
   */
-#define LL_LPUART_CR1_IDLEIE               USART_CR1_IDLEIE              /*!< IDLE interrupt enable */
+#define LL_LPUART_CR1_IDLEIE         USART_CR1_IDLEIE         /*!< IDLE interrupt enable */
 #if defined(USART_CR1_FIFOEN)
-#define LL_LPUART_CR1_RXNEIE_RXFNEIE       USART_CR1_RXNEIE_RXFNEIE      /*!< Read data register and RXFIFO not empty interrupt enable */
+#define LL_LPUART_CR1_RXNEIE_RXFNEIE USART_CR1_RXNEIE_RXFNEIE /*!< Read data register and RXFIFO not empty
+                                                                   interrupt enable */
 #else
-#define LL_LPUART_CR1_RXNEIE               USART_CR1_RXNEIE              /*!< Read data register not empty interrupt enable */
+#define LL_LPUART_CR1_RXNEIE         USART_CR1_RXNEIE         /*!< Read data register not empty interrupt enable */
 #endif /* USART_CR1_FIFOEN */
-#define LL_LPUART_CR1_TCIE                 USART_CR1_TCIE                /*!< Transmission complete interrupt enable */
+#define LL_LPUART_CR1_TCIE           USART_CR1_TCIE           /*!< Transmission complete interrupt enable */
 #if defined(USART_CR1_FIFOEN)
-#define LL_LPUART_CR1_TXEIE_TXFNFIE        USART_CR1_TXEIE_TXFNFIE       /*!< Transmit data register empty and TX FIFO not full interrupt enable */
+#define LL_LPUART_CR1_TXEIE_TXFNFIE  USART_CR1_TXEIE_TXFNFIE  /*!< Transmit data register empty and TX FIFO
+                                                                   not full interrupt enable */
 #else
-#define LL_LPUART_CR1_TXEIE                USART_CR1_TXEIE               /*!< Transmit data register empty interrupt enable */
+#define LL_LPUART_CR1_TXEIE          USART_CR1_TXEIE          /*!< Transmit data register empty interrupt enable */
 #endif /* USART_CR1_FIFOEN */
-#define LL_LPUART_CR1_PEIE                 USART_CR1_PEIE                /*!< Parity error */
-#define LL_LPUART_CR1_CMIE                 USART_CR1_CMIE                /*!< Character match interrupt enable */
+#define LL_LPUART_CR1_PEIE           USART_CR1_PEIE           /*!< Parity error */
+#define LL_LPUART_CR1_CMIE           USART_CR1_CMIE           /*!< Character match interrupt enable */
 #if defined(USART_CR1_FIFOEN)
-#define LL_LPUART_CR1_TXFEIE               USART_CR1_TXFEIE              /*!< TX FIFO empty interrupt enable */
-#define LL_LPUART_CR1_RXFFIE               USART_CR1_RXFFIE              /*!< RX FIFO full interrupt enable */
+#define LL_LPUART_CR1_TXFEIE         USART_CR1_TXFEIE         /*!< TX FIFO empty interrupt enable */
+#define LL_LPUART_CR1_RXFFIE         USART_CR1_RXFFIE         /*!< RX FIFO full interrupt enable */
 #endif /* USART_CR1_FIFOEN */
-#define LL_LPUART_CR3_EIE                  USART_CR3_EIE                 /*!< Error interrupt enable */
-#define LL_LPUART_CR3_CTSIE                USART_CR3_CTSIE               /*!< CTS interrupt enable */
-#define LL_LPUART_CR3_WUFIE                USART_CR3_WUFIE               /*!< Wakeup from Stop mode interrupt enable */
+#define LL_LPUART_CR3_EIE            USART_CR3_EIE            /*!< Error interrupt enable */
+#define LL_LPUART_CR3_CTSIE          USART_CR3_CTSIE          /*!< CTS interrupt enable */
+#define LL_LPUART_CR3_WUFIE          USART_CR3_WUFIE          /*!< Wakeup from Stop mode interrupt enable */
 #if defined(USART_CR1_FIFOEN)
-#define LL_LPUART_CR3_TXFTIE               USART_CR3_TXFTIE              /*!< TX FIFO threshold interrupt enable */
-#define LL_LPUART_CR3_RXFTIE               USART_CR3_RXFTIE              /*!< RX FIFO threshold interrupt enable */
+#define LL_LPUART_CR3_TXFTIE         USART_CR3_TXFTIE         /*!< TX FIFO threshold interrupt enable */
+#define LL_LPUART_CR3_RXFTIE         USART_CR3_RXFTIE         /*!< RX FIFO threshold interrupt enable */
 #endif /* USART_CR1_FIFOEN */
 /**
   * @}
@@ -257,10 +266,10 @@ typedef struct
 /** @defgroup LPUART_LL_EC_DIRECTION Direction
   * @{
   */
-#define LL_LPUART_DIRECTION_NONE           0x00000000U                        /*!< Transmitter and Receiver are disabled */
-#define LL_LPUART_DIRECTION_RX             USART_CR1_RE                       /*!< Transmitter is disabled and Receiver is enabled */
-#define LL_LPUART_DIRECTION_TX             USART_CR1_TE                       /*!< Transmitter is enabled and Receiver is disabled */
-#define LL_LPUART_DIRECTION_TX_RX          (USART_CR1_TE |USART_CR1_RE)       /*!< Transmitter and Receiver are enabled */
+#define LL_LPUART_DIRECTION_NONE  0x00000000U                  /*!< Transmitter and Receiver are disabled           */
+#define LL_LPUART_DIRECTION_RX    USART_CR1_RE                 /*!< Transmitter is disabled and Receiver is enabled */
+#define LL_LPUART_DIRECTION_TX    USART_CR1_TE                 /*!< Transmitter is enabled and Receiver is disabled */
+#define LL_LPUART_DIRECTION_TX_RX (USART_CR1_TE |USART_CR1_RE) /*!< Transmitter and Receiver are enabled            */
 /**
   * @}
   */
@@ -268,9 +277,9 @@ typedef struct
 /** @defgroup LPUART_LL_EC_PARITY Parity Control
   * @{
   */
-#define LL_LPUART_PARITY_NONE              0x00000000U                        /*!< Parity control disabled */
-#define LL_LPUART_PARITY_EVEN              USART_CR1_PCE                      /*!< Parity control enabled and Even Parity is selected */
-#define LL_LPUART_PARITY_ODD               (USART_CR1_PCE | USART_CR1_PS)     /*!< Parity control enabled and Odd Parity is selected */
+#define LL_LPUART_PARITY_NONE 0x00000000U                    /*!< Parity control disabled                            */
+#define LL_LPUART_PARITY_EVEN USART_CR1_PCE                  /*!< Parity control enabled and Even Parity is selected */
+#define LL_LPUART_PARITY_ODD  (USART_CR1_PCE | USART_CR1_PS) /*!< Parity control enabled and Odd Parity is selected  */
 /**
   * @}
   */
@@ -278,8 +287,8 @@ typedef struct
 /** @defgroup LPUART_LL_EC_WAKEUP Wakeup
   * @{
   */
-#define LL_LPUART_WAKEUP_IDLELINE          0x00000000U                        /*!<  LPUART wake up from Mute mode on Idle Line */
-#define LL_LPUART_WAKEUP_ADDRESSMARK       USART_CR1_WAKE                     /*!<  LPUART wake up from Mute mode on Address Mark */
+#define LL_LPUART_WAKEUP_IDLELINE    0x00000000U    /*!<  LPUART wake up from Mute mode on Idle Line    */
+#define LL_LPUART_WAKEUP_ADDRESSMARK USART_CR1_WAKE /*!<  LPUART wake up from Mute mode on Address Mark */
 /**
   * @}
   */
@@ -287,9 +296,9 @@ typedef struct
 /** @defgroup LPUART_LL_EC_DATAWIDTH Datawidth
   * @{
   */
-#define LL_LPUART_DATAWIDTH_7B             USART_CR1_M1                       /*!< 7 bits word length : Start bit, 7 data bits, n stop bits */
-#define LL_LPUART_DATAWIDTH_8B             0x00000000U                        /*!< 8 bits word length : Start bit, 8 data bits, n stop bits */
-#define LL_LPUART_DATAWIDTH_9B             USART_CR1_M0                       /*!< 9 bits word length : Start bit, 9 data bits, n stop bits */
+#define LL_LPUART_DATAWIDTH_7B USART_CR1_M1 /*!< 7 bits word length : Start bit, 7 data bits, n stop bits */
+#define LL_LPUART_DATAWIDTH_8B 0x00000000U  /*!< 8 bits word length : Start bit, 8 data bits, n stop bits */
+#define LL_LPUART_DATAWIDTH_9B USART_CR1_M0 /*!< 9 bits word length : Start bit, 9 data bits, n stop bits */
 /**
   * @}
   */
@@ -298,18 +307,27 @@ typedef struct
 /** @defgroup LPUART_LL_EC_PRESCALER Clock Source Prescaler
   * @{
   */
-#define LL_LPUART_PRESCALER_DIV1           0x00000000U                                                                   /*!< Input clock not devided   */
-#define LL_LPUART_PRESCALER_DIV2           (USART_PRESC_PRESCALER_0)                                                     /*!< Input clock devided by 2  */
-#define LL_LPUART_PRESCALER_DIV4           (USART_PRESC_PRESCALER_1)                                                     /*!< Input clock devided by 4  */
-#define LL_LPUART_PRESCALER_DIV6           (USART_PRESC_PRESCALER_1 | USART_PRESC_PRESCALER_0)                           /*!< Input clock devided by 6  */
-#define LL_LPUART_PRESCALER_DIV8           (USART_PRESC_PRESCALER_2)                                                     /*!< Input clock devided by 8  */
-#define LL_LPUART_PRESCALER_DIV10          (USART_PRESC_PRESCALER_2 | USART_PRESC_PRESCALER_0)                           /*!< Input clock devided by 10 */
-#define LL_LPUART_PRESCALER_DIV12          (USART_PRESC_PRESCALER_2 | USART_PRESC_PRESCALER_1)                           /*!< Input clock devided by 12 */
-#define LL_LPUART_PRESCALER_DIV16          (USART_PRESC_PRESCALER_2 | USART_PRESC_PRESCALER_1 | USART_PRESC_PRESCALER_0) /*!< Input clock devided by 16 */
-#define LL_LPUART_PRESCALER_DIV32          (USART_PRESC_PRESCALER_3)                                                     /*!< Input clock devided by 32 */
-#define LL_LPUART_PRESCALER_DIV64          (USART_PRESC_PRESCALER_3 | USART_PRESC_PRESCALER_0)                           /*!< Input clock devided by 64 */
-#define LL_LPUART_PRESCALER_DIV128         (USART_PRESC_PRESCALER_3 | USART_PRESC_PRESCALER_1)                           /*!< Input clock devided by 128 */
-#define LL_LPUART_PRESCALER_DIV256         (USART_PRESC_PRESCALER_3 | USART_PRESC_PRESCALER_1 | USART_PRESC_PRESCALER_0) /*!< Input clock devided by 256 */
+#define LL_LPUART_PRESCALER_DIV1   0x00000000U                    /*!< Input clock not divided   */
+#define LL_LPUART_PRESCALER_DIV2   (USART_PRESC_PRESCALER_0)      /*!< Input clock divided by 2  */
+#define LL_LPUART_PRESCALER_DIV4   (USART_PRESC_PRESCALER_1)      /*!< Input clock divided by 4  */
+#define LL_LPUART_PRESCALER_DIV6   (USART_PRESC_PRESCALER_1 |\
+                                    USART_PRESC_PRESCALER_0)      /*!< Input clock divided by 6  */
+#define LL_LPUART_PRESCALER_DIV8   (USART_PRESC_PRESCALER_2)      /*!< Input clock divided by 8  */
+#define LL_LPUART_PRESCALER_DIV10  (USART_PRESC_PRESCALER_2 |\
+                                    USART_PRESC_PRESCALER_0)      /*!< Input clock divided by 10 */
+#define LL_LPUART_PRESCALER_DIV12  (USART_PRESC_PRESCALER_2 |\
+                                    USART_PRESC_PRESCALER_1)      /*!< Input clock divided by 12 */
+#define LL_LPUART_PRESCALER_DIV16  (USART_PRESC_PRESCALER_2 |\
+                                    USART_PRESC_PRESCALER_1 |\
+                                    USART_PRESC_PRESCALER_0)      /*!< Input clock divided by 16 */
+#define LL_LPUART_PRESCALER_DIV32  (USART_PRESC_PRESCALER_3)      /*!< Input clock divided by 32 */
+#define LL_LPUART_PRESCALER_DIV64  (USART_PRESC_PRESCALER_3 |\
+                                    USART_PRESC_PRESCALER_0)      /*!< Input clock divided by 64 */
+#define LL_LPUART_PRESCALER_DIV128 (USART_PRESC_PRESCALER_3 |\
+                                    USART_PRESC_PRESCALER_1)      /*!< Input clock divided by 128 */
+#define LL_LPUART_PRESCALER_DIV256 (USART_PRESC_PRESCALER_3 |\
+                                    USART_PRESC_PRESCALER_1 |\
+                                    USART_PRESC_PRESCALER_0)      /*!< Input clock divided by 256 */
 /**
   * @}
   */
@@ -318,8 +336,8 @@ typedef struct
 /** @defgroup LPUART_LL_EC_STOPBITS Stop Bits
   * @{
   */
-#define LL_LPUART_STOPBITS_1               0x00000000U                        /*!< 1 stop bit */
-#define LL_LPUART_STOPBITS_2               USART_CR2_STOP_1                   /*!< 2 stop bits */
+#define LL_LPUART_STOPBITS_1         0x00000000U             /*!< 1 stop bit */
+#define LL_LPUART_STOPBITS_2         USART_CR2_STOP_1        /*!< 2 stop bits */
 /**
   * @}
   */
@@ -327,8 +345,8 @@ typedef struct
 /** @defgroup LPUART_LL_EC_TXRX TX RX Pins Swap
   * @{
   */
-#define LL_LPUART_TXRX_STANDARD            0x00000000U                        /*!< TX/RX pins are used as defined in standard pinout */
-#define LL_LPUART_TXRX_SWAPPED             (USART_CR2_SWAP)                   /*!< TX and RX pins functions are swapped.             */
+#define LL_LPUART_TXRX_STANDARD      0x00000000U        /*!< TX/RX pins are used as defined in standard pinout */
+#define LL_LPUART_TXRX_SWAPPED       (USART_CR2_SWAP)   /*!< TX and RX pins functions are swapped.             */
 /**
   * @}
   */
@@ -336,8 +354,8 @@ typedef struct
 /** @defgroup LPUART_LL_EC_RXPIN_LEVEL RX Pin Active Level Inversion
   * @{
   */
-#define LL_LPUART_RXPIN_LEVEL_STANDARD     0x00000000U                        /*!< RX pin signal works using the standard logic levels */
-#define LL_LPUART_RXPIN_LEVEL_INVERTED     (USART_CR2_RXINV)                  /*!< RX pin signal values are inverted.                  */
+#define LL_LPUART_RXPIN_LEVEL_STANDARD   0x00000000U       /*!< RX pin signal works using the standard logic levels */
+#define LL_LPUART_RXPIN_LEVEL_INVERTED   (USART_CR2_RXINV) /*!< RX pin signal values are inverted.                  */
 /**
   * @}
   */
@@ -345,8 +363,8 @@ typedef struct
 /** @defgroup LPUART_LL_EC_TXPIN_LEVEL TX Pin Active Level Inversion
   * @{
   */
-#define LL_LPUART_TXPIN_LEVEL_STANDARD     0x00000000U                        /*!< TX pin signal works using the standard logic levels */
-#define LL_LPUART_TXPIN_LEVEL_INVERTED     (USART_CR2_TXINV)                  /*!< TX pin signal values are inverted.                  */
+#define LL_LPUART_TXPIN_LEVEL_STANDARD  0x00000000U       /*!< TX pin signal works using the standard logic levels */
+#define LL_LPUART_TXPIN_LEVEL_INVERTED  (USART_CR2_TXINV) /*!< TX pin signal values are inverted.                  */
 /**
   * @}
   */
@@ -354,8 +372,11 @@ typedef struct
 /** @defgroup LPUART_LL_EC_BINARY_LOGIC Binary Data Inversion
   * @{
   */
-#define LL_LPUART_BINARY_LOGIC_POSITIVE    0x00000000U                        /*!< Logical data from the data register are send/received in positive/direct logic. (1=H, 0=L) */
-#define LL_LPUART_BINARY_LOGIC_NEGATIVE    USART_CR2_DATAINV                  /*!< Logical data from the data register are send/received in negative/inverse logic. (1=L, 0=H). The parity bit is also inverted. */
+#define LL_LPUART_BINARY_LOGIC_POSITIVE 0x00000000U       /*!< Logical data from the data register are send/received
+                                                               in positive/direct logic. (1=H, 0=L)                  */
+#define LL_LPUART_BINARY_LOGIC_NEGATIVE USART_CR2_DATAINV /*!< Logical data from the data register are send/received
+                                                               in negative/inverse logic. (1=L, 0=H).
+                                                               The parity bit is also inverted.                      */
 /**
   * @}
   */
@@ -363,8 +384,10 @@ typedef struct
 /** @defgroup LPUART_LL_EC_BITORDER Bit Order
   * @{
   */
-#define LL_LPUART_BITORDER_LSBFIRST        0x00000000U                        /*!< data is transmitted/received with data bit 0 first, following the start bit */
-#define LL_LPUART_BITORDER_MSBFIRST        USART_CR2_MSBFIRST                 /*!< data is transmitted/received with the MSB first, following the start bit */
+#define LL_LPUART_BITORDER_LSBFIRST 0x00000000U        /*!< data is transmitted/received with data bit 0 first,
+                                                            following the start bit */
+#define LL_LPUART_BITORDER_MSBFIRST USART_CR2_MSBFIRST /*!< data is transmitted/received with the MSB first,
+                                                            following the start bit */
 /**
   * @}
   */
@@ -372,8 +395,8 @@ typedef struct
 /** @defgroup LPUART_LL_EC_ADDRESS_DETECT Address Length Detection
   * @{
   */
-#define LL_LPUART_ADDRESS_DETECT_4B        0x00000000U                        /*!< 4-bit address detection method selected */
-#define LL_LPUART_ADDRESS_DETECT_7B        USART_CR2_ADDM7                    /*!< 7-bit address detection (in 8-bit data mode) method selected */
+#define LL_LPUART_ADDRESS_DETECT_4B 0x00000000U     /*!< 4-bit address detection method selected */
+#define LL_LPUART_ADDRESS_DETECT_7B USART_CR2_ADDM7 /*!< 7-bit address detection (in 8-bit data mode) method selected */
 /**
   * @}
   */
@@ -381,10 +404,12 @@ typedef struct
 /** @defgroup LPUART_LL_EC_HWCONTROL Hardware Control
   * @{
   */
-#define LL_LPUART_HWCONTROL_NONE           0x00000000U                        /*!< CTS and RTS hardware flow control disabled */
-#define LL_LPUART_HWCONTROL_RTS            USART_CR3_RTSE                     /*!< RTS output enabled, data is only requested when there is space in the receive buffer */
-#define LL_LPUART_HWCONTROL_CTS            USART_CR3_CTSE                     /*!< CTS mode enabled, data is only transmitted when the nCTS input is asserted (tied to 0) */
-#define LL_LPUART_HWCONTROL_RTS_CTS        (USART_CR3_RTSE | USART_CR3_CTSE)  /*!< CTS and RTS hardware flow control enabled */
+#define LL_LPUART_HWCONTROL_NONE    0x00000000U                       /*!< CTS and RTS hardware flow control disabled */
+#define LL_LPUART_HWCONTROL_RTS     USART_CR3_RTSE                    /*!< RTS output enabled, data is only requested
+                                                                           when there is space in the receive buffer  */
+#define LL_LPUART_HWCONTROL_CTS     USART_CR3_CTSE                    /*!< CTS mode enabled, data is only transmitted
+                                                                           when the nCTS input is asserted (tied to 0)*/
+#define LL_LPUART_HWCONTROL_RTS_CTS (USART_CR3_RTSE | USART_CR3_CTSE) /*!< CTS and RTS hardware flow control enabled  */
 /**
   * @}
   */
@@ -392,9 +417,9 @@ typedef struct
 /** @defgroup LPUART_LL_EC_WAKEUP_ON Wakeup Activation
   * @{
   */
-#define LL_LPUART_WAKEUP_ON_ADDRESS        0x00000000U                             /*!< Wake up active on address match */
-#define LL_LPUART_WAKEUP_ON_STARTBIT       USART_CR3_WUS_1                         /*!< Wake up active on Start bit detection */
-#define LL_LPUART_WAKEUP_ON_RXNE           (USART_CR3_WUS_0 | USART_CR3_WUS_1)     /*!< Wake up active on RXNE */
+#define LL_LPUART_WAKEUP_ON_ADDRESS   0x00000000U                          /*!< Wake up active on address match */
+#define LL_LPUART_WAKEUP_ON_STARTBIT  USART_CR3_WUS_1                      /*!< Wake up active on Start bit detection */
+#define LL_LPUART_WAKEUP_ON_RXNE      (USART_CR3_WUS_0 | USART_CR3_WUS_1)  /*!< Wake up active on RXNE */
 /**
   * @}
   */
@@ -402,8 +427,8 @@ typedef struct
 /** @defgroup LPUART_LL_EC_DE_POLARITY Driver Enable Polarity
   * @{
   */
-#define LL_LPUART_DE_POLARITY_HIGH         0x00000000U                        /*!< DE signal is active high */
-#define LL_LPUART_DE_POLARITY_LOW          USART_CR3_DEP                      /*!< DE signal is active low */
+#define LL_LPUART_DE_POLARITY_HIGH         0x00000000U    /*!< DE signal is active high */
+#define LL_LPUART_DE_POLARITY_LOW          USART_CR3_DEP  /*!< DE signal is active low */
 /**
   * @}
   */
@@ -411,8 +436,8 @@ typedef struct
 /** @defgroup LPUART_LL_EC_DMA_REG_DATA DMA Register Data
   * @{
   */
-#define LL_LPUART_DMA_REG_DATA_TRANSMIT    0x00000000U                       /*!< Get address of data register used for transmission */
-#define LL_LPUART_DMA_REG_DATA_RECEIVE     0x00000001U                       /*!< Get address of data register used for reception */
+#define LL_LPUART_DMA_REG_DATA_TRANSMIT    0x00000000U    /*!< Get address of data register used for transmission */
+#define LL_LPUART_DMA_REG_DATA_RECEIVE     0x00000001U    /*!< Get address of data register used for reception */
 /**
   * @}
   */
@@ -477,11 +502,13 @@ typedef struct
   * @retval LPUARTDIV value to be used for BRR register filling
   */
 #if defined(USART_PRESC_PRESCALER)
-#define __LL_LPUART_DIV(__PERIPHCLK__, __PRESCALER__, __BAUDRATE__) (uint32_t)((((((uint64_t)(__PERIPHCLK__)/(uint64_t)(LPUART_PRESCALER_TAB[(uint16_t)(__PRESCALER__)])) * LPUART_LPUARTDIV_FREQ_MUL)\
-                                                                                + (uint32_t)((__BAUDRATE__)/2U))/(__BAUDRATE__)) & LPUART_BRR_MASK)
+#define __LL_LPUART_DIV(__PERIPHCLK__, __PRESCALER__, __BAUDRATE__) (uint32_t)\
+  ((((((uint64_t)(__PERIPHCLK__)/(uint64_t)(LPUART_PRESCALER_TAB[(uint16_t)(__PRESCALER__)]))\
+      * LPUART_LPUARTDIV_FREQ_MUL) + (uint32_t)((__BAUDRATE__)/2U))/(__BAUDRATE__)) & LPUART_BRR_MASK)
 #else
-#define __LL_LPUART_DIV(__PERIPHCLK__, __BAUDRATE__) (uint32_t)(((((uint64_t)(__PERIPHCLK__)*LPUART_LPUARTDIV_FREQ_MUL) + (uint32_t)((__BAUDRATE__)/2U))/(__BAUDRATE__))\
-                                                                & LPUART_BRR_MASK)
+#define __LL_LPUART_DIV(__PERIPHCLK__, __BAUDRATE__) (uint32_t)\
+  (((((uint64_t)(__PERIPHCLK__)*LPUART_LPUARTDIV_FREQ_MUL) + (uint32_t)((__BAUDRATE__)/2U))/(__BAUDRATE__)) \
+   & LPUART_BRR_MASK)
 #endif /* USART_PRESC_PRESCALER */
 
 /**
@@ -537,7 +564,7 @@ __STATIC_INLINE void LL_LPUART_Disable(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabled(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabled(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_UE) == (USART_CR1_UE)) ? 1UL : 0UL);
 }
@@ -571,7 +598,7 @@ __STATIC_INLINE void LL_LPUART_DisableFIFO(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledFIFO(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledFIFO(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_FIFOEN) == (USART_CR1_FIFOEN)) ? 1UL : 0UL);
 }
@@ -591,7 +618,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledFIFO(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_SetTXFIFOThreshold(USART_TypeDef *LPUARTx, uint32_t Threshold)
 {
-  MODIFY_REG(LPUARTx->CR3, USART_CR3_TXFTCFG, Threshold << USART_CR3_TXFTCFG_Pos);
+  ATOMIC_MODIFY_REG(LPUARTx->CR3, USART_CR3_TXFTCFG, Threshold << USART_CR3_TXFTCFG_Pos);
 }
 
 /**
@@ -606,7 +633,7 @@ __STATIC_INLINE void LL_LPUART_SetTXFIFOThreshold(USART_TypeDef *LPUARTx, uint32
   *         @arg @ref LL_LPUART_FIFOTHRESHOLD_7_8
   *         @arg @ref LL_LPUART_FIFOTHRESHOLD_8_8
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetTXFIFOThreshold(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetTXFIFOThreshold(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR3, USART_CR3_TXFTCFG) >> USART_CR3_TXFTCFG_Pos);
 }
@@ -626,7 +653,7 @@ __STATIC_INLINE uint32_t LL_LPUART_GetTXFIFOThreshold(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_SetRXFIFOThreshold(USART_TypeDef *LPUARTx, uint32_t Threshold)
 {
-  MODIFY_REG(LPUARTx->CR3, USART_CR3_RXFTCFG, Threshold << USART_CR3_RXFTCFG_Pos);
+  ATOMIC_MODIFY_REG(LPUARTx->CR3, USART_CR3_RXFTCFG, Threshold << USART_CR3_RXFTCFG_Pos);
 }
 
 /**
@@ -641,7 +668,7 @@ __STATIC_INLINE void LL_LPUART_SetRXFIFOThreshold(USART_TypeDef *LPUARTx, uint32
   *         @arg @ref LL_LPUART_FIFOTHRESHOLD_7_8
   *         @arg @ref LL_LPUART_FIFOTHRESHOLD_8_8
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetRXFIFOThreshold(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetRXFIFOThreshold(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR3, USART_CR3_RXFTCFG) >> USART_CR3_RXFTCFG_Pos);
 }
@@ -669,7 +696,8 @@ __STATIC_INLINE uint32_t LL_LPUART_GetRXFIFOThreshold(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_ConfigFIFOsThreshold(USART_TypeDef *LPUARTx, uint32_t TXThreshold, uint32_t RXThreshold)
 {
-  MODIFY_REG(LPUARTx->CR3, USART_CR3_TXFTCFG | USART_CR3_RXFTCFG, (TXThreshold << USART_CR3_TXFTCFG_Pos) | (RXThreshold << USART_CR3_RXFTCFG_Pos));
+  ATOMIC_MODIFY_REG(LPUARTx->CR3, USART_CR3_TXFTCFG | USART_CR3_RXFTCFG, (TXThreshold << USART_CR3_TXFTCFG_Pos) | \
+                    (RXThreshold << USART_CR3_RXFTCFG_Pos));
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -683,7 +711,7 @@ __STATIC_INLINE void LL_LPUART_ConfigFIFOsThreshold(USART_TypeDef *LPUARTx, uint
   */
 __STATIC_INLINE void LL_LPUART_EnableInStopMode(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_UESM);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_UESM);
 }
 
 /**
@@ -695,7 +723,7 @@ __STATIC_INLINE void LL_LPUART_EnableInStopMode(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableInStopMode(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_UESM);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_UESM);
 }
 
 /**
@@ -705,7 +733,7 @@ __STATIC_INLINE void LL_LPUART_DisableInStopMode(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledInStopMode(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledInStopMode(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_UESM) == (USART_CR1_UESM)) ? 1UL : 0UL);
 }
@@ -720,7 +748,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledInStopMode(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableClockInStopMode(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR3, USART_CR3_UCESM);
+  ATOMIC_SET_BIT(LPUARTx->CR3, USART_CR3_UCESM);
 }
 
 /**
@@ -732,7 +760,7 @@ __STATIC_INLINE void LL_LPUART_EnableClockInStopMode(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableClockInStopMode(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR3, USART_CR3_UCESM);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR3, USART_CR3_UCESM);
 }
 
 /**
@@ -741,7 +769,7 @@ __STATIC_INLINE void LL_LPUART_DisableClockInStopMode(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsClockEnabledInStopMode(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsClockEnabledInStopMode(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_UCESM) == (USART_CR3_UCESM)) ? 1UL : 0UL);
 }
@@ -755,7 +783,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsClockEnabledInStopMode(USART_TypeDef *LPUAR
   */
 __STATIC_INLINE void LL_LPUART_EnableDirectionRx(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_RE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_RE);
 }
 
 /**
@@ -766,7 +794,7 @@ __STATIC_INLINE void LL_LPUART_EnableDirectionRx(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableDirectionRx(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_RE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_RE);
 }
 
 /**
@@ -777,7 +805,7 @@ __STATIC_INLINE void LL_LPUART_DisableDirectionRx(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableDirectionTx(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_TE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_TE);
 }
 
 /**
@@ -788,7 +816,7 @@ __STATIC_INLINE void LL_LPUART_EnableDirectionTx(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableDirectionTx(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_TE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_TE);
 }
 
 /**
@@ -806,7 +834,7 @@ __STATIC_INLINE void LL_LPUART_DisableDirectionTx(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_SetTransferDirection(USART_TypeDef *LPUARTx, uint32_t TransferDirection)
 {
-  MODIFY_REG(LPUARTx->CR1, USART_CR1_RE | USART_CR1_TE, TransferDirection);
+  ATOMIC_MODIFY_REG(LPUARTx->CR1, USART_CR1_RE | USART_CR1_TE, TransferDirection);
 }
 
 /**
@@ -820,7 +848,7 @@ __STATIC_INLINE void LL_LPUART_SetTransferDirection(USART_TypeDef *LPUARTx, uint
   *         @arg @ref LL_LPUART_DIRECTION_TX
   *         @arg @ref LL_LPUART_DIRECTION_TX_RX
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetTransferDirection(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetTransferDirection(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR1, USART_CR1_RE | USART_CR1_TE));
 }
@@ -854,7 +882,7 @@ __STATIC_INLINE void LL_LPUART_SetParity(USART_TypeDef *LPUARTx, uint32_t Parity
   *         @arg @ref LL_LPUART_PARITY_EVEN
   *         @arg @ref LL_LPUART_PARITY_ODD
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetParity(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetParity(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR1, USART_CR1_PS | USART_CR1_PCE));
 }
@@ -881,7 +909,7 @@ __STATIC_INLINE void LL_LPUART_SetWakeUpMethod(USART_TypeDef *LPUARTx, uint32_t 
   *         @arg @ref LL_LPUART_WAKEUP_IDLELINE
   *         @arg @ref LL_LPUART_WAKEUP_ADDRESSMARK
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetWakeUpMethod(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetWakeUpMethod(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR1, USART_CR1_WAKE));
 }
@@ -910,7 +938,7 @@ __STATIC_INLINE void LL_LPUART_SetDataWidth(USART_TypeDef *LPUARTx, uint32_t Dat
   *         @arg @ref LL_LPUART_DATAWIDTH_8B
   *         @arg @ref LL_LPUART_DATAWIDTH_9B
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetDataWidth(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetDataWidth(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR1, USART_CR1_M));
 }
@@ -923,7 +951,7 @@ __STATIC_INLINE uint32_t LL_LPUART_GetDataWidth(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableMuteMode(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_MME);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_MME);
 }
 
 /**
@@ -934,7 +962,7 @@ __STATIC_INLINE void LL_LPUART_EnableMuteMode(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableMuteMode(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_MME);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_MME);
 }
 
 /**
@@ -943,7 +971,7 @@ __STATIC_INLINE void LL_LPUART_DisableMuteMode(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledMuteMode(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledMuteMode(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_MME) == (USART_CR1_MME)) ? 1UL : 0UL);
 }
@@ -991,7 +1019,7 @@ __STATIC_INLINE void LL_LPUART_SetPrescaler(USART_TypeDef *LPUARTx, uint32_t Pre
   *         @arg @ref LL_LPUART_PRESCALER_DIV128
   *         @arg @ref LL_LPUART_PRESCALER_DIV256
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetPrescaler(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetPrescaler(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->PRESC, USART_PRESC_PRESCALER));
 }
@@ -1019,7 +1047,7 @@ __STATIC_INLINE void LL_LPUART_SetStopBitsLength(USART_TypeDef *LPUARTx, uint32_
   *         @arg @ref LL_LPUART_STOPBITS_1
   *         @arg @ref LL_LPUART_STOPBITS_2
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetStopBitsLength(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetStopBitsLength(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR2, USART_CR2_STOP));
 }
@@ -1077,7 +1105,7 @@ __STATIC_INLINE void LL_LPUART_SetTXRXSwap(USART_TypeDef *LPUARTx, uint32_t Swap
   *         @arg @ref LL_LPUART_TXRX_STANDARD
   *         @arg @ref LL_LPUART_TXRX_SWAPPED
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetTXRXSwap(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetTXRXSwap(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR2, USART_CR2_SWAP));
 }
@@ -1104,7 +1132,7 @@ __STATIC_INLINE void LL_LPUART_SetRXPinLevel(USART_TypeDef *LPUARTx, uint32_t Pi
   *         @arg @ref LL_LPUART_RXPIN_LEVEL_STANDARD
   *         @arg @ref LL_LPUART_RXPIN_LEVEL_INVERTED
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetRXPinLevel(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetRXPinLevel(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR2, USART_CR2_RXINV));
 }
@@ -1131,7 +1159,7 @@ __STATIC_INLINE void LL_LPUART_SetTXPinLevel(USART_TypeDef *LPUARTx, uint32_t Pi
   *         @arg @ref LL_LPUART_TXPIN_LEVEL_STANDARD
   *         @arg @ref LL_LPUART_TXPIN_LEVEL_INVERTED
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetTXPinLevel(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetTXPinLevel(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR2, USART_CR2_TXINV));
 }
@@ -1161,7 +1189,7 @@ __STATIC_INLINE void LL_LPUART_SetBinaryDataLogic(USART_TypeDef *LPUARTx, uint32
   *         @arg @ref LL_LPUART_BINARY_LOGIC_POSITIVE
   *         @arg @ref LL_LPUART_BINARY_LOGIC_NEGATIVE
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetBinaryDataLogic(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetBinaryDataLogic(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR2, USART_CR2_DATAINV));
 }
@@ -1192,7 +1220,7 @@ __STATIC_INLINE void LL_LPUART_SetTransferBitOrder(USART_TypeDef *LPUARTx, uint3
   *         @arg @ref LL_LPUART_BITORDER_LSBFIRST
   *         @arg @ref LL_LPUART_BITORDER_MSBFIRST
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetTransferBitOrder(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetTransferBitOrder(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR2, USART_CR2_MSBFIRST));
 }
@@ -1236,7 +1264,7 @@ __STATIC_INLINE void LL_LPUART_ConfigNodeAddress(USART_TypeDef *LPUARTx, uint32_
   * @param  LPUARTx LPUART Instance
   * @retval Address of the LPUART node (Value between Min_Data=0 and Max_Data=255)
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetNodeAddress(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetNodeAddress(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR2, USART_CR2_ADD) >> USART_CR2_ADD_Pos);
 }
@@ -1249,7 +1277,7 @@ __STATIC_INLINE uint32_t LL_LPUART_GetNodeAddress(USART_TypeDef *LPUARTx)
   *         @arg @ref LL_LPUART_ADDRESS_DETECT_4B
   *         @arg @ref LL_LPUART_ADDRESS_DETECT_7B
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetNodeAddressLen(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetNodeAddressLen(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR2, USART_CR2_ADDM7));
 }
@@ -1326,7 +1354,7 @@ __STATIC_INLINE void LL_LPUART_SetHWFlowCtrl(USART_TypeDef *LPUARTx, uint32_t Ha
   *         @arg @ref LL_LPUART_HWCONTROL_CTS
   *         @arg @ref LL_LPUART_HWCONTROL_RTS_CTS
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetHWFlowCtrl(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetHWFlowCtrl(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR3, USART_CR3_RTSE | USART_CR3_CTSE));
 }
@@ -1359,7 +1387,7 @@ __STATIC_INLINE void LL_LPUART_DisableOverrunDetect(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledOverrunDetect(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledOverrunDetect(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_OVRDIS) != USART_CR3_OVRDIS) ? 1UL : 0UL);
 }
@@ -1388,7 +1416,7 @@ __STATIC_INLINE void LL_LPUART_SetWKUPType(USART_TypeDef *LPUARTx, uint32_t Type
   *         @arg @ref LL_LPUART_WAKEUP_ON_STARTBIT
   *         @arg @ref LL_LPUART_WAKEUP_ON_RXNE
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetWKUPType(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetWKUPType(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR3, USART_CR3_WUS));
 }
@@ -1432,9 +1460,15 @@ __STATIC_INLINE void LL_LPUART_SetBaudRate(USART_TypeDef *LPUARTx, uint32_t Peri
 #endif /* USART_PRESC_PRESCALER */
 {
 #if defined(USART_PRESC_PRESCALER)
-  LPUARTx->BRR = __LL_LPUART_DIV(PeriphClk, PrescalerValue, BaudRate);
+  if (BaudRate != 0U)
+  {
+    LPUARTx->BRR = __LL_LPUART_DIV(PeriphClk, PrescalerValue, BaudRate);
+  }
 #else
-  LPUARTx->BRR = __LL_LPUART_DIV(PeriphClk, BaudRate);
+  if (BaudRate != 0U)
+  {
+    LPUARTx->BRR = __LL_LPUART_DIV(PeriphClk, BaudRate);
+  }
 #endif /* USART_PRESC_PRESCALER */
 }
 
@@ -1463,9 +1497,10 @@ __STATIC_INLINE void LL_LPUART_SetBaudRate(USART_TypeDef *LPUARTx, uint32_t Peri
   * @retval Baud Rate
   */
 #if defined(USART_PRESC_PRESCALER)
-__STATIC_INLINE uint32_t LL_LPUART_GetBaudRate(USART_TypeDef *LPUARTx, uint32_t PeriphClk, uint32_t PrescalerValue)
+__STATIC_INLINE uint32_t LL_LPUART_GetBaudRate(const USART_TypeDef *LPUARTx, uint32_t PeriphClk,
+                                               uint32_t PrescalerValue)
 #else
-__STATIC_INLINE uint32_t LL_LPUART_GetBaudRate(USART_TypeDef *LPUARTx, uint32_t PeriphClk)
+__STATIC_INLINE uint32_t LL_LPUART_GetBaudRate(const USART_TypeDef *LPUARTx, uint32_t PeriphClk)
 #endif /* USART_PRESC_PRESCALER */
 {
   uint32_t lpuartdiv;
@@ -1528,7 +1563,7 @@ __STATIC_INLINE void LL_LPUART_DisableHalfDuplex(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledHalfDuplex(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledHalfDuplex(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_HDSEL) == (USART_CR3_HDSEL)) ? 1UL : 0UL);
 }
@@ -1559,7 +1594,7 @@ __STATIC_INLINE void LL_LPUART_SetDEDeassertionTime(USART_TypeDef *LPUARTx, uint
   * @param  LPUARTx LPUART Instance
   * @retval Time value expressed on 5 bits ([4:0] bits) : c
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetDEDeassertionTime(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetDEDeassertionTime(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR1, USART_CR1_DEDT) >> USART_CR1_DEDT_Pos);
 }
@@ -1582,7 +1617,7 @@ __STATIC_INLINE void LL_LPUART_SetDEAssertionTime(USART_TypeDef *LPUARTx, uint32
   * @param  LPUARTx LPUART Instance
   * @retval Time value expressed on 5 bits ([4:0] bits) : Time Value between Min_Data=0 and Max_Data=31
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetDEAssertionTime(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetDEAssertionTime(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR1, USART_CR1_DEAT) >> USART_CR1_DEAT_Pos);
 }
@@ -1615,7 +1650,7 @@ __STATIC_INLINE void LL_LPUART_DisableDEMode(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledDEMode(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledDEMode(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_DEM) == (USART_CR3_DEM)) ? 1UL : 0UL);
 }
@@ -1642,7 +1677,7 @@ __STATIC_INLINE void LL_LPUART_SetDESignalPolarity(USART_TypeDef *LPUARTx, uint3
   *         @arg @ref LL_LPUART_DE_POLARITY_HIGH
   *         @arg @ref LL_LPUART_DE_POLARITY_LOW
   */
-__STATIC_INLINE uint32_t LL_LPUART_GetDESignalPolarity(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_GetDESignalPolarity(const USART_TypeDef *LPUARTx)
 {
   return (uint32_t)(READ_BIT(LPUARTx->CR3, USART_CR3_DEP));
 }
@@ -1661,7 +1696,7 @@ __STATIC_INLINE uint32_t LL_LPUART_GetDESignalPolarity(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_PE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_PE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_PE) == (USART_ISR_PE)) ? 1UL : 0UL);
 }
@@ -1672,7 +1707,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_PE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_FE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_FE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_FE) == (USART_ISR_FE)) ? 1UL : 0UL);
 }
@@ -1683,7 +1718,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_FE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_NE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_NE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_NE) == (USART_ISR_NE)) ? 1UL : 0UL);
 }
@@ -1694,7 +1729,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_NE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_ORE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_ORE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_ORE) == (USART_ISR_ORE)) ? 1UL : 0UL);
 }
@@ -1705,14 +1740,13 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_ORE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_IDLE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_IDLE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_IDLE) == (USART_ISR_IDLE)) ? 1UL : 0UL);
 }
 
 #if defined(USART_CR1_FIFOEN)
-/* Legacy define */
-#define LL_LPUART_IsActiveFlag_RXNE  LL_LPUART_IsActiveFlag_RXNE_RXFNE
+#define LL_LPUART_IsActiveFlag_RXNE  LL_LPUART_IsActiveFlag_RXNE_RXFNE /* Redefinition for legacy purpose */
 
 /**
   * @brief  Check if the LPUART Read Data Register or LPUART RX FIFO Not Empty Flag is set or not
@@ -1720,7 +1754,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_IDLE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXNE_RXFNE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXNE_RXFNE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_RXNE_RXFNE) == (USART_ISR_RXNE_RXFNE)) ? 1UL : 0UL);
 }
@@ -1731,7 +1765,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXNE_RXFNE(USART_TypeDef *LPUART
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXNE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXNE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_RXNE) == (USART_ISR_RXNE)) ? 1UL : 0UL);
 }
@@ -1743,14 +1777,13 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXNE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TC(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TC(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_TC) == (USART_ISR_TC)) ? 1UL : 0UL);
 }
 
 #if defined(USART_CR1_FIFOEN)
-/* Legacy define */
-#define LL_LPUART_IsActiveFlag_TXE  LL_LPUART_IsActiveFlag_TXE_TXFNF
+#define LL_LPUART_IsActiveFlag_TXE  LL_LPUART_IsActiveFlag_TXE_TXFNF /* Redefinition for legacy purpose */
 
 /**
   * @brief  Check if the LPUART Transmit Data Register Empty or LPUART TX FIFO Not Full Flag is set or not
@@ -1758,7 +1791,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TC(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXE_TXFNF(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXE_TXFNF(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_TXE_TXFNF) == (USART_ISR_TXE_TXFNF)) ? 1UL : 0UL);
 }
@@ -1769,7 +1802,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXE_TXFNF(USART_TypeDef *LPUARTx
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_TXE) == (USART_ISR_TXE)) ? 1UL : 0UL);
 }
@@ -1781,7 +1814,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_nCTS(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_nCTS(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_CTSIF) == (USART_ISR_CTSIF)) ? 1UL : 0UL);
 }
@@ -1792,7 +1825,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_nCTS(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_CTS(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_CTS(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_CTS) == (USART_ISR_CTS)) ? 1UL : 0UL);
 }
@@ -1803,7 +1836,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_CTS(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_BUSY(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_BUSY(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_BUSY) == (USART_ISR_BUSY)) ? 1UL : 0UL);
 }
@@ -1814,7 +1847,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_BUSY(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_CM(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_CM(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_CMF) == (USART_ISR_CMF)) ? 1UL : 0UL);
 }
@@ -1825,7 +1858,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_CM(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_SBK(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_SBK(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_SBKF) == (USART_ISR_SBKF)) ? 1UL : 0UL);
 }
@@ -1836,7 +1869,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_SBK(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RWU(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RWU(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_RWU) == (USART_ISR_RWU)) ? 1UL : 0UL);
 }
@@ -1847,7 +1880,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RWU(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_WKUP(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_WKUP(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_WUF) == (USART_ISR_WUF)) ? 1UL : 0UL);
 }
@@ -1858,7 +1891,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_WKUP(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TEACK(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TEACK(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_TEACK) == (USART_ISR_TEACK)) ? 1UL : 0UL);
 }
@@ -1869,7 +1902,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TEACK(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_REACK(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_REACK(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_REACK) == (USART_ISR_REACK)) ? 1UL : 0UL);
 }
@@ -1881,7 +1914,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_REACK(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXFE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXFE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_TXFE) == (USART_ISR_TXFE)) ? 1UL : 0UL);
 }
@@ -1892,7 +1925,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXFE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXFF(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXFF(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_RXFF) == (USART_ISR_RXFF)) ? 1UL : 0UL);
 }
@@ -1903,7 +1936,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXFF(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXFT(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXFT(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_TXFT) == (USART_ISR_TXFT)) ? 1UL : 0UL);
 }
@@ -1914,7 +1947,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_TXFT(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXFT(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsActiveFlag_RXFT(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->ISR, USART_ISR_RXFT) == (USART_ISR_RXFT)) ? 1UL : 0UL);
 }
@@ -1974,19 +2007,6 @@ __STATIC_INLINE void LL_LPUART_ClearFlag_IDLE(USART_TypeDef *LPUARTx)
 {
   WRITE_REG(LPUARTx->ICR, USART_ICR_IDLECF);
 }
-
-#if defined(USART_CR1_FIFOEN)
-/**
-  * @brief  Clear TX FIFO Empty Flag
-  * @rmtoll ICR          TXFECF        LL_LPUART_ClearFlag_TXFE
-  * @param  LPUARTx LPUART Instance
-  * @retval None
-  */
-__STATIC_INLINE void LL_LPUART_ClearFlag_TXFE(USART_TypeDef *LPUARTx)
-{
-  WRITE_REG(LPUARTx->ICR, USART_ICR_TXFECF);
-}
-#endif /* USART_CR1_FIFOEN */
 
 /**
   * @brief  Clear Transmission Complete Flag
@@ -2048,12 +2068,11 @@ __STATIC_INLINE void LL_LPUART_ClearFlag_WKUP(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_IDLE(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_IDLEIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_IDLEIE);
 }
 
 #if defined(USART_CR1_FIFOEN)
-/* Legacy define */
-#define LL_LPUART_EnableIT_RXNE  LL_LPUART_EnableIT_RXNE_RXFNE
+#define LL_LPUART_EnableIT_RXNE  LL_LPUART_EnableIT_RXNE_RXFNE /* Redefinition for legacy purpose */
 
 /**
   * @brief  Enable RX Not Empty and RX FIFO Not Empty Interrupt
@@ -2063,7 +2082,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_IDLE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_RXNE_RXFNE(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_RXNEIE_RXFNEIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_RXNEIE_RXFNEIE);
 }
 #else
 
@@ -2075,7 +2094,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_RXNE_RXFNE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_RXNE(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_RXNEIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_RXNEIE);
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -2087,12 +2106,11 @@ __STATIC_INLINE void LL_LPUART_EnableIT_RXNE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_TC(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_TCIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_TCIE);
 }
 
 #if defined(USART_CR1_FIFOEN)
-/* Legacy define */
-#define LL_LPUART_EnableIT_TXE  LL_LPUART_EnableIT_TXE_TXFNF
+#define LL_LPUART_EnableIT_TXE  LL_LPUART_EnableIT_TXE_TXFNF /* Redefinition for legacy purpose */
 
 /**
   * @brief  Enable TX Empty and TX FIFO Not Full Interrupt
@@ -2102,7 +2120,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_TC(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_TXE_TXFNF(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_TXEIE_TXFNFIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_TXEIE_TXFNFIE);
 }
 #else
 
@@ -2114,7 +2132,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_TXE_TXFNF(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_TXE(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_TXEIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_TXEIE);
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -2126,7 +2144,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_TXE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_PE(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_PEIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_PEIE);
 }
 
 /**
@@ -2137,7 +2155,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_PE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_CM(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_CMIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_CMIE);
 }
 
 #if defined(USART_CR1_FIFOEN)
@@ -2149,7 +2167,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_CM(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_TXFE(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_TXFEIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_TXFEIE);
 }
 
 /**
@@ -2160,7 +2178,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_TXFE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_RXFF(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR1, USART_CR1_RXFFIE);
+  ATOMIC_SET_BIT(LPUARTx->CR1, USART_CR1_RXFFIE);
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -2176,7 +2194,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_RXFF(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_ERROR(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR3, USART_CR3_EIE);
+  ATOMIC_SET_BIT(LPUARTx->CR3, USART_CR3_EIE);
 }
 
 /**
@@ -2187,7 +2205,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_ERROR(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_CTS(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR3, USART_CR3_CTSIE);
+  ATOMIC_SET_BIT(LPUARTx->CR3, USART_CR3_CTSIE);
 }
 
 /**
@@ -2198,7 +2216,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_CTS(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_WKUP(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR3, USART_CR3_WUFIE);
+  ATOMIC_SET_BIT(LPUARTx->CR3, USART_CR3_WUFIE);
 }
 
 #if defined(USART_CR1_FIFOEN)
@@ -2210,7 +2228,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_WKUP(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_TXFT(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR3, USART_CR3_TXFTIE);
+  ATOMIC_SET_BIT(LPUARTx->CR3, USART_CR3_TXFTIE);
 }
 
 /**
@@ -2221,7 +2239,7 @@ __STATIC_INLINE void LL_LPUART_EnableIT_TXFT(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableIT_RXFT(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR3, USART_CR3_RXFTIE);
+  ATOMIC_SET_BIT(LPUARTx->CR3, USART_CR3_RXFTIE);
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -2233,12 +2251,11 @@ __STATIC_INLINE void LL_LPUART_EnableIT_RXFT(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_IDLE(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_IDLEIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_IDLEIE);
 }
 
 #if defined(USART_CR1_FIFOEN)
-/* Legacy define */
-#define LL_LPUART_DisableIT_RXNE  LL_LPUART_DisableIT_RXNE_RXFNE
+#define LL_LPUART_DisableIT_RXNE  LL_LPUART_DisableIT_RXNE_RXFNE /* Redefinition for legacy purpose */
 
 /**
   * @brief  Disable RX Not Empty and RX FIFO Not Empty Interrupt
@@ -2248,7 +2265,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_IDLE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_RXNE_RXFNE(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_RXNEIE_RXFNEIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_RXNEIE_RXFNEIE);
 }
 #else
 
@@ -2260,7 +2277,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_RXNE_RXFNE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_RXNE(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_RXNEIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_RXNEIE);
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -2272,12 +2289,11 @@ __STATIC_INLINE void LL_LPUART_DisableIT_RXNE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_TC(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_TCIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_TCIE);
 }
 
 #if defined(USART_CR1_FIFOEN)
-/* Legacy define */
-#define LL_LPUART_DisableIT_TXE  LL_LPUART_DisableIT_TXE_TXFNF
+#define LL_LPUART_DisableIT_TXE  LL_LPUART_DisableIT_TXE_TXFNF /* Redefinition for legacy purpose */
 
 /**
   * @brief  Disable TX Empty and TX FIFO Not Full Interrupt
@@ -2287,7 +2303,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_TC(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_TXE_TXFNF(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_TXEIE_TXFNFIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_TXEIE_TXFNFIE);
 }
 #else
 
@@ -2299,7 +2315,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_TXE_TXFNF(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_TXE(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_TXEIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_TXEIE);
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -2311,7 +2327,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_TXE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_PE(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_PEIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_PEIE);
 }
 
 /**
@@ -2322,7 +2338,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_PE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_CM(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_CMIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_CMIE);
 }
 
 #if defined(USART_CR1_FIFOEN)
@@ -2334,7 +2350,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_CM(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_TXFE(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_TXFEIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_TXFEIE);
 }
 
 /**
@@ -2345,7 +2361,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_TXFE(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_RXFF(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR1, USART_CR1_RXFFIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR1, USART_CR1_RXFFIE);
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -2361,7 +2377,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_RXFF(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_ERROR(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR3, USART_CR3_EIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR3, USART_CR3_EIE);
 }
 
 /**
@@ -2372,7 +2388,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_ERROR(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_CTS(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR3, USART_CR3_CTSIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR3, USART_CR3_CTSIE);
 }
 
 /**
@@ -2383,7 +2399,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_CTS(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_WKUP(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR3, USART_CR3_WUFIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR3, USART_CR3_WUFIE);
 }
 
 #if defined(USART_CR1_FIFOEN)
@@ -2395,7 +2411,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_WKUP(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_TXFT(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR3, USART_CR3_TXFTIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR3, USART_CR3_TXFTIE);
 }
 
 /**
@@ -2406,7 +2422,7 @@ __STATIC_INLINE void LL_LPUART_DisableIT_TXFT(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableIT_RXFT(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR3, USART_CR3_RXFTIE);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR3, USART_CR3_RXFTIE);
 }
 #endif /* USART_CR1_FIFOEN */
 
@@ -2416,14 +2432,13 @@ __STATIC_INLINE void LL_LPUART_DisableIT_RXFT(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_IDLE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_IDLE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_IDLEIE) == (USART_CR1_IDLEIE)) ? 1UL : 0UL);
 }
 
 #if defined(USART_CR1_FIFOEN)
-/* Legacy define */
-#define LL_LPUART_IsEnabledIT_RXNE  LL_LPUART_IsEnabledIT_RXNE_RXFNE
+#define LL_LPUART_IsEnabledIT_RXNE  LL_LPUART_IsEnabledIT_RXNE_RXFNE /* Redefinition for legacy purpose */
 
 /**
   * @brief  Check if the LPUART RX Not Empty and LPUART RX FIFO Not Empty Interrupt is enabled or disabled.
@@ -2431,7 +2446,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_IDLE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXNE_RXFNE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXNE_RXFNE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_RXNEIE_RXFNEIE) == (USART_CR1_RXNEIE_RXFNEIE)) ? 1UL : 0UL);
 }
@@ -2443,7 +2458,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXNE_RXFNE(USART_TypeDef *LPUARTx
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXNE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXNE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_RXNEIE) == (USART_CR1_RXNEIE)) ? 1UL : 0UL);
 }
@@ -2455,14 +2470,13 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXNE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TC(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TC(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_TCIE) == (USART_CR1_TCIE)) ? 1UL : 0UL);
 }
 
 #if defined(USART_CR1_FIFOEN)
-/* Legacy define */
-#define LL_LPUART_IsEnabledIT_TXE  LL_LPUART_IsEnabledIT_TXE_TXFNF
+#define LL_LPUART_IsEnabledIT_TXE  LL_LPUART_IsEnabledIT_TXE_TXFNF /* Redefinition for legacy purpose */
 
 /**
   * @brief  Check if the LPUART TX Empty and LPUART TX FIFO Not Full Interrupt is enabled or disabled
@@ -2470,7 +2484,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TC(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXE_TXFNF(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXE_TXFNF(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_TXEIE_TXFNFIE) == (USART_CR1_TXEIE_TXFNFIE)) ? 1UL : 0UL);
 }
@@ -2482,7 +2496,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXE_TXFNF(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_TXEIE) == (USART_CR1_TXEIE)) ? 1UL : 0UL);
 }
@@ -2494,7 +2508,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_PE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_PE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_PEIE) == (USART_CR1_PEIE)) ? 1UL : 0UL);
 }
@@ -2505,7 +2519,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_PE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_CM(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_CM(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_CMIE) == (USART_CR1_CMIE)) ? 1UL : 0UL);
 }
@@ -2517,7 +2531,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_CM(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXFE(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXFE(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_TXFEIE) == (USART_CR1_TXFEIE)) ? 1UL : 0UL);
 }
@@ -2528,7 +2542,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXFE(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXFF(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXFF(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR1, USART_CR1_RXFFIE) == (USART_CR1_RXFFIE)) ? 1UL : 0UL);
 }
@@ -2540,7 +2554,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXFF(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_ERROR(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_ERROR(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_EIE) == (USART_CR3_EIE)) ? 1UL : 0UL);
 }
@@ -2551,7 +2565,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_ERROR(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_CTS(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_CTS(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_CTSIE) == (USART_CR3_CTSIE)) ? 1UL : 0UL);
 }
@@ -2562,7 +2576,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_CTS(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_WKUP(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_WKUP(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_WUFIE) == (USART_CR3_WUFIE)) ? 1UL : 0UL);
 }
@@ -2574,7 +2588,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_WKUP(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXFT(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXFT(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_TXFTIE) == (USART_CR3_TXFTIE)) ? 1UL : 0UL);
 }
@@ -2585,7 +2599,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_TXFT(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXFT(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXFT(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_RXFTIE) == (USART_CR3_RXFTIE)) ? 1UL : 0UL);
 }
@@ -2607,7 +2621,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledIT_RXFT(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableDMAReq_RX(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR3, USART_CR3_DMAR);
+  ATOMIC_SET_BIT(LPUARTx->CR3, USART_CR3_DMAR);
 }
 
 /**
@@ -2618,7 +2632,7 @@ __STATIC_INLINE void LL_LPUART_EnableDMAReq_RX(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableDMAReq_RX(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR3, USART_CR3_DMAR);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR3, USART_CR3_DMAR);
 }
 
 /**
@@ -2627,7 +2641,7 @@ __STATIC_INLINE void LL_LPUART_DisableDMAReq_RX(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledDMAReq_RX(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledDMAReq_RX(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_DMAR) == (USART_CR3_DMAR)) ? 1UL : 0UL);
 }
@@ -2640,7 +2654,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledDMAReq_RX(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_EnableDMAReq_TX(USART_TypeDef *LPUARTx)
 {
-  SET_BIT(LPUARTx->CR3, USART_CR3_DMAT);
+  ATOMIC_SET_BIT(LPUARTx->CR3, USART_CR3_DMAT);
 }
 
 /**
@@ -2651,7 +2665,7 @@ __STATIC_INLINE void LL_LPUART_EnableDMAReq_TX(USART_TypeDef *LPUARTx)
   */
 __STATIC_INLINE void LL_LPUART_DisableDMAReq_TX(USART_TypeDef *LPUARTx)
 {
-  CLEAR_BIT(LPUARTx->CR3, USART_CR3_DMAT);
+  ATOMIC_CLEAR_BIT(LPUARTx->CR3, USART_CR3_DMAT);
 }
 
 /**
@@ -2660,7 +2674,7 @@ __STATIC_INLINE void LL_LPUART_DisableDMAReq_TX(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledDMAReq_TX(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledDMAReq_TX(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_DMAT) == (USART_CR3_DMAT)) ? 1UL : 0UL);
 }
@@ -2693,7 +2707,7 @@ __STATIC_INLINE void LL_LPUART_DisableDMADeactOnRxErr(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval State of bit (1 or 0).
   */
-__STATIC_INLINE uint32_t LL_LPUART_IsEnabledDMADeactOnRxErr(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint32_t LL_LPUART_IsEnabledDMADeactOnRxErr(const USART_TypeDef *LPUARTx)
 {
   return ((READ_BIT(LPUARTx->CR3, USART_CR3_DDRE) == (USART_CR3_DDRE)) ? 1UL : 0UL);
 }
@@ -2708,7 +2722,7 @@ __STATIC_INLINE uint32_t LL_LPUART_IsEnabledDMADeactOnRxErr(USART_TypeDef *LPUAR
   *         @arg @ref LL_LPUART_DMA_REG_DATA_RECEIVE
   * @retval Address of data register
   */
-__STATIC_INLINE uint32_t LL_LPUART_DMA_GetRegAddr(USART_TypeDef *LPUARTx, uint32_t Direction)
+__STATIC_INLINE uint32_t LL_LPUART_DMA_GetRegAddr(const USART_TypeDef *LPUARTx, uint32_t Direction)
 {
   uint32_t data_reg_addr;
 
@@ -2740,7 +2754,7 @@ __STATIC_INLINE uint32_t LL_LPUART_DMA_GetRegAddr(USART_TypeDef *LPUARTx, uint32
   * @param  LPUARTx LPUART Instance
   * @retval Time Value between Min_Data=0x00 and Max_Data=0xFF
   */
-__STATIC_INLINE uint8_t LL_LPUART_ReceiveData8(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint8_t LL_LPUART_ReceiveData8(const USART_TypeDef *LPUARTx)
 {
   return (uint8_t)(READ_BIT(LPUARTx->RDR, USART_RDR_RDR) & 0xFFU);
 }
@@ -2751,7 +2765,7 @@ __STATIC_INLINE uint8_t LL_LPUART_ReceiveData8(USART_TypeDef *LPUARTx)
   * @param  LPUARTx LPUART Instance
   * @retval Time Value between Min_Data=0x00 and Max_Data=0x1FF
   */
-__STATIC_INLINE uint16_t LL_LPUART_ReceiveData9(USART_TypeDef *LPUARTx)
+__STATIC_INLINE uint16_t LL_LPUART_ReceiveData9(const USART_TypeDef *LPUARTx)
 {
   return (uint16_t)(READ_BIT(LPUARTx->RDR, USART_RDR_RDR));
 }
@@ -2827,6 +2841,23 @@ __STATIC_INLINE void LL_LPUART_RequestRxDataFlush(USART_TypeDef *LPUARTx)
   SET_BIT(LPUARTx->RQR, (uint16_t)USART_RQR_RXFRQ);
 }
 
+#if defined(USART_CR1_FIFOEN)
+/**
+  * @brief  Request a Transmit data FIFO flush
+  * @note   TXFRQ bit is set to flush the whole FIFO when FIFO mode is enabled. This
+  *         also sets the flag TXFE (TXFIFO empty bit in the LPUART_ISR register).
+  * @note   Macro IS_UART_FIFO_INSTANCE(USARTx) can be used to check whether or not
+  *         FIFO mode feature is supported by the USARTx instance.
+  * @rmtoll RQR          TXFRQ         LL_LPUART_RequestTxDataFlush
+  * @param  LPUARTx LPUART Instance
+  * @retval None
+  */
+__STATIC_INLINE void LL_LPUART_RequestTxDataFlush(USART_TypeDef *LPUARTx)
+{
+  SET_BIT(LPUARTx->RQR, (uint16_t)USART_RQR_TXFRQ);
+}
+
+#endif /* USART_CR1_FIFOEN */
 /**
   * @}
   */
@@ -2835,8 +2866,8 @@ __STATIC_INLINE void LL_LPUART_RequestRxDataFlush(USART_TypeDef *LPUARTx)
 /** @defgroup LPUART_LL_EF_Init Initialization and de-initialization functions
   * @{
   */
-ErrorStatus LL_LPUART_DeInit(USART_TypeDef *LPUARTx);
-ErrorStatus LL_LPUART_Init(USART_TypeDef *LPUARTx, LL_LPUART_InitTypeDef *LPUART_InitStruct);
+ErrorStatus LL_LPUART_DeInit(const USART_TypeDef *LPUARTx);
+ErrorStatus LL_LPUART_Init(USART_TypeDef *LPUARTx, const LL_LPUART_InitTypeDef *LPUART_InitStruct);
 void        LL_LPUART_StructInit(LL_LPUART_InitTypeDef *LPUART_InitStruct);
 /**
   * @}
@@ -2863,4 +2894,3 @@ void        LL_LPUART_StructInit(LL_LPUART_InitTypeDef *LPUART_InitStruct);
 
 #endif /* STM32L4xx_LL_LPUART_H */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

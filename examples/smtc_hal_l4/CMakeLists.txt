@@ -40,8 +40,10 @@ target_include_directories(st_hal PUBLIC
 )
 
 add_library(smtc_hal STATIC
+    smtc_hal_button.c
     smtc_hal_flash.c
     smtc_hal_gpio.c
+    smtc_hal_led.c
     smtc_hal_lp_timer.c
     smtc_hal_libc_stub.c
     smtc_hal_mcu.c

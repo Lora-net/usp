@@ -44,9 +44,6 @@
  * -----------------------------------------------------------------------------
  * --- PUBLIC MACROS -----------------------------------------------------------
  */
-#ifndef PACKET_TYPE
-#define PACKET_TYPE SMTC_RAC_MODULATION_LORA
-#endif
 
 #ifndef RF_FREQ_IN_HZ
 #define RF_FREQ_IN_HZ 868100000
@@ -84,41 +81,6 @@
 #define LORA_CRC true
 #endif
 
-#ifndef FSK_BITRATE
-#define FSK_BITRATE 50000  // 50 kbps
-#endif
-
-#ifndef FSK_FDEV
-#define FSK_FDEV 25000  // 25 kHz frequency deviation
-#endif
-
-#ifndef FSK_BANDWIDTH
-#define FSK_BANDWIDTH 138000  // 138.0 kHz in Hz
-#endif
-
-#ifndef FSK_PREAMBLE_LENGTH
-#define FSK_PREAMBLE_LENGTH 5  // bytes
-#endif
-
-#ifndef FSK_SYNC_WORD_LENGTH
-#define FSK_SYNC_WORD_LENGTH 3  // bytes
-#endif
-
-#ifndef FSK_SYNC_WORD
-#define FSK_SYNC_WORD NULL  // Use default sync word
-#endif
-
-#ifndef FSK_CRC
-#define FSK_CRC RAL_GFSK_CRC_2_BYTES_INV  // 2-byte CRC
-#endif
-
-#ifndef FSK_WHITENING
-#define FSK_WHITENING true
-#endif
-
-#ifndef FSK_PACKET_TYPE
-#define FSK_PACKET_TYPE RAL_GFSK_PKT_VAR_LEN  // Variable length packet
-#endif
 #ifndef PAYLOAD_SIZE
 #define PAYLOAD_SIZE 128
 #endif

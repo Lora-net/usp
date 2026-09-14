@@ -11,6 +11,8 @@ if(RADIO_FAMILY STREQUAL "sx126x")
   endif()
 endif()
 
-add_subdirectory(${RADIO_FAMILY}_driver)
-
-set(radio_driver_library "${RADIO_FAMILY}_driver::${RADIO_FAMILY}_driver" CACHE STRING "")
+# UDP virtual radio has no driver to compile
+if(NOT RADIO_FAMILY STREQUAL "udp_pf")
+    add_subdirectory(${RADIO_FAMILY}_driver)
+    set(radio_driver_library "${RADIO_FAMILY}_driver::${RADIO_FAMILY}_driver" CACHE STRING "")
+endif()

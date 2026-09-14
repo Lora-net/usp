@@ -187,12 +187,6 @@ ral_status_t ralf_lr20xx_setup_flrc( const ralf_t* radio, const ralf_params_flrc
         return status;
     }
 
-    status = ral_set_tx_cfg( &radio->ral, params->output_pwr_in_dbm, params->rf_freq_in_hz );
-    if( status != RAL_STATUS_OK )
-    {
-        return status;
-    }
-
     status = ral_set_flrc_mod_params( &radio->ral, &params->mod_params );
     if( status != RAL_STATUS_OK )
     {
@@ -211,8 +205,35 @@ ral_status_t ralf_lr20xx_setup_flrc( const ralf_t* radio, const ralf_params_flrc
         return status;
     }
 
-    status = ral_set_flrc_sync_word( &radio->ral, params->pkt_params.tx_syncword, params->sync_word,
-                                     params->pkt_params.sync_word_len );
+    if( params->is_tx == true )
+    {
+        status = ral_set_tx_cfg( &radio->ral, params->output_pwr_in_dbm, params->rf_freq_in_hz );
+        if( status != RAL_STATUS_OK )
+        {
+            return status;
+        }
+
+        status = ral_set_flrc_sync_word( &radio->ral, params->pkt_params.tx_syncword,
+                                         &params->sync_word[params->pkt_params.tx_syncword - 1][0],
+                                         params->pkt_params.sync_word_len );
+        if( status != RAL_STATUS_OK )
+        {
+            return status;
+        }
+    }
+    else
+    {
+        // There is 3 possible sync word ids: 1, 2, 3.
+        for( uint8_t i = 0; i < 3; i++ )
+        {
+            status = ral_set_flrc_sync_word( &radio->ral, i + 1, &params->sync_word[i][0],
+                                             params->pkt_params.sync_word_len );
+            if( status != RAL_STATUS_OK )
+            {
+                return status;
+            }
+        }
+    }
 
     return status;
 }

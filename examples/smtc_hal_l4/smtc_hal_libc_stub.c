@@ -37,8 +37,9 @@
  * --- DEPENDENCIES ------------------------------------------------------------
  */
 
-#include <stdint.h>   // C99 types
-#include <stdbool.h>  // bool type
+#include <stdint.h>    // C99 types
+#include <stdbool.h>   // bool type
+#include <sys/stat.h>  // struct stat
 
 #include "smtc_hal_mcu.h"
 
@@ -96,6 +97,21 @@ int __attribute__( ( weak ) ) _isatty( int file )
 {
     mcu_panic( );
     return 0;
+}
+int __attribute__( ( weak ) ) _fstat( int file, struct stat* st )
+{
+    mcu_panic( );
+    return -1;
+}
+int __attribute__( ( weak ) ) _getpid( void )
+{
+    mcu_panic( );
+    return 1;
+}
+int __attribute__( ( weak ) ) _kill( int pid, int sig )
+{
+    mcu_panic( );
+    return -1;
 }
 
 /* --- EOF ------------------------------------------------------------------ */

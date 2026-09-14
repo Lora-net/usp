@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.2] - 2026-04-07
+
+### Added
+
+- Add patch RAM related functions:
+  - `lr20xx_patch_load_pram`
+  - `lr20xx_patch_get_version`
+  - `lr20xx_patch_enable_pram`
+  - `lr20xx_pram_load_pram_lr2021`
+  - `lr20xx_pram_load_pram_lr20x2`
+
+### Changed
+
+- [Z-Wave] `lr20xx_radio_z_wave_get_pkt_status` returns the channel of last received packet
+- [OQPSK 15.4] `lr20xx_radio_oqpsk_15_4_params_t` has a new parameter to control length check bypass on received packet
+
+### Fixed
+
+- Fix `lr20xx_radio_lora_get_rx_statistics` and `lr20xx_radio_lora_rx_statistics_t` to read `n_header_valid`
+- Fix `lr20xx_radio_fsk_get_rx_bandwidth` that was missing bandwidth `LR20XX_RADIO_FSK_COMMON_RX_BW_119_000_HZ`
+
+### Removed
+
+- [Bluetooth_LE] `lr20xx_workarounds_bluetooth_le_phy_coded_syncwords`
+- [Bluetooth_LE] `lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift` and `lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift_store_retention_mem`
+- [Bluetooth_LE] `lr20xx_workarounds_bluetooth_le_2mbps_preamble_length`
+- [Bluetooth_LE] `lr20xx_workarounds_bluetooth_le_phy_coded_improve_blocking` and `lr20xx_workarounds_bluetooth_le_phy_coded_improve_blocking_store_retention_mem`
+- [RTToF] `lr20xx_workarounds_rttof_truncate_pll_freq_step`
+- [RTToF] `lr20xx_workarounds_rttof_rssi_computation`
+- [RTToF] `lr20xx_workarounds_rttof_extended_stuck_second_request_enable`, `lr20xx_workarounds_rttof_extended_stuck_second_request_disable`, and `lr20xx_workarounds_rttof_extended_stuck_second_request_store_retention_mem`
+- `lr20xx_workarounds_dcdc_reset`, `lr20xx_workarounds_dcdc_configure`, and `lr20xx_workarounds_dcdc_store_retention_mem`
+
+## [v1.5.1] - 2026-02-09
+
+### Added
+
+- [LoRa] `freq_offset_hz` field to `lr20xx_radio_lora_packet_status_t`
+- [FiFo] Add functions for 1024 byte Tx/Rx FiFos:
+  - `lr20xx_radio_fifo_configure_1024_byte_tx_fifo`
+  - `lr20xx_radio_fifo_1024_byte_tx_fifo_store_retention_mem`
+  - `lr20xx_radio_fifo_configure_1024_byte_rx_fifo`
+  - `lr20xx_radio_fifo_1024_byte_rx_fifo_store_retention_mem`
+- [workaround] Functions related to 1024-byte Tx/Rx FiFos low thresholds above 256
+  - `lr20xx_workarounds_1024_byte_fifo_cfg_irq`
+  - `lr20xx_workarounds_1024_byte_fifo_cfg_irq_store_retention_mem`
+- [FLRC] `crc_ok` field to `lr20xx_radio_flrc_rx_stats_t`
+
+## [v1.4.0] - 2026-01-26
+
+### Added
+
+- [workaround] `lr20xx_workarounds_bluetooth_le_phy_coded_improve_blocking` and `lr20xx_workarounds_bluetooth_le_phy_coded_improve_blocking_store_retention_mem`
+
+### Changed
+
+- [Bluetooth_LE] `lr20xx_radio_bluetooth_le_set_modulation_pkt_params` calls `lr20xx_workarounds_bluetooth_le_phy_coded_improve_blocking`
+- [regmem] Change implementation of `lr20xx_regmem_write_regmem32` and `lr20xx_regmem_read_regmem32` to extract the buffer length check in a function
+
+### Fixed
+
+- Remove erroneous mention in readme concerning application of workarounds
+
 ## [v1.3.4] - 2025-11-25
 
 ### Added

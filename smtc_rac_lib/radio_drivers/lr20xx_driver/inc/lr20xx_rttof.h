@@ -104,34 +104,20 @@ lr20xx_status_t lr20xx_rttof_set_tx_rx_delay( const void* context, uint32_t dela
 /*!
  * @brief Get results from a RTToF operation
  *
- * This function automatically calls the workaround @ref lr20xx_workarounds_rttof_rssi_computation to fix inaccurate
- * RTToF RSSI value, unless the macro @p LR20XX_WORKAROUND_DISABLE_RTTOF_RSSI_COMPUTATION_FIX is defined at compile
- * time.
- *
- *
  * @param [in] context Chip implementation context
  * @param [out] result Structure holding the result
  *
  * @returns Operation status
- *
- * @see lr20xx_workarounds_rttof_rssi_computation
  */
 lr20xx_status_t lr20xx_rttof_get_results( const void* context, lr20xx_rttof_results_t* result );
 
 /*!
  * @brief Get results from a RTToF operation
  *
- * This function automatically calls the workaround @ref lr20xx_workarounds_rttof_rssi_computation to fix inaccurate
- * RTToF RSSI value, unless the macro @p LR20XX_WORKAROUND_DISABLE_RTTOF_RSSI_COMPUTATION_FIX is defined at compile
- * time.
- *
- *
  * @param [in] context Chip implementation context
  * @param [out] result Structure holding the result
  *
  * @returns Operation status
- *
- * @see lr20xx_workarounds_rttof_rssi_computation
  */
 lr20xx_status_t lr20xx_rttof_get_results_extended( const void* context, lr20xx_rttof_results_extended_t* result );
 

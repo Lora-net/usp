@@ -89,9 +89,6 @@ enum
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
  */
 
-static lr20xx_status_t lr20xx_radio_bluetooth_le_conditionally_apply_phy_coded_workarounds(
-    const void* context, lr20xx_radio_bluetooth_le_phy_t phy );
-
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
@@ -106,34 +103,8 @@ lr20xx_status_t lr20xx_radio_bluetooth_le_set_modulation_params( const void*    
         ( uint8_t ) phy,
     };
 
-    const lr20xx_status_t set_modulation_status = ( lr20xx_status_t ) lr20xx_hal_write(
-        context, cbuffer, LR20XX_RADIO_BLUETOOTH_LE_SET_MODULATION_PARAMS_CMD_LENGTH, 0, 0 );
-
-    // Conditionally apply workarounds if set modulation commands returned status OK
-    if( set_modulation_status == LR20XX_STATUS_OK )
-    {
-        switch( phy )
-        {
-        case LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_2M:
-        {
-            RETURN_STATUS_ON_NOT_OK( LR20XX_WORKAROUND_CONDITIONAL_APPLY_BLE_2MBPS_PREAMBLE_LENGTH( context ) );
-            break;
-        }
-        case LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_1M:
-        case LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_CODED_125KB:
-        case LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_CODED_500KB:
-        default:
-        {
-            // Nothing on purpose
-        }
-        }
-        // If this point is reached, then no failed status have been detected: status OK is to be returned.
-        return LR20XX_STATUS_OK;
-    }
-    else
-    {
-        return set_modulation_status;
-    }
+    return ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer,
+                                                 LR20XX_RADIO_BLUETOOTH_LE_SET_MODULATION_PARAMS_CMD_LENGTH, 0, 0 );
 }
 
 lr20xx_status_t lr20xx_radio_bluetooth_le_set_pkt_params( const void*                                   context,
@@ -164,7 +135,6 @@ lr20xx_status_t lr20xx_radio_bluetooth_le_set_modulation_pkt_params(
 {
     RETURN_STATUS_ON_NOT_OK( lr20xx_radio_bluetooth_le_set_modulation_params( context, phy ) );
     RETURN_STATUS_ON_NOT_OK( lr20xx_radio_bluetooth_le_set_pkt_params( context, pkt_params ) );
-    RETURN_STATUS_ON_NOT_OK( lr20xx_radio_bluetooth_le_conditionally_apply_phy_coded_workarounds( context, phy ) );
 
     // If this point is reached, it means that none of the above returned with a not OK status. Therefore an OK status
     // must be returned here.
@@ -250,23 +220,5 @@ lr20xx_status_t lr20xx_radio_bluetooth_le_set_pdu_length( const void* context, u
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DEFINITION --------------------------------------------
  */
-
-lr20xx_status_t lr20xx_radio_bluetooth_le_conditionally_apply_phy_coded_workarounds(
-    const void* context, lr20xx_radio_bluetooth_le_phy_t phy )
-{
-    switch( phy )
-    {
-    case LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_CODED_500KB:
-    case LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_CODED_125KB:
-    {
-        RETURN_STATUS_ON_NOT_OK( lr20xx_workarounds_bluetooth_le_phy_coded_syncwords( context ) );
-        return lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift( context );
-    }
-    default:
-    {
-        return LR20XX_STATUS_OK;
-    }
-    }
-}
 
 /* --- EOF ------------------------------------------------------------------ */

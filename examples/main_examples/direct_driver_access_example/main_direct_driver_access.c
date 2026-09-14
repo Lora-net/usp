@@ -38,10 +38,9 @@
  */
 
 #include "app_direct_driver_access.h"
-#include "main_direct_driver_access.h"
 
-#include "modem_pinout.h"
-#include "smtc_hal_gpio.h"
+#include "smtc_hal_button.h"
+#include "smtc_hal_led.h"
 #include "smtc_hal_mcu.h"
 #include "smtc_hal_watchdog.h"
 #include "smtc_rac_api.h"
@@ -60,72 +59,36 @@
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
 
-static const uint32_t SLEEP_DELAY          = 1000;  // ms
-static const uint32_t BUTTON_TRIGGER_DELAY = 500;   // ms
+static const uint32_t SLEEP_DELAY = 1000;  // ms
 
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE TYPES -----------------------------------------------------------
  */
 
-typedef struct user_button_s
-{
-    bool     is_pressed;            // is the button pressed
-    uint32_t last_press_timestamp;  // last absolute time the button was pressed
-} user_button_t;
-
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
-
-static volatile user_button_t user_button = {
-    .is_pressed           = false,
-    .last_press_timestamp = 0,
-};
 
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
  */
 
-/**
- * @brief Update `user_button`
- *
- * This function is called in IRQ context
- *
- */
-static void user_button_callback( void* context );
-
-/**
- * @brief Get the and reset user button pressed status
- *
- * This function ensures the state is reset and returned protected from IRQ context.
- *
- * @return true The button has been pressed, its state is now reset
- * @return false The button has not been pressed
- */
-static bool get_and_reset_user_button_state( void );
-
-/**
- * @brief Initialise example HAL
- *
- * This function initialize example HAL:
- * - MCU
- * - user button
- * - LEDs
- */
-static void init_hal( void );
-
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS DEFINITION ---------------------------------------------
  */
 
-void main_direct_driver_access( void )
+int main( void )
 {
-    // Initialize example HAL
-    init_hal( );
+    // Initialize MCU
+    hal_mcu_init( );
+
+    // Initialize LEDs and button
+    hal_led_init( );
+    hal_button_init( NULL, NULL );
 
     // Initialize Radio Access Controller (RAC)
     smtc_rac_init( );
@@ -143,15 +106,16 @@ void main_direct_driver_access( void )
         smtc_rac_run_engine( );
 
         // handle logic
-        if( get_and_reset_user_button_state( ) == true )
+        if( hal_button_is_pressed( ) )
         {
+            hal_button_clear( );
             RAC_LOG_INFO( "button pressed\n" );
             direct_driver_access_on_button_press( );
         }
 
         // handle sleep
         hal_mcu_disable_irq( );
-        if( ( user_button.is_pressed == false ) && ( smtc_rac_is_irq_flag_pending( ) == false ) )
+        if( ( !hal_button_is_pressed( ) ) && ( smtc_rac_is_irq_flag_pending( ) == false ) )
         {
             hal_mcu_set_sleep_for_ms( SLEEP_DELAY );
             hal_watchdog_reload( );  // update watchdog after sleep
@@ -165,42 +129,4 @@ void main_direct_driver_access( void )
  * --- PRIVATE FUNCTIONS DEFINITION --------------------------------------------
  */
 
-static void user_button_callback( void* context )
-{
-    UNUSED( context );
-
-    uint32_t timestamp = smtc_modem_hal_get_time_in_ms( );
-
-    // avoid multiple triggers
-    if( ( timestamp - user_button.last_press_timestamp ) > BUTTON_TRIGGER_DELAY )
-    {
-        user_button.last_press_timestamp = timestamp;
-        user_button.is_pressed           = true;
-    }
-}
-
-bool get_and_reset_user_button_state( void )
-{
-    hal_mcu_disable_irq( );
-    const bool is_button_pressed = user_button.is_pressed;
-    user_button.is_pressed       = false;
-    hal_mcu_enable_irq( );
-    return is_button_pressed;
-}
-
-void init_hal( void )
-{
-    hal_mcu_init( );
-
-    // setup user button
-    static hal_gpio_irq_t nucleo_blue_button = {
-        .pin      = EXTI_BUTTON,
-        .context  = 0,
-        .callback = user_button_callback,
-    };
-    hal_gpio_init_in( EXTI_BUTTON, BSP_GPIO_PULL_MODE_NONE, BSP_GPIO_IRQ_MODE_FALLING, &nucleo_blue_button );
-
-    // initialize LEDs
-    hal_gpio_init_out( SMTC_LED_TX, 0 );
-    hal_gpio_init_out( SMTC_LED_RX, 0 );
-}
+/* --- EOF ------------------------------------------------------------------ */

@@ -65,6 +65,12 @@ extern "C" {
     } while( 0 );
 
 /*!
+ * No-op on MCU targets: soft reset is only needed on Linux where hal_mcu_reset()
+ * cannot perform a real hardware reset.
+ */
+#define hal_mcu_set_reset_point( )
+
+/*!
  * Begins critical section
  */
 #define CRITICAL_SECTION_BEGIN( ) \
@@ -122,7 +128,7 @@ void hal_mcu_init( void );
 /*!
  * Reset mcu
  */
-void hal_mcu_reset( void );
+_Noreturn void hal_mcu_reset( void );
 
 /*!
  * Blocking wait

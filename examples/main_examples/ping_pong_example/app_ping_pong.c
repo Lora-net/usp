@@ -43,6 +43,7 @@
 #include "main_ping_pong.h"
 
 #include "smtc_rac_api.h"
+#include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
 #include "smtc_modem_hal.h"
 
@@ -271,8 +272,8 @@ static void ping_pong_rx( smtc_rac_scheduling_t scheduling, uint32_t delay )
 static void pre_ping_pong_callback( void )
 {
     PING_PONG_PRINT( "usp/rac: transaction is starting\n" );
-    const smtc_led_pin_e led = ( ping_pong.transaction->radio_params.lora.is_tx ) ? SMTC_PF_LED_TX : SMTC_PF_LED_RX;
-    set_led( led, true );
+    const hal_led_id_t led = ( ping_pong.transaction->radio_params.lora.is_tx ) ? HAL_LED_TX : HAL_LED_RX;
+    hal_led_set( led, true );
 }
 
 static void post_ping_pong_callback( rp_status_t status )
@@ -283,8 +284,8 @@ static void post_ping_pong_callback( rp_status_t status )
     uint8_t separator_received           = 0;
     uint8_t counter_received             = 0;
 
-    set_led( SMTC_PF_LED_TX, false );
-    set_led( SMTC_PF_LED_RX, false );
+    hal_led_set( HAL_LED_TX, false );
+    hal_led_set( HAL_LED_RX, false );
 
     switch( status )
     {

@@ -5,12 +5,26 @@ add_library(radio_planner STATIC
     src/radio_planner.c
 )
 
+# Set preprocessor macros
+if(NOT DEFINED RP_MARGIN_DELAY)
+    set(RP_MARGIN_DELAY "8")
+endif()
+message(STATUS "radio_planner: RP_MARGIN_DELAY=${RP_MARGIN_DELAY}")
+target_compile_definitions(radio_planner PRIVATE RP_MARGIN_DELAY=${RP_MARGIN_DELAY} )
+
+
 # Include necessary directories
 target_include_directories(radio_planner PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../smtc_modem_hal
-    ${CMAKE_CURRENT_SOURCE_DIR}/../radio_drivers/lr11xx_driver/src 
 )
+
+# Add LR11xx include if geoloc (geoloc implies LR1110 / LR1120 chip so no need to check radio aswell)
+if(LBM_GEOLOCATION)
+    target_include_directories(radio_planner PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../radio_drivers/lr11xx_driver/src 
+    )
+endif()
 
 # Link the dependency to the ralf library
 target_link_libraries(radio_planner PUBLIC

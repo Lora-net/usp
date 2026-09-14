@@ -91,6 +91,18 @@ void hal_spi_de_init( const uint32_t id );
 
  * \retval in_data      Received byte.
  */
+void hal_spi_in_dma( const uint32_t id, uint8_t* in_data, const uint16_t length );
+void hal_spi_out_dma( const uint32_t id, uint8_t* out_data, const uint16_t length );
+void hal_spi_in_out_v2( const uint32_t id, uint8_t* out_data, uint8_t* in_data, const uint16_t length );
+
+/*!
+ * Sends out_data and receives in_data
+ *
+ * \param [IN] id       SPI interface id [1:N]
+ * \param [IN] out_data Byte to be sent
+
+ * \retval in_data      Received byte.
+ */
 uint16_t hal_spi_in_out( const uint32_t id, const uint16_t out_data );
 
 #ifdef __cplusplus

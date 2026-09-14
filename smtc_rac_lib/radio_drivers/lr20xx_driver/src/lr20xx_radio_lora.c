@@ -69,8 +69,8 @@
 #define LR20XX_RADIO_LORA_CONFIGURE_SIDE_DETECTOR_CAD_TEMP_LENGTH \
     ( 3 * LR20XX_RADIO_LORA_CAD_SIDE_DETECTOR_CONFIGURATION_LENGTH )
 
-#define LR20XX_RADIO_LORA_GET_RX_STATISTICS_RBUFFER_LENGTH ( 8 )
-#define LR20XX_RADIO_LORA_GET_PACKET_STATUS_RBUFFER_LENGTH ( 6 )
+#define LR20XX_RADIO_LORA_GET_RX_STATISTICS_RBUFFER_LENGTH ( 10 )
+#define LR20XX_RADIO_LORA_GET_PACKET_STATUS_RBUFFER_LENGTH ( 9 )
 
 /*
  * -----------------------------------------------------------------------------
@@ -191,17 +191,8 @@ lr20xx_status_t lr20xx_radio_lora_set_modulation_params( const void*            
         ( uint8_t ) ( ( mod_params->cr << 4 ) + mod_params->ppm ),
     };
 
-    const lr20xx_status_t write_status = ( lr20xx_status_t ) lr20xx_hal_write(
-        context, cbuffer, LR20XX_RADIO_LORA_SET_MODULATION_PARAMS_CMD_LENGTH, 0, 0 );
-
-    if( write_status != LR20XX_STATUS_OK )
-    {
-        return write_status;
-    }
-    else
-    {
-        return LR20XX_WORKAROUNDS_CONDITIONAL_APPLY_AUTOMATIC_DCDC_CONFIGURE( context );
-    }
+    return ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_RADIO_LORA_SET_MODULATION_PARAMS_CMD_LENGTH,
+                                                 0, 0 );
 }
 
 lr20xx_status_t lr20xx_radio_lora_set_packet_params( const void*                           context,
@@ -352,7 +343,8 @@ lr20xx_status_t lr20xx_radio_lora_get_rx_statistics( const void*                
         statistics->n_received_packets      = read_2_bytes_msbf( rbuffer + 0 );
         statistics->n_crc_errors            = read_2_bytes_msbf( rbuffer + 2 );
         statistics->n_header_errors         = read_2_bytes_msbf( rbuffer + 4 );
-        statistics->n_false_synchronisation = read_2_bytes_msbf( rbuffer + 6 );
+        statistics->n_header_valid          = read_2_bytes_msbf( rbuffer + 6 );
+        statistics->n_false_synchronisation = read_2_bytes_msbf( rbuffer + 8 );
     }
 
     return status;
@@ -383,6 +375,10 @@ lr20xx_status_t lr20xx_radio_lora_get_packet_status( const void*                
         pkt_status->detector                       = ( rbuffer[5] >> 2 ) & 0x0F;
         pkt_status->rssi_pkt_half_dbm_count        = ( rbuffer[5] >> 1 ) & 0x01;
         pkt_status->rssi_signal_pkt_half_dbm_count = ( rbuffer[5] >> 0 ) & 0x01;
+        /* Extract 24-bit signed value and sign-extend to 32 bits */
+        int32_t freq_offset_24 = ( ( rbuffer[6] << 16 ) | ( rbuffer[7] << 8 ) | rbuffer[8] ) & 0x00FFFFFF;
+        /* Sign-extend: shift left 8 bits then arithmetic shift right 8 bits */
+        pkt_status->freq_offset_hz = ( freq_offset_24 << 8 ) >> 8;
     }
 
     return status;

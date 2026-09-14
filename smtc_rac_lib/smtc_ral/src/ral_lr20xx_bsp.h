@@ -134,7 +134,7 @@ void ral_lr20xx_bsp_get_front_end_calibration_cfg(
  * @param [out] function The DIO function to be configured
  */
 void ral_lr20xx_bsp_get_dio_function( const void* context, lr20xx_system_dio_t dio,
-    lr20xx_system_dio_func_t* function );
+                                      lr20xx_system_dio_func_t* function );
 
 /**
  * Get the sleep drive to be configured on a DIO
@@ -144,7 +144,7 @@ void ral_lr20xx_bsp_get_dio_function( const void* context, lr20xx_system_dio_t d
  * @param [out] function The DIO sleep drive configuration
  */
 void ral_lr20xx_bsp_get_dio_sleep_drive( const void* context, lr20xx_system_dio_t dio,
-    lr20xx_system_dio_drive_t* drive );
+                                         lr20xx_system_dio_drive_t* drive );
 
 /**
  * Get the IRQ mask to be configured on a DIO
@@ -154,7 +154,7 @@ void ral_lr20xx_bsp_get_dio_sleep_drive( const void* context, lr20xx_system_dio_
  * @param [out] irq_mask The IRQ mask to apply on the DIO
  */
 void ral_lr20xx_bsp_get_dio_irq_mask( const void* context, lr20xx_system_dio_t dio,
-    lr20xx_system_irq_mask_t* irq_mask );
+                                      lr20xx_system_irq_mask_t* irq_mask );
 
 /**
  * Get the RF switch configuration to be used on a DIO
@@ -164,7 +164,7 @@ void ral_lr20xx_bsp_get_dio_irq_mask( const void* context, lr20xx_system_dio_t d
  * @param [out] rf_switch_cfg Pointer to a rf_switch configuration structure
  */
 void ral_lr20xx_bsp_get_dio_rf_switch_cfg( const void* context, lr20xx_system_dio_t dio,
-    lr20xx_system_dio_rf_switch_cfg_t* rf_switch_cfg );
+                                           lr20xx_system_dio_rf_switch_cfg_t* rf_switch_cfg );
 
 /**
  * Get the HF Clock output scaling to be configured
@@ -172,8 +172,7 @@ void ral_lr20xx_bsp_get_dio_rf_switch_cfg( const void* context, lr20xx_system_di
  * @param [in] context Chip implementation context
  * @param [out] rf_switch_cfg Pointer to a rf_switch configuration structure
  */
-void ral_lr20xx_bsp_get_dio_hf_clk_scaling_cfg( const void* context,
-    lr20xx_system_hf_clk_scaling_t* hf_clk_scaling);
+void ral_lr20xx_bsp_get_dio_hf_clk_scaling_cfg( const void* context, lr20xx_system_hf_clk_scaling_t* hf_clk_scaling );
 
 /**
  * @brief Get regulator mode

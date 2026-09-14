@@ -41,6 +41,7 @@
 #include "main_per.h"
 
 #include "smtc_rac_api.h"
+#include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
 #include "smtc_modem_hal.h"
 
@@ -227,7 +228,7 @@ void per_init( void )
     PER_LOG_CONFIG( "Bandwidth: %d kHz\n", LORA_BANDWIDTH == 0 ? 125 : ( LORA_BANDWIDTH == 1 ? 250 : 500 ) );
     PER_LOG_CONFIG( "Coding Rate: 4/%d\n", LORA_CODING_RATE + 5 );
     PER_LOG_CONFIG( "Preamble Length: %d symbols\n", LORA_PREAMBLE_LENGTH );
-    PER_LOG_CONFIG( "Header Type: %s\n", LORA_PKT_LEN_MODE ? "Explicit" : "Implicit" );
+    PER_LOG_CONFIG( "Header Type: %s\n", ral_lora_pkt_len_modes_to_str( LORA_PKT_LEN_MODE ) );
     PER_LOG_CONFIG( "CRC: %s\n", LORA_CRC ? "Enabled" : "Disabled" );
     PER_LOG_CONFIG( "IQ Inversion: %s\n", LORA_IQ ? "Enabled" : "Disabled" );
     PER_LOG_CONFIG( "Sync Word: 0x%02X\n", LORA_SYNCWORD );
@@ -258,11 +259,11 @@ static void pre_transaction_callback( void )
 {
     if( IS_TRANSMITTER )
     {
-        set_led( SMTC_PF_LED_TX, true );
+        hal_led_set( HAL_LED_TX, true );
     }
     else
     {
-        set_led( SMTC_PF_LED_RX, true );
+        hal_led_set( HAL_LED_RX, true );
     }
 }
 
@@ -274,8 +275,8 @@ static void post_transaction_callback( rp_status_t status )
     uint8_t  separator_received           = 0;
     uint32_t counter_received             = 0;
 
-    set_led( SMTC_PF_LED_TX, false );
-    set_led( SMTC_PF_LED_RX, false );
+    hal_led_set( HAL_LED_TX, false );
+    hal_led_set( HAL_LED_RX, false );
 
     switch( status )
     {
@@ -296,8 +297,10 @@ static void post_transaction_callback( rp_status_t status )
     case RP_STATUS_RX_PACKET:
     {
         PER_LOG_RX( "Packet received successfully\n" );
-        PER_LOG_RX( "RSSI: %d dBm, SNR: %d dB\n", packet_error_rate.transaction->smtc_rac_data_result.rssi_result,
-                    packet_error_rate.transaction->smtc_rac_data_result.snr_result );
+        PER_LOG_RX( "RSSI: %d dBm, SNR: %d dB, Signal RSSI: %d dB\n",
+                    packet_error_rate.transaction->smtc_rac_data_result.rssi_result,
+                    packet_error_rate.transaction->smtc_rac_data_result.snr_result,
+                    packet_error_rate.transaction->smtc_rac_data_result.signal_rssi_result );
 
         packet_error_rate.exchange_started = true;
         if( packet_error_rate.transaction->smtc_rac_data_result.rx_size == PAYLOAD_SIZE )
@@ -501,6 +504,7 @@ static const char* rp_status_to_str( const rp_status_t status )
         return "RP_STATUS_RADIO_LOCKED";
     case RP_STATUS_RADIO_UNLOCKED:
         return "RP_STATUS_RADIO_UNLOCKED";
+    default:
+        return "UNKNOW_RP_STATUS";
     }
-    return "UNKNOW_RP_STATUS";
 }

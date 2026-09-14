@@ -39,6 +39,7 @@
 #include "hw_modem.h"
 #include "cmd_parser.h"
 #include "modem_pinout.h"
+#include "radio_utilities.h"
 #include "smtc_modem_utilities.h"
 #include "smtc_hal_uart.h"
 #include "smtc_hal_mcu.h"
@@ -230,6 +231,28 @@ bool hw_modem_is_low_power_ok( void )
     {
         return false;
     }
+}
+
+void hw_modem_unset_event_pin( void )
+{
+    hal_gpio_set_value( HW_MODEM_EVENT_PIN, 0 );
+}
+
+void hw_modem_disable_irq( void )
+{
+    hal_mcu_disable_irq( );
+}
+
+void hw_modem_set_tx_power_offset( const void* context, uint8_t tx_pwr_offset_db )
+{
+    ( void ) context;
+    radio_utilities_set_tx_power_offset( tx_pwr_offset_db );
+}
+
+uint8_t hw_modem_get_tx_power_offset( const void* context )
+{
+    ( void ) context;
+    return radio_utilities_get_tx_power_offset( );
 }
 
 // COMMAND pin

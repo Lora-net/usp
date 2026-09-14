@@ -48,30 +48,12 @@ extern "C" {
 #include <stdbool.h>
 #include "lr20xx_status.h"
 #include "lr20xx_radio_fsk_common_types.h"
+#include "lr20xx_radio_fifo_types.h"
 
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC MACROS -----------------------------------------------------------
  */
-
-#ifndef LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_DCDC_RESET
-#define LR20XX_WORKAROUNDS_CONDITIONAL_APPLY_AUTOMATIC_DCDC_RESET( cont ) lr20xx_workarounds_dcdc_reset( cont )
-#else
-#define LR20XX_WORKAROUNDS_CONDITIONAL_APPLY_AUTOMATIC_DCDC_RESET( cont ) LR20XX_STATUS_OK
-#endif  // LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_DCDC_RESET
-
-#ifndef LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_DCDC_CONFIGURE
-#define LR20XX_WORKAROUNDS_CONDITIONAL_APPLY_AUTOMATIC_DCDC_CONFIGURE( cont ) lr20xx_workarounds_dcdc_configure( cont )
-#else
-#define LR20XX_WORKAROUNDS_CONDITIONAL_APPLY_AUTOMATIC_DCDC_CONFIGURE( cont ) LR20XX_STATUS_OK
-#endif  // LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_DCDC_CONFIGURE
-
-#ifndef LR20XX_WORKAROUND_DISABLE_AUTOMATIC_BLE_2MBPS_PREAMBLE_LENGTH
-#define LR20XX_WORKAROUND_CONDITIONAL_APPLY_BLE_2MBPS_PREAMBLE_LENGTH( cont ) \
-    lr20xx_workarounds_bluetooth_le_2mbps_preamble_length( cont )
-#else
-#define LR20XX_WORKAROUND_CONDITIONAL_APPLY_BLE_2MBPS_PREAMBLE_LENGTH( cont ) LR20XX_STATUS_OK
-#endif  // LR20XX_WORKAROUND_DISABLE_AUTOMATIC_BLE_2MBPS_PREAMBLE_LENGTH
 
 /*
  * -----------------------------------------------------------------------------
@@ -87,69 +69,6 @@ extern "C" {
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS PROTOTYPES ---------------------------------------------
  */
-
-/**
- * @brief Apply workaround for syncwords usage with BLE LE coded PHY
- *
- * This workaround is to be applied after configuring Bluetooth LE modulation and packet, if phy @ref
- * LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_CODED_125KB or @ref LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_CODED_500KB are configured.
- *
- * @param [in] context Chip implementation context
- *
- * @returns Operation status
- *
- * @see lr20xx_radio_bluetooth_le_set_modulation_params, lr20xx_radio_bluetooth_le_set_pkt_params,
- * lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift
- */
-lr20xx_status_t lr20xx_workarounds_bluetooth_le_phy_coded_syncwords( const void* context );
-
-/**
- * @brief Apply workaround to support frequency drift with BLE LE coded PHY
- *
- * This workaround is to be applied after configuring Bluetooth LE modulation and packet, if phy @ref
- * LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_CODED_125KB or @ref LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_CODED_500KB are configured.
- *
- * @param [in] context Chip implementation context
- *
- * @returns Operation status
- *
- * @see lr20xx_radio_bluetooth_le_set_modulation_params, lr20xx_radio_bluetooth_le_set_pkt_params,
- * lr20xx_workarounds_bluetooth_le_phy_coded_syncwords
- */
-lr20xx_status_t lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift( const void* context );
-
-/**
- * @brief Store the Bluetooth LE PHY coded frequency drift workaround in retention memory
- *
- * Calling this function allows to store the Bluetooth LE PHY coded frequency drift workaround state during sleep mode.
- * This helper function internally calls @ref lr20xx_system_add_register_to_retention_mem with the appropriate register
- * address.
- *
- * @param context Chip implementation context
- * @param slot Index in the storage list. Allowed values [0:31]
- *
- * @return Operation status
- *
- * @see lr20xx_system_add_register_to_retention_mem, lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift
- */
-lr20xx_status_t lr20xx_workarounds_bluetooth_le_phy_coded_frequency_drift_store_retention_mem( const void* context,
-                                                                                               uint8_t     slot );
-
-/**
- * @brief Fix preamble length for Bluetooth LE 2Mbps
- *
- * The preamble length is by default incorrect for 2Mbps datarate. This workaround fixes the preamble length.
- * It must be called right after @ref lr20xx_radio_bluetooth_le_set_modulation_params if the mode is @ref
- * LR20XX_RADIO_BLUETOOTH_LE_PHY_LE_2M.
- *
- * Note that by default this workaround is automatically applied by @ref
- * lr20xx_radio_bluetooth_le_set_modulation_params, unless the macro @ref
- * LR20XX_WORKAROUND_DISABLE_AUTOMATIC_BLE_2MBPS_PREAMBLE_LENGTH is defined.
- *
- * @param context Chip implementation context
- * @return Operation status
- */
-lr20xx_status_t lr20xx_workarounds_bluetooth_le_2mbps_preamble_length( const void* context );
 
 /**
  * @brief Enable LoRa compatibility mode with SX1276
@@ -289,112 +208,6 @@ lr20xx_status_t lr20xx_workarounds_ook_set_detection_threshold_level( const void
 int16_t lr20xx_workarounds_ook_get_default_detection_threshold_level( lr20xx_radio_fsk_common_bw_t bw );
 
 /**
- * @brief Apply workaround to truncate internal PLL frequency step for RTToF operation
- *
- * Unexpected RTToF results may be obtained if the RF frequency is not set to a value multiple of 122Hz.
- * This workaround ensures internal RF frequency is configured to a multiple of 122Hz.
- *
- * This workaround must be applied after configuring the RF frequency of RTToF ranging operations with @ref
- * lr20xx_radio_common_set_rf_freq.
- * After applying the workaround, the RF frequency is therefore modified by a quantity inferior or equal to 122Hz
- * compared to the value set by last call to @ref lr20xx_radio_common_set_rf_freq.
- *
- * @param context Chip implementation context
- *
- * @return Operation status
- *
- * @see lr20xx_radio_common_set_rf_freq
- */
-lr20xx_status_t lr20xx_workarounds_rttof_truncate_pll_freq_step( const void* context );
-
-/**
- * @brief Fix RTToF RSSI raw values
- *
- * This workaround fixes raw values of RTToF RSSIs by gathering information from the chip.
- * This function can be used either for:
- * - normal result (with only one RSSI value), setting @p rssi2_raw_fixed to null pointer; and
- * - extended result (with two RSSI values).
- *
- * This workaround handles the raw RSSI values, which are available only in the internal of the driver, and not exposed
- * by the API. It is however possible to retrieve approximation of raw RSSI value from exposed one in dB (and the other
- * way around) thanks to the following pseudo-code:
- * @code{.c}
- * // Convert from RSSI in dB to raw value
- * uint8_t raw_rssi_value = -(rssi_db * 2);
- *
- * // Convert from raw RSSI value to dB value
- * uint8_t rssi_db = -(raw_rssi_value / 2);
- * @endcode
- *
- * @param context Chip implementation context
- * @param [in] rssi1_raw_value Raw value of RSSI1
- * @param [in] rssi2_raw_value Raw value of RSSI2
- * @param [out] rssi1_raw_fixed Pointer to store fixed raw value for RSSI1
- * @param [out] rssi2_raw_fixed Pointer to store fixed raw value for RSSI2, can be null.
- * @return lr20xx_status_t
- */
-lr20xx_status_t lr20xx_workarounds_rttof_rssi_computation( const void* context, uint8_t rssi1_raw_value,
-                                                           uint8_t rssi2_raw_value, uint8_t* rssi1_raw_fixed,
-                                                           uint8_t* rssi2_raw_fixed );
-
-/**
- * @brief Reset DCDC regulator internal value to appropriate configuration
- *
- * This workaround must be called after each @ref lr20xx_radio_common_set_pkt_type if all the following is true:
- * - Rx operations are intended
- * - @ref LR20XX_SYSTEM_REG_MODE_DCDC is used
- * - sub GHz operations are intended
- *
- * @param context Chip implementation context
- * @return Operation status
- *
- * @see lr20xx_radio_common_set_pkt_type, lr20xx_workarounds_dcdc_configure,
- * lr20xx_workarounds_lora_sx1276_compatibility_mode_store_retention_mem
- */
-lr20xx_status_t lr20xx_workarounds_dcdc_reset( const void* context );
-
-/**
- * @brief Configure DCDC regulator internal value for specific operations
- *
- * This workaround must be called if all the following is true:
- * - Rx operations are intended
- * - @ref LR20XX_SYSTEM_REG_MODE_DCDC is used
- * - sub GHz operations are intended
- *
- * This workaround must be called after each of the following commands:
- * - @ref lr20xx_radio_fsk_set_modulation_params
- * - @ref lr20xx_radio_flrc_set_modulation_params
- * - @ref lr20xx_radio_ook_set_modulation_params
- * - @ref lr20xx_radio_lora_set_modulation_params
- * - @ref lr20xx_radio_z_wave_set_params
- * - @ref lr20xx_radio_common_set_rx_path
- *
- * @param context Chip implementation context
- * @return Operation status
- *
- * @see lr20xx_workarounds_dcdc_reset, lr20xx_radio_fsk_set_modulation_params, lr20xx_radio_flrc_set_modulation_params,
- * lr20xx_radio_ook_set_modulation_params, lr20xx_radio_lora_set_modulation_params, lr20xx_radio_z_wave_set_params,
- * lr20xx_radio_common_set_rx_path, lr20xx_workarounds_lora_sx1276_compatibility_mode_store_retention_mem
- */
-lr20xx_status_t lr20xx_workarounds_dcdc_configure( const void* context );
-
-/**
- * @brief Store the LoRa DCDC configuration in retention memory
- *
- * Calling this function allows to store the DCDC new reset value or configuration during sleep mode.
- * This helper function internally calls @ref lr20xx_system_add_register_to_retention_mem with the appropriate register
- * address.
- *
- * @param context Chip implementation context
- * @param slot Index in the storage list. Allowed values [0:31]
- *
- * @return Operation status
- *
- * @see lr20xx_system_add_register_to_retention_mem, lr20xx_workarounds_dcdc_reset, lr20xx_workarounds_dcdc_configure
- */
-lr20xx_status_t lr20xx_workarounds_dcdc_store_retention_mem( const void* context, uint8_t slot );
-
-/**
  * @brief Apply workaround to reduce standard deviation of RTToF results with fractional bandwidths
  *
  * This workaround reduces the standard deviation of observed RTToF result on the following bandwiths:
@@ -435,52 +248,56 @@ lr20xx_status_t lr20xx_workarounds_rttof_results_deviation( const void* context,
 lr20xx_status_t lr20xx_workarounds_rttof_results_deviation_store_retention_mem( const void* context, uint8_t slot_1,
                                                                                 uint8_t slot_2 );
 
-/**
- * @brief Enable the workaround for RTToF Extention mode
+/*!
+ * @brief Workaround helper to configure FIFO events and threshold levels with 1024-byte Tx/Rx FiFos
  *
- * This workaround must be called when attempting RTToF operations with @ref
- * lr20xx_rttof_mode_e:LR20XX_RTTOF_MODE_EXTENDED
+ * This workaround wraps @ref lr20xx_radio_fifo_cfg_irq when using 1024-byte Rx/Tx FiFos to allow settings @p
+ * tx_fifo_low_threshold and @p rx_fifo_low_threshold to value superior to 256.
  *
- * @param context Chip implementation context
+ * This workaround configures registers that are not maintained in memory during sleep mode. Call @ref
+ * lr20xx_workarounds_1024_byte_fifo_cfg_irq_store_retention_mem to register these registers as maintained during sleep
+ * mode.
  *
- * @return Operation status
+ * @param [in] context Chip implementation context
+ * @param [in] rx_fifo_irq_enable FIFO events triggering an interrupt in Rx
+ * @param [in] tx_fifo_irq_enable FIFO events triggering an interrupt in Tx
+ * @param [in] rx_fifo_high_threshold Rx FIFO threshold above which an interrupt (if
+ * LR20XX_RADIO_FIFO_FLAG_THRESHOLD_HIGH is enabled) is triggered
+ * @param [in] tx_fifo_low_threshold Tx FIFO threshold below which an interrupt (if LR20XX_RADIO_FIFO_FLAG_THRESHOLD_LOW
+ * is enabled) is triggered
+ * @param [in] rx_fifo_low_threshold Rx FIFO threshold below which an interrupt (if LR20XX_RADIO_FIFO_FLAG_THRESHOLD_LOW
+ * is enabled) is triggered
+ * @param [in] tx_fifo_high_threshold Tx FIFO threshold above which an interrupt (if
+ * LR20XX_RADIO_FIFO_FLAG_THRESHOLD_HIGH is enabled) is triggered
  *
- * @see lr20xx_rttof_set_params, lr20xx_workarounds_rttof_extended_stuck_second_request_disable,
- * lr20xx_workarounds_rttof_extended_stuck_second_request_store_retention_mem
+ * @returns Operation status
+ *
+ * @see lr20xx_radio_fifo_cfg_irq, lr20xx_radio_fifo_configure_1024_byte_tx_fifo,
+ * lr20xx_radio_fifo_configure_1024_byte_rx_fifo
  */
-lr20xx_status_t lr20xx_workarounds_rttof_extended_stuck_second_request_enable( const void* context );
+lr20xx_status_t lr20xx_workarounds_1024_byte_fifo_cfg_irq(
+    const void* context, lr20xx_radio_fifo_flag_t rx_fifo_irq_enable, lr20xx_radio_fifo_flag_t tx_fifo_irq_enable,
+    uint16_t rx_fifo_high_threshold, uint16_t tx_fifo_low_threshold, uint16_t rx_fifo_low_threshold,
+    uint16_t tx_fifo_high_threshold );
 
 /**
- * @brief Disable the RTToF workaround for Extention mode
+ * @brief Store the registers to configure the 1024 bytes Tx/Rx FiFos threshold related IRQs in retention memory
  *
- * If @ref lr20xx_workarounds_rttof_extended_stuck_second_request_enable has previously been called and @ref
- * lr20xx_rttof_mode_e:LR20XX_RTTOF_MODE_NORMAL are attempted, the workaround must be disabled calling this function.
+ * Calling this function allows to store the workaround registers for IRQ FiFo configuration with 1024-byte Tx/Rx FiFos
+ * during sleep mode. This helper function internally calls @ref lr20xx_system_add_register_to_retention_mem with the
+ * appropriate register address.
  *
- * @param context Chip implementation context
- *
- * @return Operation status
- *
- * @see lr20xx_rttof_set_params, lr20xx_workarounds_rttof_extended_stuck_second_request_enable,
- * lr20xx_workarounds_rttof_extended_stuck_second_request_store_retention_mem
- */
-lr20xx_status_t lr20xx_workarounds_rttof_extended_stuck_second_request_disable( const void* context );
-
-/**
- * @brief Store the registers for RTToF extended stuck workaround in retention memory
- *
- * Calling this function allows to store the workaround register during sleep mode. This helper function internally
- * calls @ref lr20xx_system_add_register_to_retention_mem with the appropriate register address.
- *
- * @param context Chip implementation context
- * @param slot Index in the storage list. Allowed values [0:31]
+ * @param [in] context Chip implementation context
+ * @param [in] retention_slot_rx_thresholds Retention memory slot to store Rx FiFo thresholds
+ * @param [in] retention_slot_tx_thresholds Retention memory slot to store Tx FiFo thresholds
  *
  * @return Operation status
  *
- * @see lr20xx_system_add_register_to_retention_mem, lr20xx_workarounds_rttof_extended_stuck_second_request_enable,
- * lr20xx_workarounds_rttof_extended_stuck_second_request_disable
+ * @see lr20xx_system_add_register_to_retention_mem, lr20xx_workarounds_1024_byte_fifo_cfg_irq
  */
-lr20xx_status_t lr20xx_workarounds_rttof_extended_stuck_second_request_store_retention_mem( const void* context,
-                                                                                            uint8_t     slot );
+lr20xx_status_t lr20xx_workarounds_1024_byte_fifo_cfg_irq_store_retention_mem( const void* context,
+                                                                               uint8_t     retention_slot_rx_thresholds,
+                                                                               uint8_t retention_slot_tx_thresholds );
 
 #ifdef __cplusplus
 }

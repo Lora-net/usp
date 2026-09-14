@@ -121,8 +121,8 @@ void ral_sx128x_bsp_get_lora_cad_det_peak( const void* context, ral_lora_sf_t sf
  * @param [out] pwr_consumption_in_ua The corresponding instantaneous power consumption
  * @return ral_status_t
  */
-ral_status_t ral_sx128x_bsp_get_instantaneous_tx_power_consumption(const void* context,
-    ral_sx128x_bsp_tx_cfg_output_params_t tx_cfg_output_params_local, sx128x_reg_mod_t reg_mode,
+ral_status_t ral_sx128x_bsp_get_instantaneous_tx_power_consumption(
+    const void* context, ral_sx128x_bsp_tx_cfg_output_params_t tx_cfg_output_params_local, sx128x_reg_mod_t reg_mode,
     uint32_t* pwr_consumption_in_ua );
 
 /**
@@ -134,8 +134,10 @@ ral_status_t ral_sx128x_bsp_get_instantaneous_tx_power_consumption(const void* c
  * @param [out] pwr_consumption_in_ua The corresponding instantaneous power consumption
  * @return ral_status_t
  */
-ral_status_t ral_sx128x_bsp_get_instantaneous_gfsk_rx_power_consumption( const void* context,
-    sx128x_reg_mod_t radio_reg_mode, bool rx_boosted, uint32_t* pwr_consumption_in_ua );
+ral_status_t ral_sx128x_bsp_get_instantaneous_gfsk_rx_power_consumption( const void*      context,
+                                                                         sx128x_reg_mod_t radio_reg_mode,
+                                                                         bool             rx_boosted,
+                                                                         uint32_t*        pwr_consumption_in_ua );
 
 /**
  * @brief Get the instantaneous power consumption for the given LoRa Rx configuration
@@ -147,8 +149,9 @@ ral_status_t ral_sx128x_bsp_get_instantaneous_gfsk_rx_power_consumption( const v
  * @param [out] pwr_consumption_in_ua The corresponding instantaneous power consumption
  * @return ral_status_t
  */
-ral_status_t ral_sx128x_bsp_get_instantaneous_lora_rx_power_consumption( const void* context,
-    sx128x_reg_mod_t reg_mode, ral_lora_bw_t bw, bool rx_boosted, uint32_t* pwr_consumption_in_ua );
+ral_status_t ral_sx128x_bsp_get_instantaneous_lora_rx_power_consumption( const void* context, sx128x_reg_mod_t reg_mode,
+                                                                         ral_lora_bw_t bw, bool rx_boosted,
+                                                                         uint32_t* pwr_consumption_in_ua );
 
 #ifdef __cplusplus
 }

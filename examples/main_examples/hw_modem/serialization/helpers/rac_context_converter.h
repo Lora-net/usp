@@ -45,6 +45,11 @@ extern "C" {
 #include <smtc_rac_api.h>                                 // Original API structures
 #include "serialization/generated/smtc_rac_context.pb.h"  // Generated protobuf structures
 
+#if defined( USE_FLRC_PROTOCOL )
+#include "smtc_flrp_api.h"        // FLRP protocol API structures
+#include "smtc_flrp_api_tests.h"  // smtc_flrp_flrc_advanced_radio_config_t
+#endif
+
 // ========================================
 // ENUM CONVERSION FUNCTIONS
 // ========================================
@@ -55,9 +60,9 @@ extern "C" {
 smtc_rac_priority_pb_t rac_convert_priority_to_pb( smtc_rac_priority_t native_priority );
 
 /**
- * \brief Convert protobuf priority to native priority
+ * \brief Convert protobuf priority to native priority (with error checking)
  */
-smtc_rac_priority_t rac_convert_priority_from_pb( smtc_rac_priority_pb_t pb_priority );
+bool rac_convert_priority_from_pb( smtc_rac_priority_pb_t pb_priority, smtc_rac_priority_t* output );
 
 /**
  * \brief Convert native modulation type to protobuf modulation type
@@ -119,13 +124,87 @@ void rac_convert_radio_params_to_pb( const smtc_rac_radio_lora_params_t* native_
                                      rac_radio_lora_params_pb_t*         pb_params );
 
 /**
- * \brief Convert protobuf radio params to native radio params
+ * \brief Convert protobuf LoRa radio params to native radio params
  *
  * \param [in] pb_params Protobuf radio params structure
  * \param [out] native_params Native radio params structure to populate
  */
 void rac_convert_radio_params_from_pb( const rac_radio_lora_params_pb_t* pb_params,
                                        smtc_rac_radio_lora_params_t*     native_params );
+
+#if defined( USE_FLRC_PROTOCOL )
+/**
+ * \brief Convert native FLRC radio params to protobuf FLRC radio params
+ *
+ * \param [in] native_params Native FLRC radio params structure
+ * \param [out] pb_params Protobuf FLRC radio params structure to populate
+ */
+void rac_convert_flrc_radio_params_to_pb( const smtc_rac_radio_flrc_params_t* native_params,
+                                          rac_radio_flrc_params_pb_t*         pb_params );
+
+/**
+ * \brief Convert protobuf FLRC radio params to native FLRC radio params
+ *
+ * \param [in] pb_params Protobuf FLRC radio params structure
+ * \param [out] native_params Native FLRC radio params structure to populate
+ * \param [out] sync_word_buffers Array of 3 buffers to store the sync words (each must be at least 4 bytes)
+ */
+void rac_convert_flrc_radio_params_from_pb( const rac_radio_flrc_params_pb_t* pb_params,
+                                            smtc_rac_radio_flrc_params_t*     native_params,
+                                            uint8_t*                          sync_word_buffers[3] );
+
+/**
+ * \brief Convert protobuf CMD_SET_FLRC_PROTOCOL_PARAMS payload to native FLRP radio config
+ *
+ * \param [in] pb_config flrc_protocol_radio_config_pb_t (flat FLRC + timing fields)
+ * \param [out] native_config Native FLRP radio config structure to populate
+ */
+void convert_pb_flrc_protocol_radio_config_to_native( const flrc_protocol_radio_config_pb_t* pb_config,
+                                                      smtc_flrp_radio_config_t*              native_config );
+
+/**
+ * \brief Map flrc_protocol_radio_config_pb_t to smtc_flrp_flrc_advanced_radio_config_t
+ */
+void convert_pb_flrc_protocol_radio_config_to_native_advanced(
+    const flrc_protocol_radio_config_pb_t* pb_config, smtc_flrp_flrc_advanced_radio_config_t* advanced_config );
+
+/**
+ * \brief Map flrp_flrc_advanced_radio_config_pb_t (CMD_FLRP_SET_PARAMS_ADVANCED) to
+ * smtc_flrp_flrc_advanced_radio_config_t
+ */
+void convert_pb_flrp_flrc_advanced_radio_config_to_native( const flrp_flrc_advanced_radio_config_pb_t* pb_config,
+                                                           smtc_flrp_flrc_advanced_radio_config_t* advanced_config );
+
+/**
+ * \brief Convert protobuf FLRP radio config (nested flrc / wor_rx / wor_tx) to smtc_flrp_radio_config_t
+ */
+void convert_pb_flrp_radio_config( const flrp_radio_config_pb_t* pb_config,
+                                   smtc_flrp_radio_config_t*     flrp_radio_config );
+
+/**
+ * \brief Convert native FLRP radio config to protobuf (inverse of convert_pb_flrp_radio_config)
+ *
+ * \return false if native_config or pb_config is NULL
+ */
+bool convert_native_flrp_radio_config_to_pb( const smtc_flrp_radio_config_t* native_config,
+                                             flrp_radio_config_pb_t*         pb_config );
+
+/**
+ * \brief Convert protobuf FLRP com config to smtc_flrp_com_config_t
+ *
+ * \return false if slave_dev_eui is not exactly 8 bytes, filter_len > 63, or enums are not recognized
+ */
+bool convert_pb_flrp_com_config_to_native( const flrp_com_config_pb_t* pb_config,
+                                           smtc_flrp_com_config_t*     native_config );
+
+/**
+ * \brief Convert protobuf FLRP API init config to smtc_flrp_api_config_t
+ *
+ * \return false if dev_eui size is not SMTC_FLRP_EUI_LENGTH or freq_plan is not a known enumerator
+ */
+bool convert_pb_flrp_api_config_to_native( const flrp_api_config_pb_t* pb_config,
+                                           smtc_flrp_api_config_t*     native_config );
+#endif  // USE_FLRC_PROTOCOL
 
 /**
  * \brief Convert protobuf data buffer setup to native data buffer setup

@@ -125,7 +125,7 @@ void hal_gpio_init_in( const hal_gpio_pin_names_t pin, const hal_gpio_pull_mode_
 void hal_gpio_init_out( const hal_gpio_pin_names_t pin, const uint32_t value )
 {
     gpio_t gpio = {
-        .pin = pin, .mode = GPIO_MODE_OUTPUT_PP, .pull = GPIO_NOPULL, .speed = GPIO_SPEED_FREQ_LOW, .alternate = 0
+        .pin = pin, .mode = GPIO_MODE_OUTPUT_PP, .pull = GPIO_NOPULL, .speed = GPIO_SPEED_FREQ_MEDIUM, .alternate = 0
     };
     gpio_init( &gpio, ( value != 0 ) ? GPIO_PIN_SET : GPIO_PIN_RESET, NULL );
 }
@@ -300,23 +300,23 @@ static void gpio_init( const gpio_t* gpio, const uint32_t value, const hal_gpio_
         switch( gpio->pin & 0x0F )
         {
         case 0:
-            HAL_NVIC_SetPriority( EXTI0_IRQn, 0, 0 );
+            HAL_NVIC_SetPriority( EXTI0_IRQn, 1, 1 );
             HAL_NVIC_EnableIRQ( EXTI0_IRQn );
             break;
         case 1:
-            HAL_NVIC_SetPriority( EXTI1_IRQn, 0, 0 );
+            HAL_NVIC_SetPriority( EXTI1_IRQn, 1, 1 );
             HAL_NVIC_EnableIRQ( EXTI1_IRQn );
             break;
         case 2:
-            HAL_NVIC_SetPriority( EXTI2_IRQn, 0, 0 );
+            HAL_NVIC_SetPriority( EXTI2_IRQn, 1, 1 );
             HAL_NVIC_EnableIRQ( EXTI2_IRQn );
             break;
         case 3:
-            HAL_NVIC_SetPriority( EXTI3_IRQn, 0, 0 );
+            HAL_NVIC_SetPriority( EXTI3_IRQn, 1, 1 );
             HAL_NVIC_EnableIRQ( EXTI3_IRQn );
             break;
         case 4:
-            HAL_NVIC_SetPriority( EXTI4_IRQn, 0, 0 );
+            HAL_NVIC_SetPriority( EXTI4_IRQn, 1, 1 );
             HAL_NVIC_EnableIRQ( EXTI4_IRQn );
             break;
         case 5:
@@ -324,11 +324,11 @@ static void gpio_init( const gpio_t* gpio, const uint32_t value, const hal_gpio_
         case 7:
         case 8:
         case 9:
-            HAL_NVIC_SetPriority( EXTI9_5_IRQn, 0, 0 );
+            HAL_NVIC_SetPriority( EXTI9_5_IRQn, 1, 1 );
             HAL_NVIC_EnableIRQ( EXTI9_5_IRQn );
             break;
         default:
-            HAL_NVIC_SetPriority( EXTI15_10_IRQn, 0, 0 );
+            HAL_NVIC_SetPriority( EXTI15_10_IRQn, 1, 1 );
             HAL_NVIC_EnableIRQ( EXTI15_10_IRQn );
             break;
         }

@@ -98,7 +98,7 @@ static void lpm_enter_sleep_mode( void );
 static void lpm_exit_sleep_mode( void );
 static void sleep_handler( void );
 
-#if( LOW_POWER_MODE == 1 )
+#if ( LOW_POWER_MODE == 1 )
 static void lpm_mcu_deinit( void );
 static void lpm_mcu_reinit( void );
 #endif
@@ -155,7 +155,7 @@ void hal_mcu_init( void )
     // Initialize Low Power Timer
     hal_lp_timer_init( HAL_LP_TIMER_ID_1 );
 
-#if( SX127X )
+#if ( SX127X )
     hal_lp_timer_init( HAL_LP_TIMER_ID_2 );
 #endif
 
@@ -322,7 +322,7 @@ static void system_clock_config( void )
 
 static void mcu_gpio_init( void )
 {
-#if( HW_DEBUG_PROBE == 1 )
+#if ( HW_DEBUG_PROBE == 1 )
     // Enable debug in sleep/stop/standby
     HAL_DBGMCU_EnableDBGSleepMode( );
     HAL_DBGMCU_EnableDBGStopMode( );
@@ -341,16 +341,14 @@ static void mcu_gpio_init( void )
     hal_gpio_init_in( RADIO_NRST, BSP_GPIO_PULL_MODE_NONE, BSP_GPIO_IRQ_MODE_OFF, NULL );
     hal_gpio_init_out( RADIO_ANTENNA_SWITCH, 0 );
 #else
-    hal_gpio_init_in( RADIO_BUSY_PIN, BSP_GPIO_PULL_MODE_NONE, BSP_GPIO_IRQ_MODE_OFF, NULL );
     // Here init only the pin as an exti rising and the callback will be attached later
-    hal_gpio_init_in( RADIO_DIOX, BSP_GPIO_PULL_MODE_DOWN, BSP_GPIO_IRQ_MODE_RISING, NULL );
+    hal_gpio_init_in( RADIO_BUSY_PIN, BSP_GPIO_PULL_MODE_NONE, BSP_GPIO_IRQ_MODE_OFF, NULL );
+    hal_gpio_init_in( RADIO_DIO_MAIN, BSP_GPIO_PULL_MODE_DOWN, BSP_GPIO_IRQ_MODE_RISING, NULL );
     hal_gpio_init_out( RADIO_NRST, 1 );
 #if defined( SX128X )
     hal_gpio_init_out( RADIO_ANTENNA_SWITCH, 1 );
 #elif defined( LR11XX_TRANSCEIVER ) && defined( ENABLE_MODEM_GNSS_FEATURE )
     hal_gpio_init_out( RADIO_LNA_CTRL, 0 );
-    hal_gpio_init_out( SMTC_LED_TX, 0 );
-    hal_gpio_init_out( SMTC_LED_RX, 0 );
 #elif defined( SX126X )
     // If the sx126x drives the rf switch with dio2, just put the SX126X_RADIO_RF_SWITCH_CTRL in pull up
     hal_gpio_init_in( SX126X_RADIO_RF_SWITCH_CTRL, BSP_GPIO_PULL_MODE_UP, BSP_GPIO_IRQ_MODE_OFF, NULL );
@@ -366,7 +364,7 @@ static void mcu_gpio_init( void )
  */
 static void lpm_enter_sleep_mode( void )
 {
-#if( LOW_POWER_MODE == 1 )
+#if ( LOW_POWER_MODE == 1 )
     // Deinit periph & enter Stop Mode
     lpm_mcu_deinit( );
 #if defined( SX1272 ) || defined( SX1276 )
@@ -390,7 +388,7 @@ static void lpm_enter_sleep_mode( void )
  */
 static void lpm_exit_sleep_mode( void )
 {
-#if( LOW_POWER_MODE == 1 )
+#if ( LOW_POWER_MODE == 1 )
     // Initializes the peripherals
     lpm_mcu_reinit( );
 #endif
@@ -415,7 +413,7 @@ static void sleep_handler( void )
     HAL_ResumeTick( );
 }
 
-#if( LOW_POWER_MODE == 1 )
+#if ( LOW_POWER_MODE == 1 )
 
 /**
  * @brief De-init periph begore going in sleep mode

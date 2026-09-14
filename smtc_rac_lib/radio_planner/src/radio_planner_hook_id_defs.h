@@ -62,6 +62,9 @@ enum RP_HOOK_ID_DEF
     RP_HOOK_ID_SUSPEND = 0,
     //@TODO have to find a way to manage it in case of multistack
     RP_HOOK_RAC_VERY_HIGH_PRIORITY,
+
+    RP_HOOK_RAC_FLRP_MAC,
+
     RP_HOOK_RAC_HIGH_PRIORITY,
     RP_HOOK_RAC_MEDIUM_PRIORITY,
 
@@ -109,7 +112,12 @@ enum RP_HOOK_ID_DEF
 #else
     RP_HOOK_ID_DIRECT_RP_ACCESS,
 #endif
+
     RP_HOOK_RAC_LOW_PRIORITY,
+
+    RP_HOOK_RAC_FLRP_WOR_TX,
+    RP_HOOK_RAC_FLRP_WOR_RX,
+
     RP_HOOK_RAC_VERY_LOW_PRIORITY,
 #if defined( ADD_BLE )
     RP_HOOK_ID_BLE_RX_BEACON,

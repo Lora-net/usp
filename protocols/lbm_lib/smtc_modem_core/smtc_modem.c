@@ -2667,7 +2667,8 @@ smtc_modem_return_code_t smtc_modem_dm_get_periodic_info_fields( uint8_t        
     RETURN_INVALID_IF_NULL( dm_fields_payload );
     RETURN_INVALID_IF_NULL( dm_field_length );
 
-    if( cloud_dm_get_info_field( stack_id, dm_fields_payload, dm_field_length, DM_INFO_PERIODIC ) == DM_OK )
+    if( cloud_dm_get_info_field( stack_id, ( uint8_t* ) dm_fields_payload, dm_field_length, DM_INFO_PERIODIC ) ==
+        DM_OK )
     {
         return SMTC_MODEM_RC_OK;
     }
@@ -2681,7 +2682,8 @@ smtc_modem_return_code_t smtc_modem_dm_set_periodic_info_fields( uint8_t        
     RETURN_BUSY_IF_TEST_MODE( );
     RETURN_INVALID_IF_NULL( dm_fields_payload );
 
-    if( cloud_dm_set_info_field( stack_id, dm_fields_payload, dm_field_length, DM_INFO_PERIODIC ) == DM_OK )
+    if( cloud_dm_set_info_field( stack_id, ( const uint8_t* ) dm_fields_payload, dm_field_length, DM_INFO_PERIODIC ) ==
+        DM_OK )
     {
         return SMTC_MODEM_RC_OK;
     }
@@ -2709,7 +2711,8 @@ smtc_modem_return_code_t smtc_modem_dm_request_immediate_info_field( uint8_t    
     }
     else
     {
-        if( cloud_dm_set_info_field( stack_id, dm_fields_payload, dm_field_length, DM_INFO_NOW ) != DM_OK )
+        if( cloud_dm_set_info_field( stack_id, ( const uint8_t* ) dm_fields_payload, dm_field_length, DM_INFO_NOW ) !=
+            DM_OK )
         {
             return_code = SMTC_MODEM_RC_INVALID;
         }

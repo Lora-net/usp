@@ -30,7 +30,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-foreach(radio lr11xx lr20xx sx126x sx127x sx128x)
+foreach(radio lr11xx lr20xx sx126x sx127x sx128x udp_pf)
     set(library_name smtc_ralf_${radio})
     add_library(${library_name} STATIC EXCLUDE_FROM_ALL
         ${CMAKE_CURRENT_SOURCE_DIR}/ralf_${radio}.c

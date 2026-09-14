@@ -240,7 +240,7 @@ void smtc_modem_hal_context_flash_pages_erase( const modem_context_type_t ctx_ty
  * @param [in] fmt  String Format
  * @param ...  String Arguments
  */
-void smtc_modem_hal_on_panic( uint8_t* func, uint32_t line, const char* fmt, ... );
+_Noreturn void smtc_modem_hal_on_panic( uint8_t* func, uint32_t line, const char* fmt, ... );
 
 /* ------------ Random management ------------*/
 

@@ -45,27 +45,63 @@
  * --- PUBLIC MACROS -----------------------------------------------------------
  */
 
+#ifndef CAD_DELAY_MS
 #define CAD_DELAY_MS 1000
-#define CAD_DURATION_MS 1000
+#endif  // CAD_DELAY_MS
+
+#ifndef CAD_DURATION_MS
+#define CAD_DURATION_MS 2000
+#endif  // CAD_DURATION_MS
 
 #if !defined( TYPE_OF_CAD )
 // #define TYPE_OF_CAD RAL_LORA_CAD_LBT // perform CAD and then TX
-// #define TYPE_OF_CAD RAL_LORA_CAD_RX  // perform CAD and then RX
-#define TYPE_OF_CAD RAL_LORA_CAD_ONLY  // perform CAD and stop the radio
-#endif                                 // !defined( TYPE_OF_CAD )
+#define TYPE_OF_CAD RAL_LORA_CAD_RX  // perform CAD and then RX
+// #define TYPE_OF_CAD RAL_LORA_CAD_ONLY  // perform CAD and stop the radio
+#endif  // !defined( TYPE_OF_CAD )
 
-#define FREQ_IN_HZ 868100000
+#ifndef RF_FREQ_IN_HZ
+#define RF_FREQ_IN_HZ 868100000
+#endif  // RF_FREQ_IN_HZ
 
+#ifndef LORA_SYNCWORD
 #define LORA_SYNCWORD 0x34
-#define LORA_SPREADING_FACTOR RAL_LORA_SF12
+#endif  // LORA_SYNCWORD
+
+#ifndef LORA_SPREADING_FACTOR
+#define LORA_SPREADING_FACTOR RAL_LORA_SF7
+#endif  // LORA_SPREADING_FACTOR
+
+#ifndef LORA_BANDWIDTH
 #define LORA_BANDWIDTH RAL_LORA_BW_125_KHZ
+#endif  // LORA_BANDWIDTH
+
+#ifndef LORA_CODING_RATE
 #define LORA_CODING_RATE RAL_LORA_CR_4_5
-#define LORA_IQ false
+#endif  // LORA_CODING_RATE
+
+#ifndef LORA_IQ
+#define LORA_IQ true
+#endif  // LORA_IQ
+
+#ifndef TX_OUTPUT_POWER_DBM
 #define TX_OUTPUT_POWER_DBM 14
-#define PAYLOAD_SIZE 12
+#endif  // TX_OUTPUT_POWER_DBM
+
+#ifndef PAYLOAD_SIZE
+#define PAYLOAD_SIZE 255
+#endif  // PAYLOAD_SIZE
+
+#ifndef LORA_PREAMBLE_LENGTH
 #define LORA_PREAMBLE_LENGTH 255
-#define LORA_CRC true
+#endif  // LORA_PREAMBLE_LENGTH
+
+#ifndef LORA_CRC
+#define LORA_CRC false
+#endif  // LORA_CRC
+
+#ifndef LORA_PKT_LEN_MODE
 #define LORA_PKT_LEN_MODE RAL_LORA_PKT_EXPLICIT
+#endif  // LORA_PKT_LEN_MODE
 
 /*
  * -----------------------------------------------------------------------------

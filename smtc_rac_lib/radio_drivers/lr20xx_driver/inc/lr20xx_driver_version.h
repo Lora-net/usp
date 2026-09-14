@@ -57,7 +57,7 @@ extern "C" {
 /**
  * @brief Value of driver version string
  */
-#define LR20XX_DRIVER_VERSION "v1.3.4"
+#define LR20XX_DRIVER_VERSION "v2.0.2"
 
 /*
  * -----------------------------------------------------------------------------

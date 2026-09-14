@@ -45,6 +45,7 @@ extern "C" {
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "lr20xx_radio_fsk_common_types.h"
 
 /*
@@ -107,8 +108,10 @@ typedef struct lr20xx_radio_oqpsk_15_4_params_s
                              //!< total number of bytes to transmit. The complete MPDU must be provided in the FIFO
                              //!< (except FCS if @ref LR20XX_RADIO_OQPSK_15_4_FCS_AUTO is used)
                              //!< Maximum value is 127 bytes.
-    uint16_t                           pbl_len_tx_in_bit;  //!< Length in bit of the preamble to send.
+    uint16_t                           pbl_len_tx_in_bit;  //!< Length in bit of the preamble to send
     lr20xx_radio_oqpsk_15_4_fcs_mode_t fcs_mode;           //!< Frame Check Sequence mode configuration
+    bool bypass_rx_length_check;  //!< Set to true to bypass the length check during Rx operations (so that there is no
+                                  //!< length error generated). Only available if Patch RAM is loaded
     lr20xx_radio_oqpsk_15_4_address_filtering_configuration_t
         address_filtering;  //!< Enable/disable address OQPSK 15.4 filtering
 } lr20xx_radio_oqpsk_15_4_params_t;

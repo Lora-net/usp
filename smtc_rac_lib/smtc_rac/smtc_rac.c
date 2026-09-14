@@ -40,6 +40,8 @@
 #include "smtc_rac.h"
 #include <stdbool.h>  // bool type
 #include <stdint.h>   // C99 types
+#include <stddef.h>   // NULL
+#include <string.h>   // memset
 
 #include "radio_planner.h"
 #include "ral.h"
@@ -58,6 +60,8 @@
 #include "ralf_sx127x.h"
 #elif defined( LR20XX )
 #include "ralf_lr20xx.h"
+#elif defined( UDP_PF )
+#include "ralf_udp_pf.h"
 #endif
 
 /*
@@ -247,6 +251,8 @@ ralf_t smtc_rac_radio = RALF_LR20XX_INSTANTIATE( NULL );
 #include "sx127x.h"
 static sx127x_t sx127x;
 ralf_t          smtc_rac_radio = RALF_SX127X_INSTANTIATE( &sx127x );
+#elif defined( UDP_PF )
+ralf_t smtc_rac_radio = RALF_UDP_PF_INSTANTIATE( NULL );
 #else
 #error "Please select radio board.."
 #endif
@@ -256,6 +262,9 @@ ralf_t          smtc_rac_radio = RALF_SX127X_INSTANTIATE( &sx127x );
 // TODO: HYT-129: hide these arrays in the rac_context
 static smtc_rac_callback_t smtc_rac_callbacks[RP_HOOK_ID_MAX];
 static smtc_rac_context_t  smtc_rac_context[RP_HOOK_ID_MAX];
+static void*               smtc_rac_context_private[RP_HOOK_ID_MAX];
+
+static uint8_t smtc_rac_post_callback_radio_id = RAC_INVALID_RADIO_ID;
 
 /*
  * -----------------------------------------------------------------------------
@@ -280,9 +289,11 @@ smtc_rac_return_code_t smtc_rac_get_version( smtc_usp_rac_version_t* version )
         return SMTC_RAC_INVALID_PARAMETER;
     }
 
-    version->major = USP_RAC_VERSION_MAJOR;
-    version->minor = USP_RAC_VERSION_MINOR;
-    version->patch = USP_RAC_VERSION_PATCH;
+    version->major       = USP_RAC_VERSION_MAJOR;
+    version->minor       = USP_RAC_VERSION_MINOR;
+    version->patch       = USP_RAC_VERSION_PATCH;
+    version->pre_release = USP_RAC_VERSION_PRE_RELEASE;
+    version->metadata    = USP_RAC_VERSION_METADATA;
 
     return SMTC_RAC_SUCCESS;
 }
@@ -292,8 +303,8 @@ void smtc_rac_init( void )
     smtc_modem_hal_protect_api_call( );
 
     RAC_CORE_LOG_INFO( "===== SMTC RAC INITIALIZATION =====" );
-    RAC_CORE_LOG_INFO( "USP/RAC Version: %d.%d.%d", USP_RAC_VERSION_MAJOR, USP_RAC_VERSION_MINOR,
-                       USP_RAC_VERSION_PATCH );
+    RAC_CORE_LOG_INFO( "USP/RAC Version: %d.%d.%d%s%s", USP_RAC_VERSION_MAJOR, USP_RAC_VERSION_MINOR,
+                       USP_RAC_VERSION_PATCH, USP_RAC_VERSION_PRE_RELEASE, USP_RAC_VERSION_METADATA );
 
 #if defined( SX128X )
     RAC_CORE_LOG_RADIO( "Radio Type: SX128X" );
@@ -305,6 +316,8 @@ void smtc_rac_init( void )
     RAC_CORE_LOG_RADIO( "Radio Type: LR20XX" );
 #elif defined( SX127X )
     RAC_CORE_LOG_RADIO( "Radio Type: SX127X" );
+#elif defined( UDP_PF )
+    RAC_CORE_LOG_RADIO( "Radio Type: UDP_PF" );
 #else
     RAC_CORE_LOG_ERROR( "Unknown radio type!" );
 #endif
@@ -343,12 +356,18 @@ void smtc_rac_init( void )
 
     RAC_CORE_LOG_INFO( "Configuring radio IRQ handling..." );
     smtc_modem_hal_irq_config_radio_irq( rp_radio_irq_callback, &smtc_rac_radio_planner );
-    RAC_CORE_LOG_DEBUG( "Radio IRQ callback configured" );
+    RAC_CORE_LOG_DEBUG( "Radio IRQ callback configured via HAL" );
 
     RAC_CORE_LOG_INFO( "Setting up radio planner hooks..." );
     rp_hook_init( &smtc_rac_radio_planner, RP_HOOK_ID_SUSPEND, ( void ( * )( void* ) )( smtc_rac_empty_callback ),
                   &smtc_rac_radio_planner );
     RAC_CORE_LOG_DEBUG( "Radio planner suspend hook configured" );
+
+    for( uint8_t i = 0; i < RP_HOOK_ID_MAX; i++ )
+    {
+        smtc_rac_context_private[i] = NULL;
+    }
+    RAC_CORE_LOG_DEBUG( "Private context array initialized" );
 
     RAC_CORE_LOG_INFO( "===== RAC INITIALIZATION COMPLETE =====" );
     smtc_modem_hal_unprotect_api_call( );
@@ -526,11 +545,34 @@ smtc_rac_return_code_t smtc_rac_unlock_radio_access( uint8_t radio_access_id )
 {
     return ( smtc_rac_abort_radio_submit( radio_access_id ) );
 }
+
+smtc_rac_return_code_t smtc_rac_immediate_radio_access( smtc_rac_priority_t priority, void ( *irq_callback )( void ) )
+{
+    bool status = rp_get_immediate_radio_access( smtc_rac_get_rp( ), ( uint8_t ) priority, irq_callback );
+    if( status == false )
+    {
+        SMTC_MODEM_HAL_TRACE_ERROR( "Fail to suspend radio access with following error code: %x\n", status );
+        return SMTC_RAC_ERROR;
+    }
+    return SMTC_RAC_SUCCESS;
+}
+smtc_rac_return_code_t smtc_rac_release_immediate_radio_access( void )
+{
+    bool status = rp_release_immediate_radio_access( smtc_rac_get_rp( ) );
+    if( status == false )
+    {
+        SMTC_MODEM_HAL_TRACE_ERROR( "Fail to release radio access with following error code: %x\n", status );
+        return SMTC_RAC_ERROR;
+    }
+    return SMTC_RAC_SUCCESS;
+}
 smtc_rac_return_code_t smtc_rac_submit_radio_transaction( uint8_t radio_access_id )
 {
     SMTC_RAC_CHECK_RADIO_ACCESS_ID( radio_access_id );
     smtc_rac_callbacks[radio_access_id].callback =
         smtc_rac_context[radio_access_id].scheduler_config.callback_post_radio_transaction;
+    memset( &smtc_rac_context[radio_access_id].smtc_rac_data_result, 0, sizeof( smtc_rac_data_result_t ) );
+
     switch( smtc_rac_context[radio_access_id].modulation_type )
     {
     case SMTC_RAC_MODULATION_LORA:
@@ -572,6 +614,9 @@ smtc_rac_return_code_t smtc_rac_submit_radio_transaction( uint8_t radio_access_i
             return smtc_rac_flrc( radio_access_id );
         }
         break;
+    case SMTC_RAC_MODULATION_FLRC_BURST:
+        return smtc_rac_flrc_burst( radio_access_id );
+        break;
     default:
         return SMTC_RAC_INVALID_PARAMETER;
     }
@@ -593,6 +638,41 @@ void* smtc_rac_get_radio_driver_context( void )
     return ( void* ) ( smtc_rac_get_rp( )->radio->ral.context );
 }
 
+void* smtc_rac_get_context_private( uint8_t radio_access_id )
+{
+    SMTC_RAC_CHECK_RADIO_ACCESS_ID( radio_access_id );
+    smtc_modem_hal_protect_api_call( );
+    RAC_CORE_LOG_API( "Retrieving private context for radio access ID: %u", radio_access_id );
+
+    if( radio_access_id >= RP_NB_HOOKS )
+    {
+        RAC_CORE_LOG_ERROR( "Invalid radio access ID: %u (max: %u)", radio_access_id, RP_NB_HOOKS - 1 );
+        smtc_modem_hal_unprotect_api_call( );
+        return NULL;
+    }
+
+    void* temp = smtc_rac_context_private[radio_access_id];
+    RAC_CORE_LOG_DEBUG( "Context pointer for ID %u: %p", radio_access_id, temp );
+    smtc_modem_hal_unprotect_api_call( );
+    return temp;
+}
+
+void smtc_rac_set_context_private( uint8_t radio_access_id, void* context_private )
+{
+    SMTC_RAC_CHECK_RADIO_ACCESS_ID( radio_access_id );
+    smtc_modem_hal_protect_api_call( );
+
+    if( context_private == NULL )
+    {
+        RAC_CORE_LOG_ERROR( "Context private is NULL!" );
+        smtc_modem_hal_unprotect_api_call( );
+        return;
+    }
+
+    smtc_rac_context_private[radio_access_id] = context_private;
+    smtc_modem_hal_unprotect_api_call( );
+}
+
 /*
 Private functions
 */
@@ -606,7 +686,8 @@ static void smtc_rac_rp_callback( void* callback_void )
 {
     smtc_rac_callback_t* callback_wrapper = ( smtc_rac_callback_t* ) callback_void;
     smtc_rac_context[callback_wrapper->argument].smtc_rac_data_result.radio_end_timestamp_ms =
-        ( smtc_rac_get_rp( )->irq_timestamp_ms[callback_wrapper->argument] );
+        ( rp_get_stats( smtc_rac_get_rp( ) ).end_of_task_time_ms[callback_wrapper->argument] );
+
     uint32_t    tmp_timestamp;
     rp_status_t tmp_status;
     rp_get_status( &smtc_rac_radio_planner, callback_wrapper->argument, &tmp_timestamp, &tmp_status );
@@ -622,6 +703,12 @@ static void smtc_rac_rp_callback( void* callback_void )
                 ( &smtc_rac_radio_planner )
                     ->radio_params[callback_wrapper->argument]
                     .rx.lora_pkt_status.rssi_pkt_in_dbm;
+            smtc_rac_context[callback_wrapper->argument].smtc_rac_data_result.lora_freq_offset_hz =
+                ( &smtc_rac_radio_planner )->radio_params[callback_wrapper->argument].rx.lora_pkt_status.freq_offset_hz;
+            smtc_rac_context[callback_wrapper->argument].smtc_rac_data_result.signal_rssi_result =
+                ( &smtc_rac_radio_planner )
+                    ->radio_params[callback_wrapper->argument]
+                    .rx.lora_pkt_status.signal_rssi_pkt_in_dbm;
         }
         else if( smtc_rac_context[callback_wrapper->argument].modulation_type == SMTC_RAC_MODULATION_FSK )
         {
@@ -654,5 +741,33 @@ static void smtc_rac_rp_callback( void* callback_void )
     {
         return;  // don't call the callback
     }
+
+    // Set smtc_rac_callback_wrapper_argument with callback_wrapper->argument
+    smtc_rac_post_callback_radio_id = callback_wrapper->argument;
+
     ( callback_wrapper->callback )( tmp_status );
+
+    // Reset smtc_rac_callback_wrapper_argument with callback_wrapper->argument after the user callback
+    smtc_rac_post_callback_radio_id = RAC_INVALID_RADIO_ID;
+}
+
+smtc_rac_return_code_t smtc_rac_set_active_time_out( uint8_t radio_access_id, uint32_t active_time_out_time_ms )
+{
+    radio_planner_t* rp                          = smtc_rac_get_rp( );
+    rp->active_time_out[radio_access_id]         = true;
+    rp->active_time_out_time_ms[radio_access_id] = active_time_out_time_ms;
+    return SMTC_RAC_SUCCESS;
+}
+
+smtc_rac_return_code_t smtc_rac_release_active_time_out( uint8_t radio_access_id )
+{
+    radio_planner_t* rp                          = smtc_rac_get_rp( );
+    rp->active_time_out[radio_access_id]         = false;
+    rp->active_time_out_time_ms[radio_access_id] = 0;
+    return SMTC_RAC_SUCCESS;
+}
+
+uint8_t smtc_rac_get_callback_radio_id( void )
+{
+    return smtc_rac_post_callback_radio_id;
 }

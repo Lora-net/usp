@@ -71,20 +71,12 @@ extern "C" {
 /**
  * @brief Set the modulation parameters for FLRC packets
  *
- * The workaround @ref lr20xx_workarounds_dcdc_configure must be called for Rx sub-GHz operations with regulator @ref
- * LR20XX_SYSTEM_REG_MODE_DCDC after this function to avoid possible RF sensitivity degradation.
- *
- * @note This function automatically applies the workaround @ref lr20xx_workarounds_dcdc_configure unless the macro @p
- * LR20XX_WORKAROUNDS_DISABLE_AUTOMATIC_DCDC_CONFIGURE is defined at compile time.
- *
  * @note This command is not available to LR2022
  *
  * @param[in] context Chip implementation context
  * @param[in] params Structure of FLRC modulation configuration
  *
  * @return lr20xx_status_t Operation status
- *
- * @see lr20xx_workarounds_dcdc_configure
  */
 lr20xx_status_t lr20xx_radio_flrc_set_modulation_params( const void*                           context,
                                                          const lr20xx_radio_flrc_mod_params_t* params );

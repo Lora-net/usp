@@ -114,17 +114,8 @@ lr20xx_status_t lr20xx_radio_z_wave_set_params( const void* context, const lr20x
         ( uint8_t ) params->fcs_mode,
     };
 
-    const lr20xx_status_t write_status =
-        ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_RADIO_Z_WAVE_SET_PKT_PARAMS_CMD_LENGTH, 0, 0 );
-
-    if( write_status != LR20XX_STATUS_OK )
-    {
-        return write_status;
-    }
-    else
-    {
-        return LR20XX_WORKAROUNDS_CONDITIONAL_APPLY_AUTOMATIC_DCDC_CONFIGURE( context );
-    }
+    return ( lr20xx_status_t ) lr20xx_hal_write( context, cbuffer, LR20XX_RADIO_Z_WAVE_SET_PKT_PARAMS_CMD_LENGTH, 0,
+                                                 0 );
 }
 
 lr20xx_status_t lr20xx_radio_z_wave_set_homeid( const void* context, const uint32_t homeid )
@@ -186,6 +177,7 @@ lr20xx_status_t lr20xx_radio_z_wave_get_pkt_status( const void* context, lr20xx_
         pkt_status->last_pkt_datarate_type   = ( lr20xx_radio_z_wave_datarate_type_t ) ( rbuffer[4] );
         pkt_status->rssi_avg_half_dbm_count  = ( rbuffer[5] >> 2 ) & 0x01;
         pkt_status->rssi_sync_half_dbm_count = ( rbuffer[5] >> 0 ) & 0x01;
+        pkt_status->last_channel_index       = rbuffer[5] >> 3;
         pkt_status->link_quality_indicator   = rbuffer[6];
     }
 

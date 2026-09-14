@@ -345,8 +345,9 @@ typedef enum
  */
 typedef enum lr20xx_system_reg_mode_e
 {
-    LR20XX_SYSTEM_REG_MODE_LDO  = 0x00,  //!< (Default) Only use the Low-Dropout Regulator
-    LR20XX_SYSTEM_REG_MODE_DCDC = 0x02,  //!< Switch on the DC-to-DC regulator in applicable chip modes
+    LR20XX_SYSTEM_REG_MODE_LDO = 0x00,  //!< (Default) Only use the Low-Dropout Regulator
+    LR20XX_SYSTEM_REG_MODE_DCDC =
+        0x02,  //!< Switch on the DC-to-DC regulator in applicable chip modes (a.k.a. SIMO converter)
 } lr20xx_system_reg_mode_t;
 
 /**

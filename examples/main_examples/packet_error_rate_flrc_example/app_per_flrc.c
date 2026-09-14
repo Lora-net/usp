@@ -40,6 +40,7 @@
 #include "main_per_flrc.h"
 
 #include "smtc_rac_api.h"
+#include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
 #include "smtc_modem_hal.h"
 
@@ -138,21 +139,26 @@ void per_flrc_init( void )
 
     // Buffer and size are set per-transaction in start_new_transaction()
 
-    flrc.transaction->radio_params.flrc.is_tx                = IS_TRANSMITTER;
-    flrc.transaction->radio_params.flrc.frequency_in_hz      = RF_FREQ_IN_HZ;
-    flrc.transaction->radio_params.flrc.tx_power_in_dbm      = TX_OUTPUT_POWER_DBM;
-    flrc.transaction->radio_params.flrc.br_in_bps            = FLRC_BR_BPS;
-    flrc.transaction->radio_params.flrc.bw_dsb_in_hz         = FLRC_BW_HZ;
-    flrc.transaction->radio_params.flrc.cr                   = FLRC_CR;
-    flrc.transaction->radio_params.flrc.pulse_shape          = FLRC_PULSE_SHAPE;
-    flrc.transaction->radio_params.flrc.preamble_len_in_bits = FLRC_PREAMBLE_BITS;
-    flrc.transaction->radio_params.flrc.sync_word_len        = FLRC_SYNCWORD_LEN;
-    flrc.transaction->radio_params.flrc.tx_syncword          = FLRC_TX_SYNCWORD;
-    flrc.transaction->radio_params.flrc.match_sync_word      = FLRC_MATCH_SYNCWORD;
-    flrc.transaction->radio_params.flrc.pld_is_fix           = FLRC_PLD_IS_FIX;
+    flrc.transaction->radio_params.flrc.is_tx             = IS_TRANSMITTER;
+    flrc.transaction->radio_params.flrc.frequency_in_hz   = RF_FREQ_IN_HZ;
+    flrc.transaction->radio_params.flrc.tx_power_in_dbm   = TX_OUTPUT_POWER_DBM;
+    flrc.transaction->radio_params.flrc.raw_bit_rate      = FLRC_RAW_BIT_RATE;
+    flrc.transaction->radio_params.flrc.cr                = FLRC_CR;
+    flrc.transaction->radio_params.flrc.pulse_shape       = FLRC_PULSE_SHAPE;
+    flrc.transaction->radio_params.flrc.preamble_len      = FLRC_PREAMBLE_BITS;
+    flrc.transaction->radio_params.flrc.sync_word_len     = FLRC_SYNCWORD_LEN;
+    flrc.transaction->radio_params.flrc.tx_syncword_index = FLRC_TX_SYNCWORD;
+    flrc.transaction->radio_params.flrc.match_sync_word   = FLRC_MATCH_SYNCWORD;
+    flrc.transaction->radio_params.flrc.pld_is_fix        = FLRC_PLD_IS_FIX;
 
-    static const uint8_t default_syncword[4]           = { 0x90, 0x56, 0x34, 0x12 };
-    flrc.transaction->radio_params.flrc.sync_word      = default_syncword;
+    static const uint8_t default_syncword_1[4] = { 0x90, 0x56, 0x34, 0x12 };
+    static const uint8_t default_syncword_2[4] = { 0x00, 0x00, 0x00, 0x00 };
+    static const uint8_t default_syncword_3[4] = { 0x00, 0x00, 0x00, 0x00 };
+
+    flrc.transaction->radio_params.flrc.sync_word[0] = &default_syncword_1[0];
+    flrc.transaction->radio_params.flrc.sync_word[1] = &default_syncword_2[0];
+    flrc.transaction->radio_params.flrc.sync_word[2] = &default_syncword_3[0];
+
     flrc.transaction->radio_params.flrc.crc_type       = FLRC_CRC;
     flrc.transaction->radio_params.flrc.crc_seed       = 0x00000000;  // Left default value as is
     flrc.transaction->radio_params.flrc.crc_polynomial = 0x00000000;  // Left default value as is
@@ -163,9 +169,8 @@ void per_flrc_init( void )
     SMTC_HAL_TRACE_INFO( "CONFIG Modulation: FLRC\n" );
     SMTC_HAL_TRACE_INFO( "CONFIG Frequency: %u Hz (%u MHz)\n", RF_FREQ_IN_HZ, RF_FREQ_IN_HZ / 1000000 );
     SMTC_HAL_TRACE_INFO( "CONFIG TX Power: %d dBm\n", TX_OUTPUT_POWER_DBM );
-    SMTC_HAL_TRACE_INFO( "CONFIG Bitrate: %u bps (%u kbps)\n", FLRC_BR_BPS, FLRC_BR_BPS / 1000 );
-    SMTC_HAL_TRACE_INFO( "CONFIG Bandwidth: %u Hz (%u kHz)\n", FLRC_BW_HZ, FLRC_BW_HZ / 1000 );
-    SMTC_HAL_TRACE_INFO( "CONFIG Coding Rate: %d\n", FLRC_CR );
+    SMTC_HAL_TRACE_INFO( "CONFIG Bitrate: %s (RAL) \n", ral_flrc_raw_bit_rate_to_str( FLRC_RAW_BIT_RATE ) );
+    SMTC_HAL_TRACE_INFO( "CONFIG Coding Rate: %s\n", ral_flrc_cr_to_str( FLRC_CR ) );
     SMTC_HAL_TRACE_INFO( "CONFIG Preamble Length: %d bits\n", FLRC_PREAMBLE_BITS );
     if( !IS_TRANSMITTER )
     {
@@ -200,8 +205,8 @@ static void unified_transaction_callback( rp_status_t status )
     uint32_t tmp_delayed_cnt              = 1;
     int32_t  add_delay_ms                 = 0;
 
-    set_led( SMTC_PF_LED_TX, false );
-    set_led( SMTC_PF_LED_RX, false );
+    hal_led_set( HAL_LED_TX, false );
+    hal_led_set( HAL_LED_RX, false );
 
     switch( status )
     {
@@ -443,11 +448,11 @@ static void pre_transaction_callback( void )
 {
     if( IS_TRANSMITTER )
     {
-        set_led( SMTC_PF_LED_TX, true );
+        hal_led_set( HAL_LED_TX, true );
     }
     else
     {
-        set_led( SMTC_PF_LED_RX, true );
+        hal_led_set( HAL_LED_RX, true );
     }
 }
 
