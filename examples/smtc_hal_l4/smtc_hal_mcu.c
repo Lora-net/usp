@@ -58,7 +58,7 @@
 #include <stdio.h>
 #endif
 
-#if defined( SX1272 ) || defined( SX1276 )
+#if defined( SX127X )
 #include "sx127x_hal.h"
 #endif
 
@@ -73,7 +73,9 @@
  */
 
 // Low power is enabled (0 will disable it)
+#ifndef LOW_POWER_MODE
 #define LOW_POWER_MODE 1
+#endif
 // 1 to enable debug with probe (ie do not de init pins)
 #ifndef HW_DEBUG_PROBE
 #define HW_DEBUG_PROBE 0
@@ -334,7 +336,7 @@ static void mcu_gpio_init( void )
 #endif
 
     hal_gpio_init_out( RADIO_NSS, 1 );
-#if defined( SX1272 ) || defined( SX1276 )
+#if defined( SX127X )
     hal_gpio_init_in( RADIO_DIO_0, BSP_GPIO_PULL_MODE_DOWN, BSP_GPIO_IRQ_MODE_RISING, NULL );
     hal_gpio_init_in( RADIO_DIO_1, BSP_GPIO_PULL_MODE_DOWN, BSP_GPIO_IRQ_MODE_RISING_FALLING, NULL );
     hal_gpio_init_in( RADIO_DIO_2, BSP_GPIO_PULL_MODE_DOWN, BSP_GPIO_IRQ_MODE_RISING, NULL );
@@ -367,7 +369,7 @@ static void lpm_enter_sleep_mode( void )
 #if ( LOW_POWER_MODE == 1 )
     // Deinit periph & enter Stop Mode
     lpm_mcu_deinit( );
-#if defined( SX1272 ) || defined( SX1276 )
+#if defined( SX127X )
     if( sx127x_hal_timer_is_started( NULL ) == true )
     {
         HAL_PWREx_EnterSTOP1Mode( PWR_STOPENTRY_WFI );

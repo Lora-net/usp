@@ -12,6 +12,7 @@ set(SOURCES
 
 add_library(smtc_rac STATIC ${SOURCES})
 
+
 string(TOUPPER ${RADIO_FAMILY} RADIO_FAMILY_UPPER)
 target_compile_definitions(smtc_rac PUBLIC
     ${RADIO_FAMILY_UPPER}
@@ -43,28 +44,20 @@ else()
 endif()
 
 message(STATUS "Applied RAC library logging configuration")
+message(STATUS "PROJECT_SOURCE_DIR (smtc_rac): ${PROJECT_SOURCE_DIR}")
 
 # Include necessary directories
 target_include_directories(smtc_rac PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../smtc_rac_api
-    ${CMAKE_CURRENT_SOURCE_DIR}/../smtc_ral/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../smtc_ralf/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../radio_planner/src
+    ${PROJECT_SOURCE_DIR}/smtc_rac_api
 )
-
-# Add radio driver includes conditionally for workarounds
-if(${RADIO_FAMILY} STREQUAL "lr20xx")
-    target_include_directories(smtc_rac PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../radio_drivers/lr20xx_driver/inc
-    )
-endif()
 
 # Link required dependencies
 target_link_libraries(smtc_rac PUBLIC
     smtc_hal
-    smtc_ral_${RADIO_FAMILY}
     smtc_ralf_${RADIO_FAMILY}
+    smtc_ral_${RADIO_FAMILY}
+    ${radio_driver_library}
     radio_planner
 )
 

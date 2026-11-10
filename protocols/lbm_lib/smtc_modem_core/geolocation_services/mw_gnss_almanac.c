@@ -51,7 +51,7 @@
 #include "modem_supervisor_light.h"
 #include "modem_event_utilities.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_modem_geolocation_api.h"
 #include "radio_planner.h"
 #include "radio_planner_hook_id_defs.h"

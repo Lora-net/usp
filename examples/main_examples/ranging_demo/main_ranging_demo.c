@@ -65,7 +65,7 @@
 #include "ralf_defs.h"
 #include "ralf.h"
 #include "smtc_rac_api.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 #include "smtc_hal_mcu.h"
 #include "smtc_hal_gpio.h"

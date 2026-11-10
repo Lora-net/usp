@@ -43,7 +43,7 @@
 #include "smtc_rac_api.h"
 #include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "PER-FSK"
@@ -101,10 +101,10 @@
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
 
-#if( ROLE == RECEIVER )
+#if ( ROLE == RECEIVER )
 static const bool     IS_TRANSMITTER       = false;
 static const uint32_t INTER_EXCHANGE_DELAY = 0;  // ms
-#elif( ROLE == TRANSMITTER )
+#elif ( ROLE == TRANSMITTER )
 static const bool     IS_TRANSMITTER       = true;
 static const uint32_t INTER_EXCHANGE_DELAY = 300;  // ms
 #else

@@ -48,7 +48,7 @@
 #include "lorawan_send_management.h"
 #include "smtc_modem_api.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lorawan_api.h"
 #include "radio_planner.h"
 #include "radio_planner_hook_id_defs.h"

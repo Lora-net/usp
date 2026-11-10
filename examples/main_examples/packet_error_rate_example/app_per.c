@@ -43,7 +43,7 @@
 #include "smtc_rac_api.h"
 #include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "PER"
@@ -101,17 +101,17 @@
 #define COUNTER_OFFSET ( SEPARATOR_OFFSET + SEPARATOR_SIZE )
 
 #define LBT_SNIFF_DURATION_MS_DEFAULT ( 5 )
-#define LBT_THRESHOLD_DBM_DEFAULT ( int16_t )( -80 )
+#define LBT_THRESHOLD_DBM_DEFAULT ( int16_t ) ( -80 )
 #define LBT_BW_HZ__DEFAULT ( 200000 )
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
 
-#if( ROLE == RECEIVER )
+#if ( ROLE == RECEIVER )
 static const bool     IS_TRANSMITTER       = false;
 static const uint32_t INTER_EXCHANGE_DELAY = 0;  // ms
-#elif( ROLE == TRANSMITTER )
+#elif ( ROLE == TRANSMITTER )
 static const bool     IS_TRANSMITTER       = true;
 static const uint32_t INTER_EXCHANGE_DELAY = 300;  // ms
 #else

@@ -44,7 +44,7 @@
 #include <stdint.h>
 
 #include "smtc_hal_dbg_trace.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 #include "ral.h"
 
 /*

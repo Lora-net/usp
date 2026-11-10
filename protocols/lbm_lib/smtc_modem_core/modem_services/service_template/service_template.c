@@ -44,7 +44,7 @@
 #include "modem_supervisor_light.h"
 #include "smtc_modem_api.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lorawan_api.h"
 
 /*

@@ -46,7 +46,7 @@
 #include "lorawan_send_management.h"
 #include "modem_supervisor_light.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lr1mac_defs.h"
 #include "lorawan_api.h"
 #include "lorawan_fmp_package.h"
@@ -413,9 +413,10 @@ void lorawan_fmp_package_service_get_id( uint8_t* pkt_id, uint8_t* pkt_version, 
     *pkt_version = FMP_VERSION;
     *pkt_port    = FMP_PORT;
 }
-bool lorawan_fmp_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_t* nb_bytes_read_payload_in,
-                               receive_win_t rx_window, uint8_t* payload_out, uint8_t* payload_out_length,
-                               const uint8_t max_payload_out_length, uint32_t rx_timestamp_ms )
+bool lorawan_fmp_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_t payload_in_length,
+                               uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window, uint8_t* payload_out,
+                               uint8_t* payload_out_length, const uint8_t max_payload_out_length,
+                               uint32_t rx_timestamp_ms )
 {
     *payload_out_length = 0;
     uint8_t                    service_id;
@@ -437,8 +438,16 @@ bool lorawan_fmp_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_t* n
         return false;
     }
 
+    if( payload_in_length < 1 )
+    {
+        return false;
+    }
     uint8_t cmd_id = payload_in[0];
     if( cmd_id >= sizeof( fmp_req_cmd_size ) )
+    {
+        return false;
+    }
+    if( payload_in_length < fmp_req_cmd_size[cmd_id] )
     {
         return false;
     }
@@ -837,7 +846,6 @@ static bool fmp_test( void )
     };
 
     uint8_t                    nb_errors = 0;
-    lorawan_fmp_package_ctx_t* ctx       = NULL;
     uint8_t                    stack_id  = 0;
     uint8_t                    service_id;
     lorawan_fmp_package_ctx_t* ctx = lorawan_fmp_package_get_ctx_from_stack_id( stack_id, &service_id );

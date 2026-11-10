@@ -93,8 +93,18 @@ extern "C" {
 #define RP_VERSION_MAJOR ( 1 )
 #define RP_VERSION_MINOR ( 0 )
 #define RP_VERSION_PATCH ( 3 )
+#elif defined( RP2_104 )
+#define RP_VERSION_REVISION ( 2 )
+#define RP_VERSION_MAJOR ( 1 )
+#define RP_VERSION_MINOR ( 0 )
+#define RP_VERSION_PATCH ( 4 )
+#elif defined( RP2_105 )
+#define RP_VERSION_REVISION ( 2 )
+#define RP_VERSION_MAJOR ( 1 )
+#define RP_VERSION_MINOR ( 0 )
+#define RP_VERSION_PATCH ( 5 )
 #else
-#error "RP_VERSION (LoRaWAN Regional Parameter version) must be defined: RP2_101 or RP2_103"
+#error "RP_VERSION (LoRaWAN Regional Parameter version) must be defined: RP2_101, RP2_103, RP2_104 or RP2_105"
 #endif
 
 #define SMTC_REAL_PING_SLOT_PERIODICITY_DEFAULT 7  // Default ping slot period (128s)
@@ -143,7 +153,7 @@ typedef enum smtc_real_region_types_e
 #if defined( REGION_CN_470_RP_1_0 )
     SMTC_REAL_REGION_CN_470_RP_1_0 = 12,
 #endif
-#if defined( RP2_103 )
+#if ( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
 #if defined( REGION_AS_923 )
     SMTC_REAL_REGION_AS_923_GRP4 = 13,
 #endif
@@ -161,6 +171,17 @@ typedef enum smtc_real_status_e
     SMTC_REAL_STATUS_ERROR,
 } smtc_real_status_t;
 
+#if ( defined( RP2_104 ) || defined( RP2_105 ) )
+#define SMTC_REAL_FREQ_MIN_800MHZ ( 863100000 )  // Hz
+#define SMTC_REAL_STEP_FREQ_800MHZ ( 200000 )    // Hz
+static const uint32_t smtc_real_default_freq_800mhz_cflist[] = {
+    865062500, 865402500, 865602500, 865785000, 865985000
+};  // Channel 35 to 39 for 800MHz CFListType=1
+
+#define SMTC_REAL_FREQ_MIN_900MHZ ( 915100000 )  // Hz
+#define SMTC_REAL_STEP_FREQ_900MHZ ( 100000 )    // Hz
+
+#endif
 /**
  * API return status
  */
@@ -212,7 +233,7 @@ static const uint8_t smtc_real_region_list[] = {
 #if defined( REGION_CN_470_RP_1_0 )
     SMTC_REAL_REGION_CN_470_RP_1_0,
 #endif
-#if defined( RP2_103 )
+#if ( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
 #if defined( REGION_AS_923 )
     SMTC_REAL_REGION_AS_923_GRP4,
 #endif
@@ -233,7 +254,7 @@ typedef struct smtc_real_ctx_s
 {
     uint32_t* tx_frequency_channel_ctx;
     uint32_t* rx1_frequency_channel_ctx;
-    uint8_t*  channel_index_enabled_ctx;
+    uint8_t*  tx_channel_index_enabled_ctx;
     uint8_t*  unwrapped_channel_mask_ctx;
     uint8_t*  min_tx_dr_channel_ctx;
     uint8_t*  max_tx_dr_channel_ctx;
@@ -252,7 +273,7 @@ typedef struct smtc_real_const_s
     uint8_t         const_number_of_tx_channel;
     uint8_t         const_number_of_rx_channel;
     uint8_t         const_number_of_boot_tx_channel;
-    uint8_t         const_number_of_channel_bank;
+    uint8_t         const_number_of_channel_banks;
     uint8_t         const_join_accept_delay1;
     uint8_t         const_received_delay1;
     uint8_t         const_tx_power_dbm;
@@ -273,13 +294,14 @@ typedef struct smtc_real_const_s
     uint8_t*        const_sync_word_gfsk;
     uint8_t*        const_sync_word_lr_fhss;
     uint8_t         const_min_tx_dr;
-    uint8_t         const_min_tx_dr_limit;
+    uint8_t         const_min_tx_dr_limit;  // Minimal TX DR when uplink_dwell_time == 1
     uint8_t         const_min_rx_dr;
     uint8_t         const_max_tx_dr;
     uint8_t         const_max_rx_dr;
     uint8_t         const_number_rx1_dr_offset;
-    uint16_t        const_dr_bitfield;
-    uint16_t        const_default_tx_dr_bit_field;
+    uint16_t        const_tx_dr_bitfield;
+    uint16_t        const_rx_dr_bitfield;
+    uint16_t        const_default_tx_dr_bit_field;  // DR bitfield for join channels & CFList channels (Dynamic)
     uint8_t         const_number_of_tx_dr;
     bool            const_tx_param_setup_req_supported;
     bool            const_new_channel_req_supported;
@@ -288,7 +310,10 @@ typedef struct smtc_real_const_s
     uint32_t        const_lbt_sniff_duration_ms;
     int16_t         const_lbt_threshold_dbm;
     uint32_t        const_lbt_bw_hz;
-    const uint8_t*  const_max_payload_m;
+    const uint8_t*  const_tx_max_payload_m_dwell_time_off;  // Default, in regions where no TX dwell time
+    const uint8_t*  const_tx_max_payload_m_dwell_time_on;
+    const uint8_t*  const_rx_max_payload_m_dwell_time_off;  // Default, in regions where no RX dwell time
+    const uint8_t*  const_rx_max_payload_m_dwell_time_on;
     ral_lora_cr_t   const_coding_rate;
     uint8_t         const_dtc_number_of_band;
     const uint16_t* const_dtc_by_band;
@@ -296,7 +321,7 @@ typedef struct smtc_real_const_s
     const uint8_t*  const_mobile_longrange_dr_distri;
     const uint8_t*  const_mobile_lowpower_dr_distri;
     const uint8_t*  const_default_dr_distri;
-    cf_list_type_t  const_cf_list_type_supported;
+    uint8_t         const_cf_list_type_supported;  // bit field of cf_list_type supported
     uint8_t         const_beacon_dr;
     uint32_t        const_beacon_frequency;
     uint32_t        const_ping_slot_frequency;
@@ -327,7 +352,7 @@ typedef struct smtc_real_s
         region_cn470_context_t cn470;
 #endif
 #if defined( REGION_WW_2G4 )
-        region_ww_2g4_context_t ww_2g4;
+        region_ww2g4_context_t ww2g4;
 #endif
 #if defined( REGION_IN_865 )
         region_in865_context_t in865;

@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "smtc_modem_crypto.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 #include <string.h>  //for memcpy
 /*
@@ -63,7 +63,7 @@
 /*
  * Maximum size of the message that can be handled by the crypto operations
  */
-#define CRYPTO_MAXMESSAGE_SIZE 256
+#define CRYPTO_MAXMESSAGE_SIZE 255
 
 /*
  * CMAC/AES Message Integrity Code (MIC) Block B0 size
@@ -345,7 +345,7 @@ smtc_modem_crypto_return_code_t smtc_modem_crypto_compute_and_add_mic( uint8_t* 
                                                                        uint8_t stack_id )
 {
     smtc_modem_crypto_return_code_t rc;
-    uint32_t                        computed_mic;
+    uint32_t                        computed_mic = 0;
     rc = compute_mic( buffer, size, key_id, devaddr, dir, fcnt, &computed_mic, stack_id );
     memcpy( &buffer[size], ( uint8_t* ) &computed_mic, 4 );
     return rc;

@@ -5,13 +5,16 @@
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
+# Toolchain prefix for ARM GNU Toolchain
+set(TOOLCHAIN_CROSS_PREFIX "arm-none-eabi-" CACHE STRING "Cross compiler toolchain prefix")
+
 # Toolchain configuration
-set(CMAKE_C_COMPILER arm-none-eabi-gcc)
-set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
-set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
-set(CMAKE_OBJCOPY arm-none-eabi-objcopy)
-set(CMAKE_OBJDUMP arm-none-eabi-objdump)
-set(CMAKE_SIZE arm-none-eabi-size)
+set(CMAKE_C_COMPILER ${TOOLCHAIN_CROSS_PREFIX}gcc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_CROSS_PREFIX}g++)
+set(CMAKE_ASM_COMPILER ${TOOLCHAIN_CROSS_PREFIX}gcc)
+set(CMAKE_OBJCOPY ${TOOLCHAIN_CROSS_PREFIX}objcopy)
+set(CMAKE_OBJDUMP ${TOOLCHAIN_CROSS_PREFIX}objdump)
+set(CMAKE_SIZE ${TOOLCHAIN_CROSS_PREFIX}size)
 
 # MCU-specific compiler flags
 # Cortex-M23: ARMv8-M baseline architecture, NO FPU

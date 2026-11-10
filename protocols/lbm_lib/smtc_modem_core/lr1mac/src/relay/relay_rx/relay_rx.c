@@ -45,7 +45,7 @@
 #include "radio_planner.h"
 #include "lorawan_api.h"
 #include "lr1mac_utilities.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_core.h"
 #include "lorawan_relay_rx_service.h"
 #include "relay_mac_parser.h"
@@ -237,10 +237,12 @@ static void config_enqueue_ack( const relay_config_t* config, const wor_infos_t*
  * @brief Compute the difference between the IRQ TX Done on the ED and RX Done on the relay
  *
  * @param[in]   datarate    Datarate of the message
+ * @param[in]   direction   UP_LINK if datarate is an ED uplink datarate (TX table),
+ *                          DOWN_LINK if it is a relay channel datarate (RX table)
  * @param[in]   payload_len Length of the messages
  * @return int16_t  Difference in µS
  */
-static int16_t relay_compute_rx_done_correction( uint8_t datarate, uint16_t payload_len );
+static int16_t relay_compute_rx_done_correction( uint8_t datarate, direction_frame_t direction, uint16_t payload_len );
 
 /**
  * @brief Check if received MIC is valid
@@ -463,12 +465,12 @@ void relay_fwd_dl( uint8_t stack_id, const uint8_t* buffer, uint8_t len )
         relay_start( );
     }
     // Downlink could be LORA or FSK
-    const modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate( real, dl_dr );
+    const modulation_type_t modulation_type = smtc_real_get_modulation_type_from_rx_datarate( real, dl_dr );
     rp_radio_params_t       radio_params    = { 0 };
 
     rp_task_t rp_task = {
-        .start_time_ms = relay_info.rx_uplink_timestamp_ms + RXR_WINDOWS_DELAY_S * 1000 -
-                         smtc_modem_hal_get_radio_tcxo_startup_delay_ms( ),
+        .start_time_ms         = relay_info.rx_uplink_timestamp_ms + RXR_WINDOWS_DELAY_S * 1000 -
+                                 smtc_modem_hal_get_radio_tcxo_startup_delay_ms( ),
         .hook_id               = RP_HOOK_ID_RELAY_FORWARD_RXR,
         .state                 = RP_TASK_STATE_SCHEDULE,
         .launch_task_callbacks = relay_rxr_tx_launch_callback,
@@ -481,10 +483,10 @@ void relay_fwd_dl( uint8_t stack_id, const uint8_t* buffer, uint8_t len )
         lr1mac_bandwidth_t  bw;
         ralf_params_lora_t* lora_param = &radio_params.tx.lora;
 
-        smtc_real_lora_dr_to_sf_bw( real, dl_dr, &sf, &bw );
+        smtc_real_lora_rx_dr_to_sf_bw( real, dl_dr, &sf, &bw );
 
         lora_param->rf_freq_in_hz     = dl_freq;
-        lora_param->sync_word         = smtc_real_get_sync_word( real );
+        lora_param->sync_word         = smtc_real_get_sync_word( real, sf );
         lora_param->output_pwr_in_dbm = smtc_real_clamp_output_power_eirp_vs_freq_and_dr(
             real, smtc_real_get_default_max_eirp( real ), lora_param->rf_freq_in_hz, dl_dr );
 
@@ -582,7 +584,8 @@ bool relay_update_config( const relay_config_t* config )
 
     for( uint8_t i = 0; i < config->nb_wor_channel; i++ )
     {
-        if( smtc_real_get_modulation_type_from_datarate( relay_info.lr1mac->real, config->channel_cfg[i].dr ) != LORA )
+        if( smtc_real_get_modulation_type_from_rx_datarate( relay_info.lr1mac->real, config->channel_cfg[i].dr ) !=
+            LORA )
         {
             SMTC_MODEM_HAL_TRACE_PRINTF( "Invalid dr (%d) on ch %d\n", config->channel_cfg[i].dr, i );
             return false;
@@ -620,7 +623,7 @@ bool relay_update_config( const relay_config_t* config )
         // compensation between a join and an uplink
 
         relay_info.t_irq_comp_wor_ms[i] =
-            relay_compute_rx_done_correction( relay_config.channel_cfg[i].dr, WOR_UPLINK_LENGTH ) / 1000;
+            relay_compute_rx_done_correction( relay_config.channel_cfg[i].dr, DOWN_LINK, WOR_UPLINK_LENGTH ) / 1000;
 
         relay_info.wor_toa_ms[i] = ral_get_lora_time_on_air_in_ms( &relay_info.radio->ral, &param.tx.lora.pkt_params,
                                                                    &param.tx.lora.mod_params );
@@ -796,7 +799,7 @@ static void callback_relay( void* context )
         uint8_t                       sf;
         lr1mac_bandwidth_t            bw;
         const relay_channel_config_t* channel_cfg = &relay_config.channel_cfg[relay_info.current_ch_idx];
-        smtc_real_lora_dr_to_sf_bw( relay_info.lr1mac->real, channel_cfg->dr, &sf, &bw );
+        smtc_real_lora_rx_dr_to_sf_bw( relay_info.lr1mac->real, channel_cfg->dr, &sf, &bw );
 
         rx_success               = true;
         relay_info.buffer_length = relay_info.lr1mac->rp->rx_payload_size[RP_HOOK_ID_RELAY_RX_CAD];
@@ -1025,7 +1028,7 @@ static void manage_fsm( const uint32_t irq_timestamp_ms, const bool cad_success,
 
             // Standard uplink has already been check to forward (or not) when WOR MIC is check
             const int16_t rx_correct_us =
-                relay_compute_rx_done_correction( get_ul_dr( &relay_wor_info ), relay_info.buffer_length );
+                relay_compute_rx_done_correction( get_ul_dr( &relay_wor_info ), UP_LINK, relay_info.buffer_length );
             relay_info.rx_uplink_timestamp_ms = irq_timestamp_ms - ( rx_correct_us / 1000 );
 
             if( fwd_msg == true )
@@ -1386,7 +1389,7 @@ static void notify_unknown_ed( const wor_infos_t* wor )
                                  smtc_modem_hal_get_time_in_ms( ) + 20, RELAY_SERVICE_NOTIFY_UNKNOWN_ED );
 }
 
-static int16_t relay_compute_rx_done_correction( uint8_t datarate, uint16_t payload_len )
+static int16_t relay_compute_rx_done_correction( uint8_t datarate, direction_frame_t direction, uint16_t payload_len )
 {
     const uint16_t delay_fft_sf[12 - 5 + 1] = { 23, 45, 91, 181, 362, 724, 1448, 2896 };  //(1<<sf)/sqrt(2)
 
@@ -1396,11 +1399,22 @@ static int16_t relay_compute_rx_done_correction( uint8_t datarate, uint16_t payl
     uint8_t            clock_shift      = 0;
     uint8_t            ppm              = 0;
 
-    if( smtc_real_get_modulation_type_from_datarate( relay_info.lr1mac->real, datarate ) != LORA )
+    if( direction == UP_LINK )
     {
-        return 0;
+        if( smtc_real_get_modulation_type_from_tx_datarate( relay_info.lr1mac->real, datarate ) != LORA )
+        {
+            return 0;
+        }
+        smtc_real_lora_tx_dr_to_sf_bw( relay_info.lr1mac->real, datarate, &sf, &bw );
     }
-    smtc_real_lora_dr_to_sf_bw( relay_info.lr1mac->real, datarate, &sf, &bw );
+    else
+    {
+        if( smtc_real_get_modulation_type_from_rx_datarate( relay_info.lr1mac->real, datarate ) != LORA )
+        {
+            return 0;
+        }
+        smtc_real_lora_rx_dr_to_sf_bw( relay_info.lr1mac->real, datarate, &sf, &bw );
+    }
 
     // CRC is ON and Header explicit and CR45 for SX126x
     payload_len += 2;  // For the CRC

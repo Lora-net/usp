@@ -1,0 +1,25 @@
+{
+    "one_channel_hub_conf": {
+        "lorawan_public": true,
+        "antenna_gain": 0,
+        "rx_freq_hz": 868100000,
+        "datarate": 7,
+        "bandwidth": 125000,
+        "tx_enable": true,
+        "tx_freq_min": 863000000,
+        "tx_freq_max": 870000000
+    },
+    "gateway_conf": {
+        "gateway_ID": "AA555A0000000000",
+        "server_address": "eu1.cloud.thethings.network",
+        "serv_port_up": 1700,
+        "serv_port_down": 1700,
+        "keepalive_interval": 10,
+        "autoquit_threshold": 2,
+        "stat_interval": 30,
+        "push_timeout_ms": 100,
+        "forward_crc_valid": true,
+        "forward_crc_error": false,
+        "forward_crc_disabled": false
+    }
+}

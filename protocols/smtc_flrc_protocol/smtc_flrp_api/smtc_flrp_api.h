@@ -121,7 +121,31 @@ typedef struct smtc_flrp_burst_rx_stats_s
     /*!< Bitfield of the packets missed in the burst (last burst in case of retry or multiburst).
     bit to 1 = packet of this bit index is missed */
     uint8_t last_burst_missed_packets_bitfield[SMTC_FLRP_BITFIELD_PACKETS_IN_BURST_LENGTH];
+
+    uint32_t frequency_hz;        /*!< Frequency used for the burst / burst ACK. */
+    int32_t  frequency_offset_hz; /*!< Frequency offset from the WOR used in RX for the burst / burst ACK (added to
+                                     frequency_hz). */
+
+    uint32_t payload_bit_rate_bps; /*!< The entire payload bit rate (Adaptive link if enabled + Burst + Burst ACK +
+ Retries) in bit/s */
+    uint32_t burst_bit_rate_bps;   /*!< Integer part of the burst bit rate (Computed on the first burst in case
+                                          of multiple bursts/retries) in bit/s */
 } smtc_flrp_burst_rx_stats_t;
+
+/**
+ * @brief SMTC FLRP burst tx statistics
+ */
+typedef struct smtc_flrp_burst_tx_stats_s
+{
+    uint32_t frequency_hz;         /*!< Frequency used for the burst / burst ACK. */
+    int32_t  frequency_offset_hz;  /*!< Frequency offset from the WOR used in RX for the burst / burst ACK (added to
+                                      frequency_hz). */
+    uint32_t payload_bit_rate_bps; /*!< The entire payload bit rate (Adaptive link if enabled + Burst + Burst ACK +
+                                      Retries) in bit/s */
+    uint32_t burst_bit_rate_bps;   /*!< Integer part of the burst bit rate (Computed on the first burst in case
+                                          of multiple bursts/retries) in bit/s */
+
+} smtc_flrp_burst_tx_stats_t;
 
 /**
  * @brief SMTC FLRP WOR rx statistics
@@ -142,6 +166,15 @@ typedef struct smtc_flrp_rx_stats_s
 } smtc_flrp_rx_stats_t;
 
 /**
+ * @brief SMTC FLRP tx statistics
+ */
+typedef struct smtc_flrp_tx_stats_s
+{
+    smtc_flrp_burst_tx_stats_t burst;
+    smtc_flrp_wor_rx_stats_t   wor; /*!< WOR or WOR ACK stats depending on the device role. */
+} smtc_flrp_tx_stats_t;
+
+/**
  * @brief SMTC FLRC Link adaptation mode
  */
 typedef enum smtc_flrp_link_adaptation_mode_e
@@ -155,7 +188,7 @@ typedef enum smtc_flrp_link_adaptation_mode_e
 } smtc_flrp_link_adaptation_mode_t;
 
 typedef void ( *smtc_flrp_tx_done_f )( const void* context, smtc_flrp_return_code_t status, bool send_successful,
-                                       uint8_t* dest_addr );
+                                       uint8_t* dest_addr, smtc_flrp_tx_stats_t flrp_stats );
 typedef void ( *smtc_flrp_rx_done_f )( const void* context, smtc_flrp_return_code_t status, uint32_t payload_size,
                                        uint8_t* src_addr, smtc_flrp_rx_stats_t flrp_stats );
 
@@ -172,18 +205,18 @@ typedef enum smtc_flrp_frequency_plan_e
  */
 typedef struct smtc_flrp_api_config_s
 {
-    uint8_t                    dev_eui[SMTC_FLRP_EUI_LENGTH];
-    bool                       crypto_enabled;  // Enable per-packet AES-CMAC MIC (integrity/authentication) in place of
-                                                // the radio CRC. Integrity only: the payload is NOT encrypted.
+    uint8_t dev_eui[SMTC_FLRP_EUI_LENGTH];
+    bool    crypto_enabled;  // Enable per-packet AES-CMAC MIC (integrity/authentication) in place of
+                             // the radio CRC. Integrity only: the payload is NOT encrypted.
     smtc_flrp_frequency_plan_t freq_plan;
     uint32_t                   crystal_error;
 } smtc_flrp_api_config_t;
 
 typedef struct smtc_flrp_flrc_radio_config_s
 {
-    uint32_t                channels_freq_hz[SMTC_FLRP_NB_CHANNELS_MAX]; /*!< Frequencies of the channels. */
-    uint8_t                 nb_channels; /*!< Number of channels set in channels_freq_hz. */
-    uint8_t                 default_channel;
+    uint32_t channels_freq_hz[SMTC_FLRP_NB_CHANNELS_MAX]; /*!< Frequencies of the channels. */
+    uint8_t  nb_channels;                                 /*!< Number of channels set in channels_freq_hz. */
+    uint8_t  default_channel; /*!< Channel index of channels_freq_hz to use by default (without adaptive link). */
     ral_flrc_raw_bit_rate_t raw_bit_rate;
     int8_t                  tx_power_in_dbm; /*!< Transmission power in dBm. */
 
@@ -292,7 +325,7 @@ smtc_flrp_return_code_t smtc_flrp_slave_prepare_data_to_send( uint8_t* payload, 
  * \param [in] com_config       Communication configuration
  *
  * \return SMTC_FLRP_RC_NOT_INIT if the protocol is not initialized yet.
- * SMTC_FLRP_RC_BUSY in case a transmission can't be programmed at the moment.
+ * SMTC_FLRP_RC_BUSY if a transmission/reception is already in progress.
  * SMTC_FLRP_RC_OK in case of success.
  */
 smtc_flrp_return_code_t smtc_flrp_initiate_transmission( uint8_t* payload, uint32_t payload_size,
@@ -308,6 +341,7 @@ smtc_flrp_return_code_t smtc_flrp_initiate_transmission( uint8_t* payload, uint3
  * In this case, the broadcast / one-way mode is not supported. Only the com mode SMTC_FLRP_BIDIRECTIONAL is possible.
  *
  * \return SMTC_FLRP_RC_NOT_INIT if the protocol is not initialized yet.
+ * SMTC_FLRP_RC_BUSY if a transmission/reception is already in progress.
  * SMTC_FLRP_RC_OK in case of success.
  */
 smtc_flrp_return_code_t smtc_flrp_initiate_reception( uint8_t* payload, uint32_t payload_size,
@@ -336,6 +370,17 @@ smtc_flrp_return_code_t smtc_flrp_set_new_radio_config( smtc_flrp_radio_config_t
  * otherwise.
  */
 bool smtc_flrp_call_run( void );
+
+/*!
+ * \brief Check whether a one-shot FLRP transaction is still in progress.
+ *
+ * WOR_RX is excluded on purpose: it is only entered for background/periodic listening, not for
+ * an actual transaction, so it is not reported as "active".
+ *
+ * \return true while the core is in WOR_TX or DATA state; false when IDLE or passively listening
+ * (WOR_RX).
+ */
+bool smtc_flrp_is_transaction_active( void );
 
 #ifdef __cplusplus
 }

@@ -61,12 +61,6 @@ extern "C" {
  * --- PUBLIC MACROS -----------------------------------------------------------
  */
 
-#define PANIC_IF_STACK_ID_TOO_HIGH( x )                          \
-    do                                                           \
-    {                                                            \
-        SMTC_MODEM_HAL_PANIC_ON_FAILURE( x < NUMBER_OF_STACKS ); \
-    } while( 0 )
-
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC CONSTANTS --------------------------------------------------------
@@ -93,11 +87,6 @@ typedef enum lorawan_multicast_rc_e
     LORAWAN_MC_RC_ERROR_NOT_IMPLEMENTED,
 } lorawan_multicast_rc_t;
 
-typedef struct lorawan_down_metadata_s
-{
-    lr1mac_down_metadata_t* lr1mac_down_metadata;
-
-} lorawan_down_metadata_t;
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS PROTOTYPES ---------------------------------------------
@@ -354,12 +343,20 @@ uint8_t lorawan_api_next_power_get( uint8_t stack_id );
 uint8_t lorawan_api_next_dr_get( uint8_t stack_id );
 
 /**
- * @brief Return the modulation type from a datarate
+ * @brief Return the modulation type from a datarate for TX
  *
  * @param datarate
  * @return modulation_type_t LORA, FSK, LR_FHSS
  */
-modulation_type_t lorawan_api_get_modulation_type_from_datarate( uint8_t stack_id, uint8_t datarate );
+modulation_type_t lorawan_api_get_modulation_type_from_tx_datarate( uint8_t stack_id, uint8_t datarate );
+
+/**
+ * @brief Return the modulation type from a datarate for RX
+ *
+ * @param datarate
+ * @return modulation_type_t LORA, FSK, LR_FHSS
+ */
+modulation_type_t lorawan_api_get_modulation_type_from_rx_datarate( uint8_t stack_id, uint8_t datarate );
 
 /**
  * @brief Return the returns the next Tx Frequency
@@ -388,6 +385,28 @@ uint8_t lorawan_api_min_tx_dr_get( uint8_t stack_id );
  * @return uint16_t the mask data rate
  */
 uint16_t lorawan_api_mask_tx_dr_channel_up_dwell_time_check( uint8_t stack_id );
+
+/**
+ * @brief Set the uplink channel mask using LinkADRReq-style encoding
+ *
+ * @param [in] stack_id      Stack identifier
+ * @param [in] ch_mask_cntl  Array of channel mask control values (same as LinkADRReq ChMaskCntl)
+ * @param [in] ch_mask       Array of channel masks (same as LinkADRReq ChMask)
+ * @param [in] nb_mask       Number of masks (1 to 6)
+ *
+ * @return status_lorawan_t
+ */
+status_lorawan_t lorawan_api_set_channel_mask( uint8_t stack_id, const uint8_t* ch_mask_cntl, const uint16_t* ch_mask,
+                                               uint8_t nb_mask );
+
+/**
+ * @brief Get the current enabled channel mask
+ *
+ * @param [in]  stack_id      Stack identifier
+ * @param [out] channel_mask  Buffer to receive the mask
+ * @param [out] mask_size     Number of bytes written to channel_mask
+ */
+void lorawan_api_get_channel_mask( uint8_t stack_id, uint8_t* channel_mask, uint8_t* mask_size );
 
 /**
  * @brief returns the current state of the MAC layer.
@@ -952,13 +971,22 @@ uint8_t lorawan_api_get_ping_slot_periodicity( uint8_t stack_id );
 bool lorawan_api_get_class_b_status( uint8_t stack_id );
 
 /**
- * @brief  Convert LoRaWAN Datarate to SF and bandwidth
+ * @brief  Convert LoRaWAN TX Datarate to SF and bandwidth
  *
  * @param [in]  in_dr  Datarate
  * @param [out] out_sf Corresponding SF
  * @param [out] out_bw Corresponding bandwith
  */
-void lorawan_api_lora_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw, uint8_t stack_id );
+void lorawan_api_lora_tx_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw, uint8_t stack_id );
+
+/**
+ * @brief  Convert LoRaWAN RX Datarate to SF and bandwidth
+ *
+ * @param [in]  in_dr  Datarate
+ * @param [out] out_sf Corresponding SF
+ * @param [out] out_bw Corresponding bandwith
+ */
+void lorawan_api_lora_rx_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw, uint8_t stack_id );
 
 /**
  * @brief Get the LoRaWAN Frequency factor to convert freq to 24bits
@@ -1014,6 +1042,15 @@ uint32_t lorawan_api_decode_freq_from_24bits_buf( uint8_t stack_id, uint8_t freq
  * @return status_lorawan_t
  */
 status_lorawan_t lorawan_api_is_frequency_valid( uint8_t stack_id, uint32_t freq );
+
+/**
+ * @brief Check if beacon hopping is supported in current region
+ *
+ * @param [in] stack_id Stack identifier
+ * @return true
+ * @return false
+ */
+bool lorawan_api_is_beacon_hopping( uint8_t stack_id );
 
 /**
  * @brief Check if a datarate is valid according to current stack parameters

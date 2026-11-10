@@ -67,6 +67,10 @@ static char msgString[PRINT_BUFFER_SIZE];
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
 
+static void default_trace_tx( uint8_t* buff, uint16_t len );
+
+static hal_trace_tx_fn_t trace_tx_fn = default_trace_tx;
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
@@ -89,13 +93,23 @@ void hal_trace_print( const char* fmt, va_list argp )
     memset( msgString, 0, sizeof( msgString ) );
     if( 0 < vsnprintf( msgString, sizeof( msgString ), fmt, argp ) )  // build string
     {
-        trace_uart_tx( ( uint8_t* ) msgString, strlen( msgString ) );
+        trace_tx_fn( ( uint8_t* ) msgString, ( uint16_t ) strlen( msgString ) );
     }
+}
+
+void hal_trace_set_tx_function( hal_trace_tx_fn_t fn )
+{
+    trace_tx_fn = ( fn != NULL ) ? fn : default_trace_tx;
 }
 
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DEFINITION --------------------------------------------
  */
+
+static void default_trace_tx( uint8_t* buff, uint16_t len )
+{
+    trace_uart_tx( buff, len );
+}
 
 /* --- EOF ------------------------------------------------------------------ */

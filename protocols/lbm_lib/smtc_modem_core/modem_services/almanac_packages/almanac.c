@@ -44,7 +44,7 @@
 #include "modem_supervisor_light.h"
 #include "smtc_modem_api.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lorawan_api.h"
 #include "modem_core.h"
 #include "device_management_defs.h"
@@ -56,7 +56,6 @@
  */
 #define CURRENT_STACK ( task_id / NUMBER_OF_TASKS )
 #define NUMBER_MAX_OF_ALMANAC_OBJ 1  // modify in case of multiple obj
-
 
 /**
  * @brief Check is the index is valid before accessing ALCSync object
@@ -173,9 +172,9 @@ void almanac_service_on_launch( void* context )
     dm_port = DM_PORT;
 #endif
 
-    tx_protocol_manager_request (TX_PROTOCOL_TRANSMIT_LORA, dm_port, true, &almanac_obj.almanac_status_from_lr11xx[1],
-                              SERVICE_LR11XX_GNSS_CONTEXT_STATUS_LENGTH - 1, UNCONF_DATA_UP,
-                              smtc_modem_hal_get_time_in_ms( )  , almanac_obj.stack_id );
+    tx_protocol_manager_request( TX_PROTOCOL_TRANSMIT_LORA, dm_port, true, &almanac_obj.almanac_status_from_lr11xx[1],
+                                 SERVICE_LR11XX_GNSS_CONTEXT_STATUS_LENGTH - 1, UNCONF_DATA_UP,
+                                 smtc_modem_hal_get_time_in_ms( ), almanac_obj.stack_id );
     if( almanac_obj.up_count > 0 )
     {
         almanac_obj.up_count--;

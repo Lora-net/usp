@@ -39,7 +39,7 @@
 
 #include "lr1mac_core.h"
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lr1mac_utilities.h"
 #include "smtc_modem_hal.h"
 #include "smtc_real.h"
@@ -107,7 +107,7 @@ void lr1mac_core_init( lr1_stack_mac_t* lr1_mac_obj, smtc_real_t* real, radio_pl
     lr1_mac_obj->lr1mac_state                = LWPSTATE_IDLE;
     lr1_mac_obj->valid_rx_packet             = NO_MORE_VALID_RX_PACKET;
     lr1_mac_obj->stack_id4rp                 = RP_HOOK_ID_LR1MAC_STACK + ( *( uint8_t* ) stack_id );
-    lr1_mac_obj->real                        = real;
+    lr1_mac_obj->real                        = real;  // Link real obj to be accessible
     lr1_mac_obj->send_at_time                = false;
     lr1_mac_obj->push_callback               = push_callback;
     lr1_mac_obj->push_context                = &( lr1_mac_obj->rx_down_data );
@@ -171,6 +171,20 @@ void lr1mac_core_init( lr1_stack_mac_t* lr1_mac_obj, smtc_real_t* real, radio_pl
                                  lr1_mac_obj->join_nonce[0], lr1_mac_obj->join_nonce[1], lr1_mac_obj->join_nonce[2],
                                  lr1_mac_obj->join_nonce[3], lr1_mac_obj->join_nonce[4], lr1_mac_obj->join_nonce[5] );
     SMTC_MODEM_HAL_TRACE_PRINTF( " Region = %s\n", smtc_real_region_list_str[lr1_mac_obj->real->region_type] );
+#if MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON
+#if defined( RP2_101 )
+    const char* regional_params_ver_str = "RP2-1.0.1";
+#elif defined( RP2_103 )
+    const char* regional_params_ver_str = "RP2-1.0.3";
+#elif defined( RP2_104 )
+    const char* regional_params_ver_str = "RP2-1.0.4";
+#elif defined( RP2_105 )
+    const char* regional_params_ver_str = "RP2-1.0.5";
+#else
+    const char* regional_params_ver_str = "UNKNOWN";
+#endif
+    SMTC_MODEM_HAL_TRACE_PRINTF( " Regional Params version = %s\n", regional_params_ver_str );
+#endif  // MODEM_HAL_DBG_TRACE
 }
 
 /***********************************************************************************************/
@@ -224,13 +238,13 @@ lr1mac_states_t lr1mac_core_process( lr1_stack_mac_t* lr1_mac_obj )
             DBG_PRINT_WITH_LINE( "Send Payload  for stack_id = %d", lr1_mac_obj->stack_id );
 
             modulation_type_t tx_modulation_type =
-                smtc_real_get_modulation_type_from_datarate( lr1_mac_obj->real, lr1_mac_obj->tx_data_rate );
+                smtc_real_get_modulation_type_from_tx_datarate( lr1_mac_obj->real, lr1_mac_obj->tx_data_rate );
 
             if( tx_modulation_type == LORA )
             {
                 uint8_t            tx_sf;
                 lr1mac_bandwidth_t tx_bw;
-                smtc_real_lora_dr_to_sf_bw( lr1_mac_obj->real, lr1_mac_obj->tx_data_rate, &tx_sf, &tx_bw );
+                smtc_real_lora_tx_dr_to_sf_bw( lr1_mac_obj->real, lr1_mac_obj->tx_data_rate, &tx_sf, &tx_bw );
 
                 SMTC_MODEM_HAL_TRACE_PRINTF(
                     "  Tx  LoRa at %u ms: freq:%u, SF%u, %s, len %u bytes %d dBm, fcnt_up %d, toa = %d\n",
@@ -265,9 +279,29 @@ lr1mac_states_t lr1mac_core_process( lr1_stack_mac_t* lr1_mac_obj )
             DBG_PRINT_WITH_LINE( "%s", " TX DONE" );
             lr1_mac_obj->lr1mac_state               = LWPSTATE_RX1;
             lr1_mac_obj->tx_duty_cycle_timestamp_ms = lr1_mac_obj->isr_tx_done_radio_timestamp;
-            lr1_mac_obj->tx_duty_cycle_time_off_ms =
+
+            // In case of retransmit packet (NbTrans > 1), the duty-cycle time off must be updated
+            // allows all NbTrans retransmissions to be sent first, and then enforces the appropriate duty-cycle delay
+            // before any new uplink is transmitted.
+            uint32_t duty_cycle_time_off_tmp =
                 ( lr1_mac_obj->rp->stats.tx_last_toa_ms[myhook_id] << lr1_mac_obj->max_duty_cycle_index ) -
                 lr1_mac_obj->rp->stats.tx_last_toa_ms[myhook_id];
+
+            if( lr1_mac_obj->send_at_time == false )
+            {
+                if( lr1_mac_obj->nb_trans == lr1_mac_obj->nb_trans_cpt )
+                {
+                    lr1_mac_obj->tx_duty_cycle_time_off_ms = duty_cycle_time_off_tmp;
+                }
+                else
+                {
+                    lr1_mac_obj->tx_duty_cycle_time_off_ms += duty_cycle_time_off_tmp;
+                }
+            }
+            else
+            {
+                lr1_mac_obj->tx_duty_cycle_time_off_ms = duty_cycle_time_off_tmp;
+            }
 
             if( lr1_mac_obj->join_status == JOINING )
             {
@@ -315,13 +349,13 @@ lr1mac_states_t lr1mac_core_process( lr1_stack_mac_t* lr1_mac_obj )
                 if( lr1_mac_obj->valid_rx_packet == NO_MORE_VALID_RX_PACKET )
                 {
                     lr1_mac_obj->lr1mac_state = LWPSTATE_RX2;
-                    DBG_PRINT_WITH_LINE( "Receive a bad packet on Rx1 for stack_id = %d continue with RX2 ",
+                    DBG_PRINT_WITH_LINE( "Received a bad packet on RX1 for stack_id = %d - continuing with RX2 ",
                                          lr1_mac_obj->stack_id );
                     timer_in_past = lr1_stack_mac_rx_timer_configure( lr1_mac_obj, RX2 );
                 }
                 else
                 {
-                    DBG_PRINT_WITH_LINE( "Receive a Valid downlink Rx1 for stack_id = %d, rssi: %d dBm, snr: %d dB",
+                    DBG_PRINT_WITH_LINE( "Received a Valid downlink Rx1 for stack_id = %d, rssi: %d dBm, snr: %d dB",
                                          lr1_mac_obj->stack_id, lr1_mac_obj->rx_down_data.rx_metadata.rx_rssi,
                                          lr1_mac_obj->rx_down_data.rx_metadata.rx_snr );
                     lr1mac_mac_update( lr1_mac_obj );
@@ -357,11 +391,11 @@ lr1mac_states_t lr1mac_core_process( lr1_stack_mac_t* lr1_mac_obj )
                 lr1_mac_obj->valid_rx_packet                    = lr1_stack_mac_rx_frame_decode( lr1_mac_obj );
                 if( lr1_mac_obj->valid_rx_packet == NO_MORE_VALID_RX_PACKET )
                 {
-                    DBG_PRINT_WITH_LINE( "Receive a bad packet on Rx2 for stack_id = %d", lr1_mac_obj->stack_id );
+                    DBG_PRINT_WITH_LINE( "Received a bad packet on Rx2 for stack_id = %d", lr1_mac_obj->stack_id );
                 }
                 else
                 {
-                    DBG_PRINT_WITH_LINE( "Receive a Valid downlink Rx2 for stack_id = %d, rssi: %d dBm, snr: %d dB",
+                    DBG_PRINT_WITH_LINE( "Received a Valid downlink Rx2 for stack_id = %d, rssi: %d dBm, snr: %d dB",
                                          lr1_mac_obj->stack_id, lr1_mac_obj->rx_down_data.rx_metadata.rx_rssi,
                                          lr1_mac_obj->rx_down_data.rx_metadata.rx_snr );
                 }
@@ -384,12 +418,12 @@ lr1mac_states_t lr1mac_core_process( lr1_stack_mac_t* lr1_mac_obj )
                 lr1_mac_obj->valid_rx_packet                    = lr1_stack_mac_rx_frame_decode( lr1_mac_obj );
                 if( lr1_mac_obj->valid_rx_packet == NO_MORE_VALID_RX_PACKET )
                 {
-                    DBG_PRINT_WITH_LINE( "Receive a bad packet on Rx2 for stack_id = %d", lr1_mac_obj->stack_id );
+                    DBG_PRINT_WITH_LINE( "Received a bad packet on RX2 for stack_id = %d", lr1_mac_obj->stack_id );
                 }
                 else
                 {
                     has_receive_valid_packet = true;
-                    DBG_PRINT_WITH_LINE( "Receive a Valid downlink Rx2 for stack_id = %d, rssi: %d dBm, snr: %d dB",
+                    DBG_PRINT_WITH_LINE( "Received a Valid downlink Rx2 for stack_id = %d, rssi: %d dBm, snr: %d dB",
                                          lr1_mac_obj->stack_id, lr1_mac_obj->rx_down_data.rx_metadata.rx_rssi,
                                          lr1_mac_obj->rx_down_data.rx_metadata.rx_snr );
                 }
@@ -432,11 +466,11 @@ lr1mac_states_t lr1mac_core_process( lr1_stack_mac_t* lr1_mac_obj )
                 lr1_mac_obj->valid_rx_packet                    = lr1_stack_mac_rx_frame_decode( lr1_mac_obj );
                 if( lr1_mac_obj->valid_rx_packet == NO_MORE_VALID_RX_PACKET )
                 {
-                    DBG_PRINT_WITH_LINE( "Receive a bad packet on RxR for Hook Id = %d", myhook_id );
+                    DBG_PRINT_WITH_LINE( "Received a bad packet on RxR for Hook Id = %d", myhook_id );
                 }
                 else
                 {
-                    DBG_PRINT_WITH_LINE( "Receive a Valid downlink RxR for stack_id = %d, rssi: %d dBm, snr: %d dB",
+                    DBG_PRINT_WITH_LINE( "Received a Valid downlink RxR for stack_id = %d, rssi: %d dBm, snr: %d dB",
                                          lr1_mac_obj->stack_id, lr1_mac_obj->rx_down_data.rx_metadata.rx_rssi,
                                          lr1_mac_obj->rx_down_data.rx_metadata.rx_snr );
                 }
@@ -486,6 +520,10 @@ status_lorawan_t lr1mac_core_join( lr1_stack_mac_t* lr1_mac_obj, uint32_t target
     if( lr1_mac_obj->activation_mode == ACTIVATION_MODE_ABP )
     {
         lr1_mac_obj->join_status = JOINED;
+        if( smtc_real_is_cf_list_type_supported( lr1_mac_obj->real, CF_LIST_CH_MASK ) )
+        {
+            smtc_real_set_channel_mask( lr1_mac_obj->real );
+        }
         return OKLORAWAN;
     }
     uint32_t current_timestamp       = smtc_modem_hal_get_time_in_s( );
@@ -1254,7 +1292,7 @@ static void lr1mac_mac_update( lr1_stack_mac_t* lr1_mac_obj )
 
     if( lr1_mac_obj->valid_rx_packet == JOIN_ACCEPT_PACKET )
     {
-        SMTC_MODEM_HAL_TRACE_PRINTF( " update join procedure\n" );
+        SMTC_MODEM_HAL_TRACE_PRINTF( " Received Join-Accept packet\n" );
         if( lr1_stack_mac_join_accept( lr1_mac_obj ) == OKLORAWAN )
         {
             lr1_mac_obj->rx_down_data.rx_payload_size              = 0;
@@ -1308,6 +1346,7 @@ static void lr1mac_mac_update( lr1_stack_mac_t* lr1_mac_obj )
         lr1_mac_obj->rx_down_data.stack_id = lr1_mac_obj->stack_id;
     }
 
+    SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( lr1_mac_obj->push_callback ) );
     lr1_mac_obj->push_callback( lr1_mac_obj->push_context );
 
     if( ( lr1_mac_obj->type_of_ans_to_send == NWKFRAME_TOSEND ) ||

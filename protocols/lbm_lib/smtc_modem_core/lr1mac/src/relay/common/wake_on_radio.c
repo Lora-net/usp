@@ -41,7 +41,7 @@
 
 #include "relay_def.h"
 #include "smtc_modem_crypto.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_modem_hal.h"
 #include "smtc_secure_element.h"
 #include "wake_on_radio_def.h"
@@ -297,10 +297,9 @@ uint32_t wor_compute_mic_ack( const wor_ack_mic_info_t* mic_info, const uint8_t*
 
 uint16_t wor_convert_cad_period_in_ms( const wor_cad_periodicity_t period )
 {
-    const uint16_t tab_convert_cad_period[] = {
-        [WOR_CAD_PERIOD_1S] = 1000,   [WOR_CAD_PERIOD_500MS] = 500, [WOR_CAD_PERIOD_250MS] = 250,
-        [WOR_CAD_PERIOD_100MS] = 100, [WOR_CAD_PERIOD_50MS] = 50,   [WOR_CAD_PERIOD_20MS] = 20
-    };
+    const uint16_t tab_convert_cad_period[] = { [WOR_CAD_PERIOD_1S] = 1000,   [WOR_CAD_PERIOD_500MS] = 500,
+                                                [WOR_CAD_PERIOD_250MS] = 250, [WOR_CAD_PERIOD_100MS] = 100,
+                                                [WOR_CAD_PERIOD_50MS] = 50,   [WOR_CAD_PERIOD_20MS] = 20 };
     if( period < WOR_CAD_PERIOD_RFU )
     {
         return tab_convert_cad_period[period];
@@ -352,10 +351,10 @@ void wor_derive_keys( const uint8_t root_wor_s_key[16], uint32_t dev_addr, uint8
     uint8_t block[16] = { 0 };
 
     block[0] = 0x01;
-    block[1] = ( uint8_t )( dev_addr );
-    block[2] = ( uint8_t )( dev_addr >> 8 );
-    block[3] = ( uint8_t )( dev_addr >> 16 );
-    block[4] = ( uint8_t )( dev_addr >> 24 );
+    block[1] = ( uint8_t ) ( dev_addr );
+    block[2] = ( uint8_t ) ( dev_addr >> 8 );
+    block[3] = ( uint8_t ) ( dev_addr >> 16 );
+    block[4] = ( uint8_t ) ( dev_addr >> 24 );
 
     SMTC_MODEM_HAL_PANIC_ON_FAILURE( smtc_secure_element_aes_encrypt( block, 16, SMTC_SE_RELAY_ROOT_WOR_S_KEY,
                                                                       wor_s_int_key,
@@ -403,7 +402,7 @@ bool wor_extract_wor_info( const uint8_t* buffer, const uint8_t length, wor_info
 
         wor->uplink.devaddr = ( buffer[WOR_UPLINK_DEVADDR_31_24] << 24 ) + ( buffer[WOR_UPLINK_DEVADDR_23_16] << 16 ) +
                               ( buffer[WOR_UPLINK_DEVADDR_15_8] << 8 ) + ( buffer[WOR_UPLINK_DEVADDR_7_0] );
-        wor->uplink.fcnt = ( buffer[WOR_UPLINK_FCNT_15_8] << 8 ) + ( buffer[WOR_UPLINK_FCNT_7_0] );
+        wor->uplink.fcnt    = ( buffer[WOR_UPLINK_FCNT_15_8] << 8 ) + ( buffer[WOR_UPLINK_FCNT_7_0] );
 
         // SMTC_MODEM_HAL_TRACE_MSG( "Decode WOR STD UL: ok\n" );
         return true;
@@ -439,13 +438,12 @@ uint8_t wor_generate_ack( uint8_t* buffer, const wor_ack_infos_t* ack, const wor
     tmp |= WOR_ACK_UPLINK_SET_CAD_RX( ack->cad_to_rx );
 
     const uint8_t buffer_tmp[3] = {
-        [0] = ( uint8_t )( tmp ),
-        [1] = ( uint8_t )( tmp >> 8 ),
-        [2] = ( uint8_t )( tmp >> 16 ),
+        [0] = ( uint8_t ) ( tmp ),
+        [1] = ( uint8_t ) ( tmp >> 8 ),
+        [2] = ( uint8_t ) ( tmp >> 16 ),
     };
 
     wor_aes_ack_uplink_enc( buffer_tmp, buffer + WOR_ACK_PAYLOAD_ENC_1, mic_info, wor_s_enc_key );
-
 
     const uint32_t mic = wor_compute_mic_ack( mic_info, buffer + WOR_ACK_PAYLOAD_ENC_1, wor_s_int_key );
 

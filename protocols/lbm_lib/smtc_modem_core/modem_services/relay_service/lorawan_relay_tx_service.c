@@ -46,7 +46,7 @@
 #include "smtc_modem_hal.h"
 #include "smtc_modem_api.h"
 #include "modem_event_utilities.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lorawan_api.h"
 
 #include "relay_tx_api.h"

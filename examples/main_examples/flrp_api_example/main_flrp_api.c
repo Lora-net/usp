@@ -41,7 +41,7 @@
 #include <stdbool.h>  // bool type
 #include <string.h>
 
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "MAIN-FLRP-API"
@@ -74,7 +74,7 @@
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
 
-#if( FLRP_API_ROLE == FLRP_API_ROLE_INITIATOR )
+#if ( FLRP_API_ROLE == FLRP_API_ROLE_INITIATOR )
 static uint32_t periodic_timestamp_ms = 0;
 #endif
 
@@ -101,7 +101,6 @@ int main( void )
 
     smtc_rac_init( );
 
-
     flrp_api_init( FLRP_API_CRYPTO_ENABLED, FLRP_API_IS_LOW_FREQUENCY, FLRP_API_IS_LISTENING );
 
     while( true )
@@ -110,13 +109,13 @@ int main( void )
         smtc_rac_run_engine( );
         smtc_flrp_run_engine( );
 
-        if ( hal_button_is_pressed( ) == true )
+        if( hal_button_is_pressed( ) == true )
         {
             hal_button_clear( );
             SMTC_HAL_TRACE_INFO( "User button pressed\n" );
             if( smtc_flrp_call_run( ) == false )
             {
-#if( FLRP_API_ROLE == FLRP_API_ROLE_INITIATOR )
+#if ( FLRP_API_ROLE == FLRP_API_ROLE_INITIATOR )
                 periodic_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
 #endif
                 flrp_tx = flrp_api_initiate_transfer( flrp_tx );
@@ -128,20 +127,20 @@ int main( void )
         }
         else
         {
-#if( FLRP_API_ROLE == FLRP_API_ROLE_INITIATOR )
-        if( ( smtc_flrp_call_run( ) == false ) &&
-        ( ( smtc_modem_hal_get_time_in_ms( ) - periodic_timestamp_ms ) > FLRP_API_INTIATOR_PERIODIC_TRANSFER ) )
-        {
+#if ( FLRP_API_ROLE == FLRP_API_ROLE_INITIATOR )
+            if( ( smtc_flrp_call_run( ) == false ) &&
+                ( ( smtc_modem_hal_get_time_in_ms( ) - periodic_timestamp_ms ) > FLRP_API_INTIATOR_PERIODIC_TRANSFER ) )
+            {
                 periodic_timestamp_ms = smtc_modem_hal_get_time_in_ms( );
-                flrp_tx = flrp_api_initiate_transfer( flrp_tx );
-        }
+                flrp_tx               = flrp_api_initiate_transfer( flrp_tx );
+            }
 #endif
         }
 
-
         // handle sleep
         hal_mcu_disable_irq( );
-        if( ( !hal_button_is_pressed( ) ) && ( smtc_rac_is_irq_flag_pending( ) == false ) && smtc_flrp_call_run( ) == false )
+        if( ( !hal_button_is_pressed( ) ) && ( smtc_rac_is_irq_flag_pending( ) == false ) &&
+            smtc_flrp_call_run( ) == false )
         {
             hal_mcu_set_sleep_for_ms( FLRP_API_INTIATOR_PERIODIC_TRANSFER>>1 );
             hal_watchdog_reload( );  // update watchdog after sleep
@@ -154,6 +153,5 @@ int main( void )
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DEFINITION --------------------------------------------
  */
-
 
 /* --- EOF ------------------------------------------------------------------ */

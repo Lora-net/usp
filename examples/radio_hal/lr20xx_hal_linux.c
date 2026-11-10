@@ -58,11 +58,19 @@
  * ------------------------------------------------------------
  */
 
+typedef enum
+{
+    RADIO_SLEEP,
+    RADIO_AWAKE
+} radio_mode_t;
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE VARIABLES
  * ------------------------------------------------------------
  */
+
+static volatile radio_mode_t radio_mode = RADIO_AWAKE;
 
 /*
  * -----------------------------------------------------------------------------
@@ -84,19 +92,27 @@ static void wait_us( unsigned long delay_us )
     }
 }
 
-static void wait_ms( unsigned long delay_ms )
-{
-    wait_us( delay_ms * 1000 );
-}
-
 static void lr20xx_hal_wait_on_busy( void )
 {
-    // printf( "Waiting on busy\n" );
     while( hal_gpio_get_value( RADIO_BUSY_PIN ) == 1 )
     {
         wait_us( 10 );
     }
-    // printf( "Waiting on busy done\n" );
+}
+
+static void lr20xx_hal_check_device_ready( void )
+{
+    if( radio_mode != RADIO_SLEEP )
+    {
+        lr20xx_hal_wait_on_busy( );
+    }
+    else
+    {
+        // Keep NSS low for 100us to wake up the radio.
+        hal_spi_nss_pulse( 100 );
+        lr20xx_hal_wait_on_busy( );
+        radio_mode = RADIO_AWAKE;
+    }
 }
 
 /*
@@ -107,7 +123,7 @@ static void lr20xx_hal_wait_on_busy( void )
 lr20xx_hal_status_t lr20xx_hal_write( const void* context, const uint8_t* command, const uint16_t command_length,
                                       const uint8_t* data, const uint16_t data_length )
 {
-    lr20xx_hal_wait_on_busy( );
+    lr20xx_hal_check_device_ready( );
 
     // Prepare single SPI transfer buffer
     uint8_t* tx_buf = malloc( command_length + data_length );
@@ -129,13 +145,26 @@ lr20xx_hal_status_t lr20xx_hal_write( const void* context, const uint8_t* comman
 
     free( tx_buf );
 
-    return ( ret >= 0 ) ? LR20XX_HAL_STATUS_OK : LR20XX_HAL_STATUS_ERROR;
+    if( ret < 0 )
+    {
+        return LR20XX_HAL_STATUS_ERROR;
+    }
+
+    // Detect the SetSleep command (opcode 0x01 0x27) and track radio state.
+    // Add a small delay to let the chip fully enter sleep before any subsequent access.
+    if( ( command_length >= 2 ) && ( command[0] == 0x01 ) && ( command[1] == 0x27 ) )
+    {
+        radio_mode = RADIO_SLEEP;
+        wait_us( 500 );
+    }
+
+    return LR20XX_HAL_STATUS_OK;
 }
 
 lr20xx_hal_status_t lr20xx_hal_read( const void* context, const uint8_t* command, const uint16_t command_length,
                                      uint8_t* data, const uint16_t data_length )
 {
-    lr20xx_hal_wait_on_busy( );
+    lr20xx_hal_check_device_ready( );
 
     // Step 2: First SPI transaction - send command (CS auto-controlled by spidev)
     int ret = hal_spi_transfer( command, NULL, command_length );
@@ -181,7 +210,7 @@ lr20xx_hal_status_t lr20xx_hal_read( const void* context, const uint8_t* command
 
 lr20xx_hal_status_t lr20xx_hal_direct_read( const void* context, uint8_t* data, const uint16_t data_length )
 {
-    lr20xx_hal_wait_on_busy( );
+    lr20xx_hal_check_device_ready( );
 
     // Direct read with automatic CS control
     int ret = hal_spi_transfer( NULL, data, data_length );
@@ -192,7 +221,7 @@ lr20xx_hal_status_t lr20xx_hal_direct_read_fifo( const void* context, const uint
                                                  const uint16_t command_length, uint8_t* data,
                                                  const uint16_t data_length )
 {
-    lr20xx_hal_wait_on_busy( );
+    lr20xx_hal_check_device_ready( );
 
     // Prepare SPI transfer buffer for single transaction
     uint8_t* tx_buf = malloc( command_length + data_length );
@@ -230,17 +259,20 @@ lr20xx_hal_status_t lr20xx_hal_reset( const void* context )
     // Pull reset pin low
     hal_gpio_set_value( RADIO_NRST, 0 );
 
-    wait_ms( 1 );
+    wait_us( 1000 );
 
     // Release reset pin (set high)
     hal_gpio_set_value( RADIO_NRST, 1 );
 
+    radio_mode = RADIO_AWAKE;
     return LR20XX_HAL_STATUS_OK;
 }
 
 lr20xx_hal_status_t lr20xx_hal_wakeup( const void* context )
 {
-    // TODO: need to control NSS pin to wake up the radio
+    ( void ) context;
+
+    lr20xx_hal_check_device_ready( );
     return LR20XX_HAL_STATUS_OK;
 }
 

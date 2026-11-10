@@ -4,12 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v4.9.3] 2026-11-03
+
+### Added
+* API to get the LoRaWAN channel mask `smtc_modem_get_channel_mask()`
+
+### Changed
+* `smtc_modem_set_channel_mask()` (up to 6 masks),
+* `smtc_modem_set_external_ralf()` documentation: only to be used when Radio Planner and radio are handled above LBM (e.g. Semtech RAC)
+
+## [v4.9.2] 2026-10-01
+
+### Added
+* API to set the LoRaWAN channel mask `smtc_modem_set_channel_mask()`
+
+## [v4.9.1] 2026-04-xx
+
+### Added
+* API to set LoRaWAN channel mask `smtc_modem_set_channel_mask()`
+* `SMTC_MODEM_EVENT_RESET_REQUEST` event, with `reset_request.status` data
+* `smtc_modem_lorawan_set_no_rx_packet_threshold()` / `smtc_modem_lorawan_get_no_rx_packet_threshold()` declared in the API
+* `smtc_modem_test_bw_m_t` test type declared
 
 ## [v4.9.0] 2025-07-XX
 
 ### Added
-
+* Add reset request event
+  * `SMTC_MODEM_EVENT_RESET_REQUEST`: The modem need to be reset, for example The LoRaWAN certification could request a DUT reset
 * Add no downlink event
   * `SMTC_MODEM_EVENT_NO_DOWNLINK_THRESHOLD`: when ADR back-off reaches its end or when user-defined no RX threshold is reached
 * Add get RSSI/SNR on LoRaWAN downlink ACK

@@ -41,14 +41,12 @@
 #include <stdbool.h>  // bool type
 #include <string.h>
 
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "APP-FLRP-API"
 
-#include "smtc_hal_mcu.h"
-#include "smtc_hal_gpio.h"
-#include "smtc_hal_watchdog.h"
+#include "smtc_hal_dbg_trace.h"
 #include "smtc_rac_log.h"
 
 #include "smtc_rac_api.h"
@@ -61,7 +59,7 @@
  * --- PRIVATE MACROS-----------------------------------------------------------
  */
 
-#if ( ( FLRP_API_ROLE != FLRP_API_ROLE_INITIATOR ) && ( FLRP_API_ROLE != FLRP_API_ROLE_SLAVE ) )
+#if( ( FLRP_API_ROLE != FLRP_API_ROLE_INITIATOR ) && ( FLRP_API_ROLE != FLRP_API_ROLE_SLAVE ) )
 #error "Please define FLRP_API_ROLE as either FLRP_API_ROLE_INITIATOR or FLRP_API_ROLE_SLAVE"
 #endif
 
@@ -75,17 +73,17 @@ static flrp_api_message_t data_flrp           = { 0 };
 static uint8_t            flrp_api_key[16]    = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                                                   0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F };
 
-#if ( FLRP_API_ROLE == FLRP_API_ROLE_INITIATOR )
+#if( FLRP_API_ROLE == FLRP_API_ROLE_INITIATOR )
 static uint8_t flrp_api_device_eui[SMTC_FLRP_EUI_LENGTH]        = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
 static uint8_t flrp_api_target_device_eui[SMTC_FLRP_EUI_LENGTH] = { 0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
-#elif ( FLRP_API_ROLE == FLRP_API_ROLE_SLAVE )
+#elif( FLRP_API_ROLE == FLRP_API_ROLE_SLAVE )
 static uint8_t flrp_api_device_eui[SMTC_FLRP_EUI_LENGTH]        = { 0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
 static uint8_t flrp_api_target_device_eui[SMTC_FLRP_EUI_LENGTH] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
-#if ( FLRP_API_IS_LISTENING == false )
-#error ( "A slave device not in listening mode cannot receive any message, please set FLRP_API_IS_LISTENING to true" )
+#if( FLRP_API_IS_LISTENING == false )
+#error( "A slave device not in listening mode cannot receive any message, please set FLRP_API_IS_LISTENING to true" )
 #endif
 #else
-#error ( "Invalid FLRP_API_ROLE value" )
+#error( "Invalid FLRP_API_ROLE value" )
 #endif
 
 /*
@@ -250,12 +248,17 @@ void user_rx_callback( const void* context, smtc_flrp_return_code_t status, uint
     if( ( status == SMTC_FLRP_RC_OK ) && ( payload_size > 0 ) )
     {
         flrp_api_rx_cb_ok_count++;
-        SMTC_HAL_TRACE_INFO( "[RX #%u OK] size=%u ok/err/nok=%u/%u/%u rssi=%d dBm wor_rssi=%d dBm wor_snr=%d dB\n",
-                             ( unsigned ) flrp_api_rx_cb_ok_count, ( unsigned ) payload_size,
-                             ( unsigned ) flrp_stats.burst.nb_packets_received_ok,
-                             ( unsigned ) flrp_stats.burst.nb_packets_check_error,
-                             ( unsigned ) flrp_stats.burst.nb_packets_received_nok, ( int ) flrp_stats.burst.rssi_mean,
-                             ( int ) flrp_stats.wor.rssi, ( int ) flrp_stats.wor.snr );
+        SMTC_HAL_TRACE_INFO(
+            "[RX #%u OK] size=%u ok/err/nok=%u/%u/%u rssi=%d dBm -- freq used %" PRIu32 " / freq offset %" PRId32
+            " -- wor_rssi=%d dBm "
+            "wor_snr=%d dB -- Payload/Burst bit rate = %" PRIu32 ".%06" PRIu32 " / %" PRIu32 ".%06" PRIu32 " Mbit/s\n",
+            ( unsigned ) flrp_api_rx_cb_ok_count, ( unsigned ) payload_size,
+            ( unsigned ) flrp_stats.burst.nb_packets_received_ok, ( unsigned ) flrp_stats.burst.nb_packets_check_error,
+            ( unsigned ) flrp_stats.burst.nb_packets_received_nok, ( int ) flrp_stats.burst.rssi_mean,
+            flrp_stats.burst.frequency_hz, flrp_stats.burst.frequency_offset_hz, ( int ) flrp_stats.wor.rssi,
+            ( int ) flrp_stats.wor.snr, flrp_stats.burst.payload_bit_rate_bps / 1000000U,
+            flrp_stats.burst.payload_bit_rate_bps % 1000000U, flrp_stats.burst.burst_bit_rate_bps / 1000000U,
+            flrp_stats.burst.burst_bit_rate_bps % 1000000U );
         if( payload_size > sizeof( data_flrp.counter ) )
         {
             SMTC_HAL_TRACE_ARRAY( "[RX] data preview", data_flrp.data,
@@ -265,25 +268,33 @@ void user_rx_callback( const void* context, smtc_flrp_return_code_t status, uint
     else
     {
         SMTC_HAL_TRACE_ERROR(
-            "[RX #%u KO] status=%s size=%u ok/err/nok=%u/%u/%u expected=%u rssi=%d dBm "
-            "wor_rssi=%d dBm wor_snr=%d dB\n",
+            "[RX #%u KO] status=%s size=%u ok/err/nok=%u/%u/%u expected=%u rssi=%d dBm -- freq used %u / freq offset "
+            "%d -- wor_rssi=%d dBm wor_snr=%d dB\n",
             ( unsigned ) flrp_api_rx_cb_count, flrp_status_to_str( status ), ( unsigned ) payload_size,
             ( unsigned ) flrp_stats.burst.nb_packets_received_ok, ( unsigned ) flrp_stats.burst.nb_packets_check_error,
             ( unsigned ) flrp_stats.burst.nb_packets_received_nok, ( unsigned ) flrp_stats.burst.payload_size_expected,
-            ( int ) flrp_stats.burst.rssi_mean, ( int ) flrp_stats.wor.rssi, ( int ) flrp_stats.wor.snr );
+            ( int ) flrp_stats.burst.rssi_mean, flrp_stats.burst.frequency_hz, flrp_stats.burst.frequency_offset_hz,
+            ( int ) flrp_stats.wor.rssi, ( int ) flrp_stats.wor.snr );
     }
     flrp_api_setup_tx_buffer( );
 }
 
-void user_tx_callback( const void* context, smtc_flrp_return_code_t err_code, bool send_successful, uint8_t* dest_addr )
+void user_tx_callback( const void* context, smtc_flrp_return_code_t err_code, bool send_successful, uint8_t* dest_addr,
+                       smtc_flrp_tx_stats_t flrp_stats )
 {
     flrp_api_tx_cb_count++;
 
     if( ( err_code == SMTC_FLRP_RC_OK ) && ( send_successful == true ) )
     {
         flrp_api_tx_cb_ok_count++;
-        SMTC_HAL_TRACE_INFO( "[TX #%u OK] counter=%u\n", ( unsigned ) flrp_api_tx_cb_ok_count,
-                             ( unsigned ) data_flrp.counter );
+        SMTC_HAL_TRACE_INFO(
+            "[TX #%u OK] counter=%u -- Payload/Burst bit rate = %" PRIu32 ".%06" PRIu32 " / %" PRIu32 ".%06" PRIu32
+            " Mbit/s -- freq used %" PRIu32 " / freq offset %" PRId32 " -- wor_rssi=%d dBm wor_snr=%d dB\n",
+            ( unsigned ) flrp_api_tx_cb_ok_count, ( unsigned ) data_flrp.counter,
+            flrp_stats.burst.payload_bit_rate_bps / 1000000U, flrp_stats.burst.payload_bit_rate_bps % 1000000U,
+            flrp_stats.burst.burst_bit_rate_bps / 1000000U, flrp_stats.burst.burst_bit_rate_bps % 1000000U,
+            flrp_stats.burst.frequency_hz, flrp_stats.burst.frequency_offset_hz, flrp_stats.wor.rssi,
+            ( int ) flrp_stats.wor.snr );
         SMTC_HAL_TRACE_ARRAY( "[TX] data preview", data_flrp.data,
                               MIN( FLRP_API_DISPLAY_BYTE_SIZE, sizeof( data_flrp.data ) ) );
         flrp_api_tx_counter++;

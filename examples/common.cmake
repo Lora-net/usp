@@ -74,7 +74,7 @@ message(STATUS "RP_MARGIN_DELAY: ${RP_MARGIN_DELAY}")
 ################################################################################
 # Logging Options
 
-option(RAC_LOG_ENABLE "Enable logging system" ON)
+option(RAC_LOG_ENABLE "Enable RAC Core logs (when OFF, all RAC_CORE_LOG_* are disabled)" ON)
 
 # RAC logging controls
 option(RAC_CORE_LOG_ERROR_ENABLE "Enable RAC Core ERROR logs" ON)
@@ -85,15 +85,6 @@ option(RAC_CORE_LOG_DEBUG_ENABLE "Enable RAC Core DEBUG logs" OFF)
 option(RAC_CORE_LOG_API_ENABLE "Enable RAC Core API logs" OFF)
 option(RAC_CORE_LOG_RADIO_ENABLE "Enable RAC Core RADIO logs" OFF)
 
-# LoRa logging controls
-option(RAC_LORA_LOG_TX_ENABLE "Enable RAC LoRa TX logs" ON)
-option(RAC_LORA_LOG_RX_ENABLE "Enable RAC LoRa RX logs" ON)
-option(RAC_LORA_LOG_CONFIG_ENABLE "Enable RAC LoRa CONFIG logs" ON)
-option(RAC_LORA_LOG_ERROR_ENABLE "Enable RAC LoRa ERROR logs" ON)
-option(RAC_LORA_LOG_INFO_ENABLE "Enable RAC LoRa INFO logs" OFF)
-option(RAC_LORA_LOG_WARN_ENABLE "Enable RAC LoRa WARN logs" OFF)
-option(RAC_LORA_LOG_DEBUG_ENABLE "Enable RAC LoRa DEBUG logs" OFF)
-
 # Predefined logging profiles
 set(RAC_LOG_PROFILE "DEFAULT" CACHE STRING "logging profile")
 set_property(CACHE RAC_LOG_PROFILE PROPERTY STRINGS "MINIMAL;DEFAULT;VERBOSE;DEBUG;ALL")
@@ -102,23 +93,15 @@ set_property(CACHE RAC_LOG_PROFILE PROPERTY STRINGS "MINIMAL;DEFAULT;VERBOSE;DEB
 if(RAC_LOG_PROFILE STREQUAL "MINIMAL")
     message(STATUS "Logging Profile: MINIMAL (only ERROR logs)")
     set(RAC_CORE_LOG_ERROR_ENABLE ON CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_ERROR_ENABLE ON CACHE BOOL "" FORCE)
     set(RAC_CORE_LOG_CONFIG_ENABLE OFF CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_CONFIG_ENABLE OFF CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_TX_ENABLE OFF CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_RX_ENABLE OFF CACHE BOOL "" FORCE)
 elseif(RAC_LOG_PROFILE STREQUAL "VERBOSE")
-    message(STATUS "Logging Profile: VERBOSE (ERROR, CONFIG, TX, RX, INFO)")
+    message(STATUS "Logging Profile: VERBOSE (ERROR, CONFIG, INFO)")
     set(RAC_CORE_LOG_INFO_ENABLE ON CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_INFO_ENABLE ON CACHE BOOL "" FORCE)
 elseif(RAC_LOG_PROFILE STREQUAL "DEBUG")
-    message(STATUS "Logging Profile: DEBUG (ERROR, CONFIG, TX, RX, INFO, WARN, DEBUG)")
+    message(STATUS "Logging Profile: DEBUG (ERROR, CONFIG, INFO, WARN, DEBUG)")
     set(RAC_CORE_LOG_INFO_ENABLE ON CACHE BOOL "" FORCE)
     set(RAC_CORE_LOG_WARN_ENABLE ON CACHE BOOL "" FORCE)
     set(RAC_CORE_LOG_DEBUG_ENABLE ON CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_INFO_ENABLE ON CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_WARN_ENABLE ON CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_DEBUG_ENABLE ON CACHE BOOL "" FORCE)
 elseif(RAC_LOG_PROFILE STREQUAL "ALL")
     message(STATUS "Logging Profile: ALL (enable all log types)")
     set(RAC_CORE_LOG_INFO_ENABLE ON CACHE BOOL "" FORCE)
@@ -126,63 +109,53 @@ elseif(RAC_LOG_PROFILE STREQUAL "ALL")
     set(RAC_CORE_LOG_DEBUG_ENABLE ON CACHE BOOL "" FORCE)
     set(RAC_CORE_LOG_API_ENABLE ON CACHE BOOL "" FORCE)
     set(RAC_CORE_LOG_RADIO_ENABLE ON CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_INFO_ENABLE ON CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_WARN_ENABLE ON CACHE BOOL "" FORCE)
-    set(RAC_LORA_LOG_DEBUG_ENABLE ON CACHE BOOL "" FORCE)
 else()
-    message(STATUS "Logging Profile: DEFAULT (ERROR, CONFIG, TX, RX)")
+    message(STATUS "Logging Profile: DEFAULT (ERROR, CONFIG)")
 endif()
 
 ################################################################################
 # Radio Selection
 
 # Set target radio families
+set(sx127x_radios sx1272 sx1276 CACHE INTERNAL "SX127x radio variants")
 set(sx126x_radios sx1261 sx1262 sx1268 CACHE INTERNAL "SX126x radio variants")
+set(sx128x_radios sx1280 sx1281 CACHE INTERNAL "SX128x radio variants")
 set(lr11xx_radios lr1110 lr1120 lr1121 CACHE INTERNAL "LR11xx radio variants")
 set(lr20xx_radios lr2012 lr2021 lr2022 CACHE INTERNAL "LR20xx radio variants")
+# Radios that support geolocation (WiFi/GNSS scan). Must stay in sync with
+# GEOLOCATION_RADIOS in protocols/lbm_lib/options.cmake. lr1121 does NOT support geolocation.
+set(geoloc_radios lr1110 lr1120 CACHE INTERNAL "Radios supporting geolocation (WiFi/GNSS)")
 set(udp_pf_radios udp_pf CACHE INTERNAL "UDP packet forwarder (virtual radio)")
-set(known_radios ${sx126x_radios} ${lr11xx_radios} ${lr20xx_radios} ${udp_pf_radios})
+set(known_radios ${sx127x_radios} ${sx126x_radios} ${sx128x_radios} ${lr11xx_radios} ${lr20xx_radios} ${udp_pf_radios})
 
 set(RAC_RADIO "" CACHE STRING "The radio to target")
 set_property(CACHE RAC_RADIO PROPERTY STRINGS ${known_radios})
 if(NOT DEFINED RAC_RADIO OR RAC_RADIO STREQUAL "")
-    message(FATAL_ERROR "You must select the radio with -DRAC_RADIO=")
+    message(FATAL_ERROR "RAC_RADIO undefined - you must select the radio with -DRAC_RADIO=<selected_radio>")
 endif()
 if(NOT RAC_RADIO IN_LIST known_radios)
     message(FATAL_ERROR "Unknown radio ${RAC_RADIO}")
 endif()
 
-# Set target radio family
-if(RAC_RADIO IN_LIST sx126x_radios)
-    set(RADIO_FAMILY sx126x)
-elseif(RAC_RADIO IN_LIST lr11xx_radios)
-    set(RADIO_FAMILY lr11xx)
-elseif(RAC_RADIO IN_LIST lr20xx_radios)
-    set(RADIO_FAMILY lr20xx)
-elseif(RAC_RADIO IN_LIST udp_pf_radios)
-    set(RADIO_FAMILY udp_pf)
-endif()
-string(TOUPPER ${RADIO_FAMILY} RADIO_FAMILY_UPPER)
 
 # Radio-specific options
-if(RAC_RADIO IN_LIST lr20xx_radios)
-    option(LEGACY_EVK_LR20XX "Enable LR20XX shield" OFF)
+if(RAC_RADIO MATCHES "lr2021")
+    option(LEGACY_EVK_LR20XX "Use LR20XX legacy shield" OFF)
     message(STATUS "Legacy (mbed) LR20XX shield: ${LEGACY_EVK_LR20XX}")
 endif()
 if(RAC_RADIO IN_LIST lr11xx_radios)
-    option(USE_LR11XX_CRC_SPI "Enable CRC over SPI" OFF)
+    option(USE_LR11XX_CRC_SPI "Enable CRC over SPI for LR11xx" OFF)
 endif()
 
-message(STATUS "Selected radio ${RAC_RADIO} in family ${RADIO_FAMILY}\n")
+message(STATUS "Selected radio ${RAC_RADIO}\n")
 
 ################################################################################
 # Apply LBM features if requested (before including libraries)
-
-if(NOT DEFINED LBM_RADIO)
-    set(LBM_RADIO ${RAC_RADIO})
-endif()
-if(NOT LBM_RADIO STREQUAL ${RAC_RADIO})
-    message(FATAL_ERROR "LBM_RADIO (${LBM_RADIO}) must match RAC_RADIO (${RAC_RADIO})")
+if(INCLUDE_LBM)
+    if(DEFINED LBM_RADIO AND NOT DEFINED RAC_RADIO)
+        # If LBM protocol is used, LBM_RADIO will be automatically set to RAC_RADIO by smtc_rac_lib when including it.
+        message(FATAL_ERROR "-DLBM_RADIO=<radio> is deprecated. Please use -DRAC_RADIO=<radio> instead.")
+    endif()
 endif()
 
 if(ENABLE_FULL_LBM_FEATURES)
@@ -200,8 +173,11 @@ if(ENABLE_FULL_LBM_FEATURES)
     set(LBM_FUOTA ON CACHE BOOL "")
     set(LBM_FUOTA_MPA ON CACHE BOOL "")
     set(LBM_STORE_AND_FORWARD ON CACHE BOOL "")
-    # Geolocation is only supported on LR11XX radios
-    if(RAC_RADIO IN_LIST lr11xx_radios)
+    # Geolocation (WiFi/GNSS) is supported on lr1110/lr1120 only, NOT lr1121.
+    # This list must match GEOLOCATION_RADIOS in lbm_lib; otherwise ADD_APP_GEOLOCATION
+    # would be defined here while lbm_lib builds the modem without geolocation, leading to
+    # undefined references to smtc_modem_wifi_* / smtc_modem_gnss_* at link time.
+    if(RAC_RADIO IN_LIST geoloc_radios)
         set(LBM_GEOLOCATION ON CACHE BOOL "")
     endif()
 endif()
@@ -210,7 +186,14 @@ endif()
 # Include HAL and Libraries
 
 add_subdirectory(${SMTC_HAL_DIR} smtc_hal_build)
+# The following add_subdirectory handles the LBM include - if INCLUDE_LBM CMake variable is set to true.
 add_subdirectory(${EXAMPLES_DIR}/../smtc_rac_lib smtc_rac_lib)
+# From now on, RADIO_FAMILY, RADIO_FAMILY_UPPER and RADIO_UPPER should be available here
+message(STATUS "top-level common.cmake- RAC_RADIO = ${RAC_RADIO}, "
+                "RADIO_FAMILY = ${RADIO_FAMILY}, "
+                "RADIO_FAMILY_UPPER = ${RADIO_FAMILY_UPPER}, "
+                "RADIO_UPPER = ${RADIO_UPPER}"
+        )
 
 # Apply logging configuration to smtc_rac target
 if(TARGET smtc_rac)
@@ -219,56 +202,21 @@ if(TARGET smtc_rac)
         if(TARGET smtc_ral_${RADIO_FAMILY})
             target_compile_definitions(smtc_ral_${RADIO_FAMILY} PUBLIC LINUX_PLATFORM)
         endif()
+        # smtc_hal_linux needs access to smtc_core_hal_interface for re-implementation of __weak__ functions
+        target_link_libraries(smtc_hal PRIVATE smtc_core_hal_interface)
     endif()
 
     # Apply Radio Planner options
-    target_compile_definitions(smtc_rac PRIVATE RP_MARGIN_DELAY=${RP_MARGIN_DELAY})
+    # target_compile_definitions(smtc_rac PRIVATE RP_MARGIN_DELAY=${RP_MARGIN_DELAY})
 
-    # Apply RAC logging options
-    if(RAC_CORE_LOG_ERROR_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_ERROR_ENABLE=1)
-    endif()
-    if(RAC_CORE_LOG_CONFIG_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_CONFIG_ENABLE=1)
-    endif()
-    if(RAC_CORE_LOG_INFO_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_INFO_ENABLE=0)
-    endif()
-    if(RAC_CORE_LOG_WARN_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_WARN_ENABLE=0)
-    endif()
-    if(RAC_CORE_LOG_DEBUG_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_DEBUG_ENABLE=0)
-    endif()
-    if(RAC_CORE_LOG_API_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_API_ENABLE=0)
-    endif()
-    if(RAC_CORE_LOG_RADIO_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_RADIO_ENABLE=0)
-    endif()
-
-    # Apply RAC LoRa logging options
-    if(RAC_LORA_LOG_TX_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_LORA_LOG_TX_ENABLE=1)
-    endif()
-    if(RAC_LORA_LOG_RX_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_LORA_LOG_RX_ENABLE=1)
-    endif()
-    if(RAC_LORA_LOG_CONFIG_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_LORA_LOG_CONFIG_ENABLE=0)
-    endif()
-    if(RAC_LORA_LOG_ERROR_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_LORA_LOG_ERROR_ENABLE=1)
-    endif()
-    if(RAC_LORA_LOG_INFO_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_LORA_LOG_INFO_ENABLE=0)
-    endif()
-    if(RAC_LORA_LOG_WARN_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_LORA_LOG_WARN_ENABLE=0)
-    endif()
-    if(RAC_LORA_LOG_DEBUG_ENABLE)
-        target_compile_definitions(smtc_rac PRIVATE RAC_LORA_LOG_DEBUG_ENABLE=0)
-    endif()
+    # Apply RAC logging options: every RAC_CORE_LOG_* is defined to 0 or 1, all 0 when RAC_LOG_ENABLE is OFF
+    foreach(rac_log IN ITEMS ERROR CONFIG INFO WARN DEBUG API RADIO)
+        if(RAC_LOG_ENABLE AND RAC_CORE_LOG_${rac_log}_ENABLE)
+            target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_${rac_log}_ENABLE=1)
+        else()
+            target_compile_definitions(smtc_rac PRIVATE RAC_CORE_LOG_${rac_log}_ENABLE=0)
+        endif()
+    endforeach()
 
     message(STATUS "Applied logging configuration to smtc_rac target")
 endif()
@@ -277,6 +225,13 @@ add_subdirectory(${EXAMPLES_DIR}/smtc_modem_hal smtc_modem_hal_build)
 add_subdirectory(${EXAMPLES_DIR}/radio_hal radio_hal_build)
 
 # Radio-specific compile definitions
+
+# UDP_PF (virtual radio)
+# smtc_modem_hal_implem must link RAL when using udp_pf (access to ral_udp_pf.h)
+if(RAC_RADIO IN_LIST udp_pf_radios)
+    target_link_libraries(smtc_modem_hal_implem PRIVATE smtc_ral_${RADIO_FAMILY})
+endif()
+
 # SX127x
 if (RAC_RADIO STREQUAL "sx1272")
     target_compile_definitions(smtc_modem_hal_implem PUBLIC SX1272)
@@ -284,7 +239,13 @@ if (RAC_RADIO STREQUAL "sx1272")
 endif()
 if (RAC_RADIO STREQUAL "sx1276")
     target_compile_definitions(smtc_modem_hal_implem PUBLIC SX1276)
-    target_compile_definitions(radio_hal PUBLIC SX1272)
+    target_compile_definitions(radio_hal PUBLIC SX1276)
+endif()
+if(RAC_RADIO IN_LIST sx127x_radios)
+    target_compile_definitions(smtc_modem_hal_implem PUBLIC SX127X)
+    target_compile_definitions(smtc_hal PUBLIC SX127X)
+    target_compile_definitions(radio_hal PUBLIC SX127X)
+    target_link_libraries(smtc_hal PRIVATE ${radio_driver_library})
 endif()
 
 # SX126x
@@ -297,6 +258,23 @@ if (RAC_RADIO STREQUAL "sx1262")
 endif()
 if (RAC_RADIO STREQUAL "sx1268")
     target_compile_definitions(radio_hal PUBLIC SX1268)
+endif()
+if(RAC_RADIO IN_LIST sx126x_radios)
+    target_compile_definitions(smtc_hal PUBLIC SX126X)
+    target_compile_definitions(radio_hal PUBLIC SX126X)
+endif()
+
+# SX128x
+# Not needed in smtc_modem_hal_implem - yet.
+if (RAC_RADIO STREQUAL "sx1280")
+    target_compile_definitions(radio_hal PUBLIC SX1280)
+endif()
+if (RAC_RADIO STREQUAL "sx1281")
+    target_compile_definitions(radio_hal PUBLIC SX1281)
+endif()
+if(RAC_RADIO IN_LIST sx128x_radios)
+    target_compile_definitions(smtc_hal PUBLIC SX128X)
+    target_compile_definitions(radio_hal PUBLIC SX128X)
 endif()
 
 # LR11xx
@@ -323,19 +301,19 @@ if(RAC_RADIO STREQUAL "lr2012")
     target_compile_definitions(smtc_modem_hal_implem PUBLIC LR2012)
     target_compile_definitions(smtc_hal PUBLIC LR2012)
     target_compile_definitions(radio_hal PUBLIC LR2012)
-    target_compile_definitions(smtc_ral_lr20xx PRIVATE LR2012)
+    # target_compile_definitions(smtc_ral_lr20xx PRIVATE LR2012) # already done in smtc_ral/src/CMakeLists.txt
 endif()
 if(RAC_RADIO STREQUAL "lr2021")
     target_compile_definitions(smtc_modem_hal_implem PUBLIC LR2021)
     target_compile_definitions(smtc_hal PUBLIC LR2021)
     target_compile_definitions(radio_hal PUBLIC LR2021)
-    target_compile_definitions(smtc_ral_lr20xx PRIVATE LR2021)
+    # target_compile_definitions(smtc_ral_lr20xx PRIVATE LR2021)
 endif()
 if(RAC_RADIO STREQUAL "lr2022")
     target_compile_definitions(smtc_modem_hal_implem PUBLIC LR2022)
     target_compile_definitions(smtc_hal PUBLIC LR2022)
     target_compile_definitions(radio_hal PUBLIC LR2022)
-    target_compile_definitions(smtc_ral_lr20xx PRIVATE LR2022)
+    # target_compile_definitions(smtc_ral_lr20xx PRIVATE LR2022)
 endif()
 if(RAC_RADIO IN_LIST lr20xx_radios)
     target_compile_definitions(smtc_modem_hal_implem PUBLIC LR20XX)
@@ -367,9 +345,8 @@ if(APP_DEBUG)
 endif()
 
 # LBM-related compile definitions to HAL targets
-if(LBM_GEOLOCATION)
-    target_compile_definitions(smtc_modem_hal_implem PUBLIC ADD_APP_GEOLOCATION)
-endif()
+# NOTE: ADD_APP_GEOLOCATION is intentionally NOT set here. It is defined further below,
+# after add_subdirectory(lbm_lib), so it reflects the final value of LBM_GEOLOCATION.
 if(LBM_RELAY_TX)
     target_compile_definitions(smtc_modem_hal_implem PUBLIC USE_RELAY_TX)
 endif()
@@ -386,15 +363,30 @@ endif()
 
 ################################################################################
 # LoRa Basics Modem library
+# If the sample uses LBM (each samples defines INCLUDE_LBM - or not)
+if (INCLUDE_LBM)
+    # LBM protocol folder include is handled by RAC in smtc_rac/CMakeLists.txt
+    # Special define for radio_planner to properly define LBM hook IDs
+    target_compile_definitions(radio_planner PUBLIC USE_LBM)
+    target_compile_definitions(smtc_modem_hal_implem PUBLIC USE_LBM)
+    # Application-side geolocation definition. Set AFTER add_subdirectory(lbm_lib) so it
+    # reflects the FINAL value of LBM_GEOLOCATION: lbm_lib (options.cmake) may force it OFF
+    # for radios lacking geolocation support (e.g. lr1121). Defining ADD_APP_GEOLOCATION while
+    # the modem library is built without geolocation would compile the smtc_modem_wifi_* /
+    # smtc_modem_gnss_* calls in the app but leave them undefined at link time.
+    if(LBM_GEOLOCATION)
+        target_compile_definitions(smtc_modem_hal_implem PUBLIC ADD_APP_GEOLOCATION)
+    endif()
+endif()
 
-add_subdirectory(${EXAMPLES_DIR}/../protocols/lbm_lib lbm_lib)
-target_compile_definitions(lora_basics_modem PRIVATE USE_SMTC_RAC)
 
 ################################################################################
 # FLRC protocol
 
 if (USE_FLRC_PROTOCOL)
     add_subdirectory(${EXAMPLES_DIR}/../protocols/smtc_flrc_protocol smtc_flrc_protocol)
+    # Special define for radio_planner to properly define FLRP hook IDs
+    target_compile_definitions(radio_planner PUBLIC USE_FLRP)
     # FLRP needs a longer PA ramp time on LR20xx for best sensitivity (see ral_lr20xx_bsp.c).
     target_compile_definitions(radio_hal PRIVATE USE_FLRC_PROTOCOL)
 endif()
@@ -455,27 +447,9 @@ function(setup_example_target TARGET_NAME)
     # Add common includes
     target_include_directories(${TARGET_NAME} PUBLIC
         ${EXAMPLES_DIR}/main_examples
-        ${EXAMPLES_DIR}/examples
         ${EXAMPLES_DIR}/main_examples/ranging_demo
         ${EXAMPLES_DIR}/smtc_sw_platform
-        ${EXAMPLES_DIR}/../smtc_rac_lib/smtc_rac_api
-        ${EXAMPLES_DIR}/../smtc_rac_lib/smtc_modem_hal
-        ${EXAMPLES_DIR}/../smtc_rac_lib/radio_planner/src
-        ${EXAMPLES_DIR}/../smtc_rac_lib/smtc_ral/src
-        ${EXAMPLES_DIR}/../smtc_rac_lib/smtc_ralf/src
-        ${EXAMPLES_DIR}/../smtc_rac_lib/radio_drivers
-        ${EXAMPLES_DIR}/../protocols/network_discovery/network_discovery_api
-        ${EXAMPLES_DIR}/../protocols/network_discovery/network_discovery_core
     )
-
-    # FLRC protocol includes
-    if(USE_FLRC_PROTOCOL)
-        target_include_directories(${TARGET_NAME} PUBLIC
-            ${EXAMPLES_DIR}/../protocols/smtc_flrc_protocol
-            ${EXAMPLES_DIR}/../protocols/smtc_flrc_protocol/smtc_flrp_api
-            ${EXAMPLES_DIR}/../protocols/smtc_flrc_protocol/smtc_flrp_core
-        )
-    endif()
 
     # For FPB_RA0E2: Add FSP include directories
     if(BOARD STREQUAL "FPB_RA0E2")
@@ -498,30 +472,44 @@ function(setup_example_target TARGET_NAME)
     target_link_libraries(${TARGET_NAME} PUBLIC
         smtc_modem_hal_implem
         smtc_rac
-        LoRaBasicsModemApi
-        lora_basics_modem
         smtc_hal
         radio_hal
     )
 
-    # Generate hex file
-    add_custom_command(
-        TARGET ${TARGET_NAME} POST_BUILD
-        COMMAND ${CMAKE_OBJCOPY} -O ihex "$<TARGET_FILE:${TARGET_NAME}>" "${CMAKE_BINARY_DIR}/${TARGET_NAME}.hex"
-        COMMENT "Creating ${TARGET_NAME}.hex..."
-    )
+    if (INCLUDE_LBM)
+        target_link_libraries(${TARGET_NAME} PUBLIC lora_basics_modem)
+    endif()
 
-    # Generate bin file
-    add_custom_command(
-        TARGET ${TARGET_NAME} POST_BUILD
-        COMMAND ${CMAKE_OBJCOPY} -O binary -S "$<TARGET_FILE:${TARGET_NAME}>" "${CMAKE_BINARY_DIR}/${TARGET_NAME}.bin"
-        COMMENT "Creating ${TARGET_NAME}.bin..."
-    )
+    if (USE_FLRC_PROTOCOL)
+        target_link_libraries(${TARGET_NAME} PUBLIC smtc_flrc_protocol)
+    endif()
 
-    # Add flash target
-    add_custom_target(flash_${TARGET_NAME}
-        DEPENDS ${TARGET_NAME}
-        COMMAND st-flash --connect-under-reset write "${CMAKE_BINARY_DIR}/${TARGET_NAME}.bin" 0x8000000
-        USES_TERMINAL
-    )
+    if("${BOARD}" STREQUAL "LINUX" OR "${BOARD}" STREQUAL "LINUX_ARM" OR "${BOARD}" STREQUAL "LINUX_ARM64")
+        add_custom_command(
+            TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:${TARGET_NAME}>" "${CMAKE_BINARY_DIR}/${TARGET_NAME}.bin"
+            COMMENT "Copying ${TARGET_NAME} executable to ${TARGET_NAME}.bin..."
+        )
+    else()
+        # Generate hex file
+        add_custom_command(
+            TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${CMAKE_OBJCOPY} -O ihex "$<TARGET_FILE:${TARGET_NAME}>" "${CMAKE_BINARY_DIR}/${TARGET_NAME}.hex"
+            COMMENT "Creating ${TARGET_NAME}.hex..."
+        )
+
+        # Generate bin file
+        add_custom_command(
+            TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${CMAKE_OBJCOPY} -O binary -S "$<TARGET_FILE:${TARGET_NAME}>" "${CMAKE_BINARY_DIR}/${TARGET_NAME}.bin"
+            COMMENT "Creating ${TARGET_NAME}.bin..."
+        )
+
+        # Add flash target
+        add_custom_target(flash_${TARGET_NAME}
+            DEPENDS ${TARGET_NAME}
+            COMMAND st-flash --connect-under-reset write "${CMAKE_BINARY_DIR}/${TARGET_NAME}.bin" 0x8000000
+            USES_TERMINAL
+        )
+    endif()
 endfunction()

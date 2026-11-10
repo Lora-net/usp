@@ -59,8 +59,8 @@ extern "C" {
  * --- PUBLIC TYPES ------------------------------------------------------------
  */
 #define USP_RAC_VERSION_MAJOR 1
-#define USP_RAC_VERSION_MINOR 2
-#define USP_RAC_VERSION_PATCH 1
+#define USP_RAC_VERSION_MINOR 3
+#define USP_RAC_VERSION_PATCH 0
 // A pre-release version may be denoted by appending a hyphen and must comprise only ASCII alphanumerics and hyphens
 // [0-9A-Za-z-]
 #define USP_RAC_VERSION_PRE_RELEASE ""

@@ -80,6 +80,9 @@ typedef struct smtc_flrp_flrc_advanced_radio_config_s
     uint32_t                      crc_seed;
     uint32_t                      crc_polynomial;
     uint8_t                       sync_word[3][SMTC_FLRP_SIZE_SYNC_WORD_MAX];
+    bool frequency_offset_enabled; /*!< Enable applying the frequency offset computed for FLRC exchanges.
+    Note: the user callbacks will always return the freq offset from the WOR in smtc_flrp_burst_t/rx_stats_t,
+    but it will not be applied to the frequency in RX if this parameter is disabled.*/
 
 } smtc_flrp_flrc_advanced_radio_config_t;
 

@@ -166,15 +166,18 @@ typedef enum host_cmd_id_e
     CMD_CLOUD_ALMANAC_START = 0x7E,
     CMD_CLOUD_ALMANAC_STOP  = 0x7F,
 #endif /* ADD_ALMANAC */
-    CMD_WIFI_SCAN_START                = 0x80,
-    CMD_WIFI_SCAN_CANCEL               = 0x81,
-    CMD_WIFI_GET_SCAN_DONE_SCAN_DATA   = 0x82,
-    CMD_WIFI_GET_EVENT_DATA_TERMINATED = 0x83,
-    CMD_WIFI_SET_PORT                  = 0x84,
-    CMD_WIFI_SEND_MODE                 = 0x85,
-    CMD_WIFI_SET_PAYLOAD_FORMAT        = 0x86,
-    CMD_LR11XX_RADIO_READ              = 0x90,
-    CMD_LR11XX_RADIO_WRITE             = 0x91,
+    CMD_WIFI_SCAN_START                     = 0x80,
+    CMD_WIFI_SCAN_CANCEL                    = 0x81,
+    CMD_WIFI_GET_SCAN_DONE_SCAN_DATA        = 0x82,
+    CMD_WIFI_GET_EVENT_DATA_TERMINATED      = 0x83,
+    CMD_WIFI_SET_PORT                       = 0x84,
+    CMD_WIFI_SEND_MODE                      = 0x85,
+    CMD_WIFI_SET_PAYLOAD_FORMAT             = 0x86,
+    CMD_WIFI_SCAN_MODE                      = 0x87,
+    CMD_GNSS_ALM_DEMOD_STOP                 = 0x88,
+    CMD_WIFI_GET_SCAN_DONE_SCAN_DATA_RESULT = 0x89,
+    CMD_LR11XX_RADIO_READ                   = 0x90,
+    CMD_LR11XX_RADIO_WRITE                  = 0x91,
 #endif /* ADD_APP_GEOLOCATION */
     CMD_SET_RTC_OFFSET = 0x92,
 #if defined( USE_RELAY_TX )
@@ -187,6 +190,10 @@ typedef enum host_cmd_id_e
     CMD_MODEM_GET_CRASHLOG                     = 0x98,
     CMD_MODEM_GET_REPORT_ALL_DOWNLINKS_TO_USER = 0x99,
     CMD_MODEM_SET_REPORT_ALL_DOWNLINKS_TO_USER = 0x9A,
+    CMD_GET_NO_RX_PACKET_THRESHOLD             = 0x9B,
+    CMD_SET_NO_RX_PACKET_THRESHOLD             = 0x9C,
+    CMD_GET_CHANNEL_MASK                       = 0x9D,
+    CMD_SET_CHANNEL_MASK                       = 0x9E,
 
     CMD_USP_SUBMIT = 0xA0,
     CMD_USP_OPEN   = 0xA2,
@@ -199,21 +206,18 @@ typedef enum host_cmd_id_e
 
 #if defined( USE_FLRC_PROTOCOL )
     /* FLRC protocol commands (FLRP MAC) */
-    CMD_FLRC_PROTOCOL_INIT =
-        0xB0,  // Start FLRP: byte0=is_initiator (0/1), byte1=is_tx (0/1); optional bytes2-9=slave EUI (initiator only)
-    CMD_SET_FLRC_PROTOCOL_PARAMS      = 0xB1,  // Set FLRP radio config (protobuf)
-    CMD_GET_FLRC_PROTOCOL_STATS       = 0xB2,  // Get FLRP burst stats (protobuf flrc_burst_stats_pb_t)
     CMD_FLRP_INIT                     = 0xB3,  // Init FLRP stack (protobuf flrp_api_config_pb_t)
     CMD_FLRP_SET_PARAMS               = 0xB4,  // Set FLRP radio config (protobuf)
-    CMD_FLRP_START_PERIODIC_LISTENING = 0xB5,  // Start periodic listening
+    CMD_FLRP_START_PERIODIC_LISTENING = 0xB5,  // Start periodic listening. (payload_size)
     CMD_FLRP_STOP_PERIODIC_LISTENING  = 0xB6,  // Stop periodic listening
     CMD_FLRP_SLAVE_DATA_TO_SEND =
         0xB7,  // 4 bytes BE: payload length for smtc_flrp_slave_prepare_data_to_send (data in flrp_buffer; 0 clears)
     CMD_FLRP_INITIATE_TRANSMISSION =
         0xB8,  // Protobuf flrp_initiate_transmission_pb_t (com_config + payload_size; data in flrp_buffer)
-    CMD_FLRP_INITIATE_RECEPTION = 0xB9,  // Protobuf flrp_com_config_pb_t (buffer = flrp_buffer, size = FLRP_BURST_SIZE)
-    CMD_FLRP_GET_PARAMS         = 0xBA,  // Returns protobuf flrp_radio_config_pb_t (current smtc_flrp_radio_config_t)
-    CMD_FLRP_GET_STATS          = 0xBB,  // Returns protobuf flrp_stats_pb_t (last TX/RX callback snapshots)
+    CMD_FLRP_INITIATE_RECEPTION =
+        0xB9,  // Protobuf flrp_initiate_reception_pb_t (com_config + payload_size; buffer = flrp_buffer)
+    CMD_FLRP_GET_PARAMS = 0xBA,  // Returns protobuf flrp_radio_config_pb_t (current smtc_flrp_radio_config_t)
+    CMD_FLRP_GET_STATS  = 0xBB,  // Returns protobuf flrp_stats_pb_t (last TX/RX callback snapshots)
     CMD_FLRP_SET_PARAMS_ADVANCED =
         0xBC,  // Set FLRP advanced FLRC config (protobuf flrp_flrc_advanced_radio_config_pb_t)
 #endif

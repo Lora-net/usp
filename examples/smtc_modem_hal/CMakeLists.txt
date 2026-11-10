@@ -1,18 +1,24 @@
 # SPDX-License-Identifier: BSD-3-Clause-Clear
 
+# smtc_modem_hal implementation functions
+
 add_library(smtc_modem_hal_implem OBJECT smtc_modem_hal.c)
 
 target_link_libraries(smtc_modem_hal_implem PUBLIC
-
     smtc_hal
-    smtc_modem_hal_interface
+    smtc_core_hal_interface
 )
+if(INCLUDE_LBM)
+    target_link_libraries(smtc_modem_hal_implem PRIVATE smtc_modem_hal_interface) # For LBM-specific include file
+endif()
 
 # Our smtc_modem_hal is directly including sx127x.h
 if(RADIO_FAMILY STREQUAL sx127x)
     target_include_directories(smtc_modem_hal_implem PRIVATE
         $<TARGET_PROPERTY:${radio_driver_library},INCLUDE_DIRECTORIES>
     )
+    # Also needs access to smtc_rac includes to set context
+    target_link_libraries(smtc_modem_hal_implem PRIVATE smtc_rac)
 endif()
 
 # HAL needs RAL headers and UDP_PF definition for UDP_PF fake IRQ callback registration

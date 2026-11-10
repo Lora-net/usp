@@ -41,7 +41,7 @@
 #include <stdbool.h>  // bool type
 #include "modem_supervisor_light.h"
 #include "lorawan_send_management.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lorawan_certification.h"
 #include "smtc_modem_hal.h"
 #include "modem_core.h"
@@ -88,7 +88,7 @@ typedef enum tx_protocol_manager_state
 } tx_protocol_manager_state_t;
 #define ENABLE_DEBUG_TPM 0
 #define MAX_LIST_LENGTH 10
-#if( MODEM_HAL_DBG_TRACE )
+#if ( MODEM_HAL_DBG_TRACE )
 #define LOG_MARGIN_DELAY 50  // Log duration could impact  (it is advise to disable LOG if LBT /CSMA  are enabled)
 #else
 #define LOG_MARGIN_DELAY 0  // Log duration could impact  (it is advise to disable LOG if LBT /CSMA  are enabled)
@@ -548,6 +548,7 @@ static status_lorawan_t modem_tx_protocol_manager_engine( void )
     }
     else
     {
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( launch_tpm_func[tpm_list_of_state_to_execute[0]] ) );
         status = launch_tpm_func[tpm_list_of_state_to_execute[0]]( );
     }
     return status;
@@ -968,11 +969,11 @@ static status_lorawan_t manage_csma_state( void )
         return OKLORAWAN;
     }
     lr1_stack_mac_t* lr1mac_obj = lorawan_api_stack_mac_get( current_tpm_stack_id );
-    if( smtc_real_get_modulation_type_from_datarate( lr1mac_obj->real, lr1mac_obj->tx_data_rate ) == LORA )
+    if( smtc_real_get_modulation_type_from_tx_datarate( lr1mac_obj->real, lr1mac_obj->tx_data_rate ) == LORA )
     {
         uint8_t            tx_sf;
         lr1mac_bandwidth_t tx_bw;
-        smtc_real_lora_dr_to_sf_bw( lr1mac_obj->real, lr1mac_obj->tx_data_rate, &tx_sf, &tx_bw );
+        smtc_real_lora_tx_dr_to_sf_bw( lr1mac_obj->real, lr1mac_obj->tx_data_rate, &tx_sf, &tx_bw );
 
         smtc_lora_cad_bt_listen_channel( smtc_cad_get_obj( current_tpm_stack_id ), lr1mac_obj->tx_frequency, tx_sf,
                                          ( ral_lora_bw_t ) tx_bw, false, target_time_csma, 0,
@@ -1250,7 +1251,7 @@ static void compute_tpm_list( void )
 #if defined( ADD_CSMA )
 
         if( ( smtc_lora_cad_bt_get_state( smtc_cad_get_obj( current_tpm_stack_id ) ) == true ) &&
-            ( smtc_real_get_modulation_type_from_datarate( lr1mac_obj->real, lr1mac_obj->tx_data_rate ) == LORA ) )
+            ( smtc_real_get_modulation_type_from_tx_datarate( lr1mac_obj->real, lr1mac_obj->tx_data_rate ) == LORA ) )
         {
             tpm_list_of_state_to_execute[index++] = TPM_STATE_CSMA_BEFORE_WOR;
         }
@@ -1282,7 +1283,7 @@ static void compute_tpm_list( void )
 
 #if defined( ADD_CSMA )
         if( ( smtc_lora_cad_bt_get_state( smtc_cad_get_obj( current_tpm_stack_id ) ) == true ) &&
-            ( smtc_real_get_modulation_type_from_datarate( lr1mac_obj->real, lr1mac_obj->tx_data_rate ) == LORA ) )
+            ( smtc_real_get_modulation_type_from_tx_datarate( lr1mac_obj->real, lr1mac_obj->tx_data_rate ) == LORA ) )
         {
             tpm_list_of_state_to_execute[index++] = TPM_STATE_CSMA;
         }

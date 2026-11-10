@@ -56,9 +56,9 @@ WARNING: This trace comes from USP-Zephyr. The trace is not the same in USP.
 
 The output can be seen using minicom
 ```
-minicom -D /dev/USB0 -b 921600
+minicom -D /dev/USB0 -b 115200
 ```
-Please note that the `spectral_scan` application is configured for a baudrate of 921600
+Please note that the `spectral_scan` application is configured for a baudrate of 115200
 
 ### Application Startup
 

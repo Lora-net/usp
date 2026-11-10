@@ -33,8 +33,9 @@ The same wording is used in the [root README](../README.md):
   - **Buildable** on Linux (x86 / x86_64 native + ARM cross-compilation).
   - **Experimental** on Renesas FPB-RA0E2 (only `porting_tests` & `periodical_uplink`, Class A,
     US915) and on STMicro NUCLEO-STM32L073RZ.
-- **Radios:** Validated on the **LoRa Plus™ EVK** (LR2021 / LR2022 / LR2012); buildable on LR11xx
-  and SX126x shields. See [LoRa Plus™ EVK](LORA_PLUS_EVK.md).
+- **Radios:** Validated on the **LoRa Plus™ EVK** (LR2021 / LR2022 / LR2012) and on LR11xx shields;
+  buildable on SX126x shields; experimental on SX127x & SX128x shields (only LoRa Basics Modem
+  was tested). See [LoRa Plus™ EVK](LORA_PLUS_EVK.md).
 - See [Known Limitations](KNOWN_LIMITATIONS.md) for per-configuration caveats.
 
 ## Validation coverage per domain
@@ -62,6 +63,9 @@ Notes:
 ## Memory footprint (upcoming)
 
 **RAM / Flash footprint** figures per sample/configuration will be added in a **future release**.
+
+Indicative figures for a LoRaWAN application (`periodical_uplink`, USP vs SWL2001) and the way to
+reach a minimal footprint are given in the [SWL2001 to USP porting guide](usp_lbm_porting_guide.md#memory-footprint).
 
 ---
 

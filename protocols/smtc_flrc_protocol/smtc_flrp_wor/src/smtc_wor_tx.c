@@ -47,7 +47,7 @@
 #include "flrp_defs.h"
 #include "flrp_configuration.h"
 #include "smtc_flrp_api.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_flrp_utils.h"
 
 /*
@@ -155,8 +155,8 @@ static uint16_t get_lora_symb_timeout( smtc_wor_t* smtc_wor_obj )
     uint32_t time_symbol_us = smtc_wor_get_single_symbol_time_us( smtc_wor_obj->transaction->radio_params.lora.bw,
                                                                   smtc_wor_obj->transaction->radio_params.lora.sf );
     uint32_t rx_timeout_ms  = MAX( ( ( ( ( WOR_ACK_DELAY_MS * 2 * smtc_wor_obj->crystal_error ) / 1000 ) +
-                                      ( SMTC_WOR_NB_SYM_TIMEOUT * time_symbol_us ) ) /
-                                    1000 ),
+                                       ( SMTC_WOR_NB_SYM_TIMEOUT * time_symbol_us ) ) /
+                                     1000 ),
                                    SMTC_WOR_PREAMBLE_DURATION_MIN_MS );
 
     uint16_t rx_window_symb =

@@ -82,14 +82,16 @@ openocd -f interface/stlink.cfg -f target/stm32l4x.cfg -c "adapter serial <SERIA
 
 ## Usage
 
-### 1. Hardware Setup
+### Using the hardware bridge
+
+#### 1. Hardware Setup
 
 1. **Connect Bridge Board**: Wire UART and GPIO signals through shield to external pins
 2. **UART Connection**: Connect `smtc-hal-uart` (UART1) to bridge module
 3. **GPIO Wiring**: Connect CMD, BUSY, EVENT GPIOs to bridge board
 4. **Power Supply**: Ensure adequate power for modem operations
 
-### 2. Command Interface
+#### 2. Command Interface
 
 Commands follow the format:
 ```
@@ -106,11 +108,11 @@ Commands follow the format:
 0xA2 0x01 0x01 0xA0
 ```
 
-### 3. Python Test Suite
+#### 3. Python Test Suite
 
-Refer to the README.md file present in the python_test directory
+Refer to the README.md file present in the python_test directory.
 
-### 4. Serial Command Example
+#### 4. Serial Command Example
 
 **Using Python:**
 ```python
@@ -120,6 +122,102 @@ ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.5)
 # Get version command
 ser.write(b'\x10\x00\x10')
 response = ser.read(100)
+```
+
+### Using the software bridge
+
+The `python_bridge.py` is a software replacement for the former physical bridge that the hw_modem example mentioned previously. Commands follow the same interface as before. The script will connect to a device (through either a tty endpoint or a COM port) and expose two sockets, one for the traces (output of SMTC_HAL_TRACE_* functions) and one for the data (bidirectional connection using a ring buffer)
+
+#### 1. Parameters
+
+  * device selection and configuration
+    --port PORT: set the port used for the connection
+    --baudrate BAUDRATE: set the baudrate of the connection
+    --timeout TIMEOUT: set the timeout of the connection
+  * output setup
+    --trace-out SINK: set the destination(s) for the trace channel (repeatable)
+    --data-out SINK: set the destination(s) for the data channel (repeatable)
+
+The SINK can be any of:
+- 'stdout' or 'stderr' (this process's streams)
+- 'pty' (Unix only; allocates a PTY and prints its path, forwards raw bytes both ways)
+- 'socket[:PORT]' (TCP server, bidirectional, default port 5551 if PORT is omitted)
+- 'file:PATH' (writes raw bytes to PATH, truncated at startup)
+
+#### 2.1 Usage as a module
+
+You can import the following symbols from the script:
+  * add_python_bridge_options: add the script options to a user-provided ArgumentParser
+  * extract_python_bridge_config: extract a HostConfig from the parsed arguments
+  * open_device: a context manager that takes a HostConfig, opens the configured device, exposes and display trace and data output
+
+Example:
+```python
+from python_bridge import *
+
+def main():
+    parser = ArgumentParser(description=__doc__)
+    add_python_bridge_options(parser)
+    args = parser.parse_args()
+    config = extract_python_bridge_config(args)
+
+    with open_device(config) as device:
+        device.write(b"...")
+        reply = device.read()
+        ...
+```
+
+Using the `with` syntax, the hub will live as long as the scope.
+
+#### 2.2 Usage as a standalone
+
+The script is intended to be invoked by the `uv` tool, that takes care of the dependencies. If `uv` is not installed, you can still invoke the script with `python3`, but you will need to manually install the dependencies. Typical use:
+
+
+#### 3.1 Linux example
+
+Terminal 1 (bridge running in the background):
+```
+$ uv run python_bridge.py --port /dev/ttyACM0 --trace-out stdout
+Python bridge on /dev/ttyACM0 @ 115200
+  trace -> stdout
+  data  -> socket: 127.0.0.1:5552
+Ctrl+C to stop.
+```
+
+Terminal 2 (application communicating with hw_modem):
+```python
+from python_bridge import *
+
+def main():
+    parser = ArgumentParser(description=__doc__)
+    add_python_bridge_options(parser)
+    args = parser.parse_args()
+    config = extract_python_bridge_config(args)
+
+    with open_device(config, attach=True) as device:
+        device.write(b"...")
+        reply = device.read()
+        ...
+```
+
+Note the `attach = True` parameter of `open_device`, it allows to connect to an already running python_bridge (the hub keeps on living after the scope). This option is not compatible with `--data-out pty`.
+
+#### 3.2 Windows example
+
+The bridge runs the same way on Windows, with a few differences:
+
+  * `--port` takes a COM port instead of a tty path, e.g. `--port COM5`. Check Device Manager > Ports (COM & LPT) for the assigned number.
+  * `--trace-out pty` / `--data-out pty` are Unix only. Consider using the default option (TCP sockets).
+  * `uv run python_bridge.py ...` works the same from PowerShell or Command Prompt.
+
+Example (Command Prompt or PowerShell):
+```
+> uv run python_bridge.py --port COM5 --trace-out stdout
+Python bridge on COM5 @ 115200
+  trace -> stdout
+  data  -> socket: 127.0.0.1:5552
+Ctrl+C to stop.
 ```
 
 ## Expected Output
@@ -161,9 +259,38 @@ WARNING: This trace comes from USP-Zephyr. The trace is not the same in USP.
 
 ### Advanced Features
 - FUOTA commands (0x60-0x6F)
-- Geolocation commands (0x70-0x7F)
-- Clock sync commands (0x80-0x8F)
+- Geolocation commands (0x70-0x89, requires `LBM_GEOLOCATION=ON`)
 - Device management commands (0x90-0x9F)
+
+### Geolocation Commands
+GNSS (0x70-0x7F):
+- `0x7B` - Start almanac demodulation
+- `0x7C` - Set almanac demodulation constellations
+- `0x7D` - Get almanac update event data. The response starts with a `service_state` byte (almanac demodulation service running or stopped)
+- `0x7E` / `0x7F` - Start / stop cloud almanac update (`ADD_ALMANAC` only)
+
+The GNSS scan done event data (`0x72`) includes a `time_available` byte right after the token (radio synchronized with GPS time, needed for an immediate almanac demodulation start).
+
+WiFi (0x80-0x89):
+- `0x80` - Start WiFi scan
+- `0x81` - Cancel WiFi scan
+- `0x82` - Get WiFi scan done data. Returns the header only (number of results, power consumption, scan duration); results are read one by one with `0x89`
+- `0x83` - Get WiFi terminated event data
+- `0x84` - Set WiFi port
+- `0x85` - Set WiFi send mode
+- `0x86` - Set WiFi payload format
+- `0x87` - Set WiFi scan mode (1 byte, country code / SSID demodulation for region detection)
+- `0x88` - Stop almanac demodulation
+- `0x89` - Get one WiFi scan result (1 byte: result index, must be lower than the number of results). The response contains the result type, MAC address, channel, type and RSSI, followed by the country code and the SSID for extended results
+
+### Network Commands
+- `0x9B` - Get no-RX-packet threshold (number of uplinks without downlink before the stack is reset). Response: 2 bytes, big endian
+- `0x9C` - Set no-RX-packet threshold. 2 bytes, big endian
+- `0x9D` - Get LoRaWAN channel mask. Response: the channel mask bitfield, its size depends on the region (e.g. 9 bytes for US915/AU915)
+- `0x9E` - Set LoRaWAN channel mask. 1 to 6 groups of 3 bytes: `ChMaskCntl` (1 byte) + `ChMask` (2 bytes, big endian), same encoding as `LinkADRReq`. Must be called before join for ABP with fixed channel plan regions
+
+### Events
+- `0x37` - Reset request: the modem needs to be reset (e.g. the LoRaWAN certification can request a DUT reset). 1 byte of status
 
 ## Linux Implementation
 

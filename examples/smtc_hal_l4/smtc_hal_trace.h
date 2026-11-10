@@ -62,6 +62,14 @@ extern "C" {
  * --- PUBLIC TYPES ------------------------------------------------------------
  */
 
+/**
+ * @brief Trace transmit function signature
+ *
+ * @param [in] buff Buffer to transmit
+ * @param [in] len  Number of bytes to transmit
+ */
+typedef void ( *hal_trace_tx_fn_t )( uint8_t* buff, uint16_t len );
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS PROTOTYPES ---------------------------------------------
@@ -69,6 +77,13 @@ extern "C" {
 
 void hal_trace_print( const char* fmt, va_list argp );
 void hal_trace_print_var( const char* fmt, ... );
+
+/**
+ * @brief Override the function used to transmit trace bytes
+ *
+ * @param [in] fn Function to call for each trace print, or NULL to restore the default (trace_uart_tx)
+ */
+void hal_trace_set_tx_function( hal_trace_tx_fn_t fn );
 
 #ifdef __cplusplus
 }

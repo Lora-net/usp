@@ -42,7 +42,7 @@
 #include "circularfs.h"
 #include "modem_core.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_supervisor_light.h"
 #include "lorawan_api.h"
 #include "store_and_forward_flash.h"
@@ -554,13 +554,13 @@ static void store_and_forward_flash_service_on_launch( void* service_id )
         {
             uint8_t           dr = lorawan_api_next_dr_get( store_and_forward_flash_obj[idx].stack_id );
             modulation_type_t modulation =
-                lorawan_api_get_modulation_type_from_datarate( store_and_forward_flash_obj[idx].stack_id, dr );
+                lorawan_api_get_modulation_type_from_tx_datarate( store_and_forward_flash_obj[idx].stack_id, dr );
 
             if( modulation == LORA )
             {
                 uint8_t            out_sf;
                 lr1mac_bandwidth_t out_bw;
-                lorawan_api_lora_dr_to_sf_bw( dr, &out_sf, &out_bw, store_and_forward_flash_obj[idx].stack_id );
+                lorawan_api_lora_tx_dr_to_sf_bw( dr, &out_sf, &out_bw, store_and_forward_flash_obj[idx].stack_id );
                 if( out_sf < 9 )
                 {
                     lorawan_api_set_no_rx_windows( store_and_forward_flash_obj[idx].stack_id, true );

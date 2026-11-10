@@ -11,7 +11,7 @@ target_include_directories(smtc_modem_crypto PUBLIC
 target_link_libraries(smtc_modem_crypto PRIVATE
     smtc_modem_hal_interface
     smtc_modem_api_internal
-    smtc_modem_logging
+    # smtc_modem_logging
 )
 
 target_compile_definitions(smtc_modem_crypto PRIVATE NUMBER_OF_STACKS=${LBM_NUMBER_OF_STACKS})

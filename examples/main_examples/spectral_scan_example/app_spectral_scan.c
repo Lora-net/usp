@@ -48,7 +48,7 @@
 
 #include "radio_planner_types.h"
 #include "smtc_rac_api.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 #include "smtc_hal_dbg_trace.h"
 // #include "smtc_hal_mcu.h"
 #include "ral_defs.h"

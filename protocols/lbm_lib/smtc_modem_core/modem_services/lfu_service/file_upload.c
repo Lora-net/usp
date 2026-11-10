@@ -51,7 +51,7 @@
 
 #include "smtc_modem_api.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 #include <stdbool.h>  // bool type
 #include <stdint.h>   // C99 types
@@ -109,8 +109,6 @@
 #else
 #define ENDIAN_n2b32( x ) ( x )
 #endif
-
-
 
 /*
  * -----------------------------------------------------------------------------
@@ -454,7 +452,7 @@ static void lfu_service_on_launch( void* service_id )
     }
     uint32_t max_payload_size = lorawan_api_next_max_payload_length_get( lfu_ctx[idx].stack_id );
     file_upload_chunk_size    = file_upload_get_fragment( &lfu_ctx[idx].lfu, file_upload_chunk_payload,
-                                                       ( max_payload_size > 100 ) ? 100 : max_payload_size,
+                                                          ( max_payload_size > 100 ) ? 100 : max_payload_size,
                                                           lorawan_api_fcnt_up_get( lfu_ctx[idx].stack_id ) );
     if( file_upload_chunk_size > 0 )
     {
@@ -464,17 +462,17 @@ static void lfu_service_on_launch( void* service_id )
 #else
         dm_port = DM_PORT;
 #endif
-        lfu_ctx[idx].send_status =
-            tx_protocol_manager_request (TX_PROTOCOL_TRANSMIT_LORA, dm_port, true, file_upload_chunk_payload, file_upload_chunk_size, UNCONF_DATA_UP,
-                                      smtc_modem_hal_get_time_in_ms( )  , lfu_ctx[idx].stack_id );
+        lfu_ctx[idx].send_status = tx_protocol_manager_request(
+            TX_PROTOCOL_TRANSMIT_LORA, dm_port, true, file_upload_chunk_payload, file_upload_chunk_size, UNCONF_DATA_UP,
+            smtc_modem_hal_get_time_in_ms( ), lfu_ctx[idx].stack_id );
     }
     else
     {
         // something prevents fragment to be constructed (max payload size < 11 due to mac answers in fopts and
         // shall be uplinked first)
         lfu_ctx[idx].send_status =
-            tx_protocol_manager_request (TX_PROTOCOL_TRANSMIT_LORA, 0, false, NULL, 0, UNCONF_DATA_UP,
-                                      smtc_modem_hal_get_time_in_ms( )  , lfu_ctx[idx].stack_id );
+            tx_protocol_manager_request( TX_PROTOCOL_TRANSMIT_LORA, 0, false, NULL, 0, UNCONF_DATA_UP,
+                                         smtc_modem_hal_get_time_in_ms( ), lfu_ctx[idx].stack_id );
     }
 }
 
@@ -643,9 +641,9 @@ int32_t file_upload_get_fragment( file_upload_t* file_upload, uint8_t* buf, int3
     len = len - 3;
     // discriminator (16bit little endian): 2bit session id, 4bit session
     // counter, 10bit chunk count-1
-    uint32_t d = ( ( file_upload->sid & 0x03 ) << 14 ) | ( ( file_upload->session_counter & 0x0F ) << 10 ) |
-                 ( ( file_upload->cct - 1 ) & 0x03FF );
-    int32_t n     = 0;
+    uint32_t d    = ( ( file_upload->sid & 0x03 ) << 14 ) | ( ( file_upload->session_counter & 0x0F ) << 10 ) |
+                    ( ( file_upload->cct - 1 ) & 0x03FF );
+    int32_t  n    = 0;
     buf[n++]      = FILE_UPLOAD_TOKEN;
     buf[n++]      = d;
     buf[n++]      = d >> 8;

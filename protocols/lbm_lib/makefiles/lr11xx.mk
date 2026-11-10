@@ -23,27 +23,27 @@ ALLOW_CSMA_BUILD = yes
 #-----------------------------------------------------------------------------
 
 RADIO_DRIVER_C_SOURCES += \
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_bootloader.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_crypto_engine.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_driver_version.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_radio.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_radio_timings.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_regmem.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_rttof.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_system.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_lr_fhss.c
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_bootloader.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_crypto_engine.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_driver_version.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_radio.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_radio_timings.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_regmem.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_rttof.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_system.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_lr_fhss.c
 
 ifneq ($(RADIO),lr1121)
 RADIO_DRIVER_C_SOURCES += \
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_wifi.c\
-	smtc_modem_core/radio_drivers/lr11xx_driver/src/lr11xx_gnss.c
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_wifi.c\
+	$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src/lr11xx_gnss.c
 endif
 
 SMTC_RAL_C_SOURCES += \
-	smtc_modem_core/smtc_ral/src/ral_lr11xx.c
+	$(SMTC_RADIO_INTERFACE_DIR)/smtc_ral/src/ral_lr11xx.c
 
 SMTC_RALF_C_SOURCES += \
-	smtc_modem_core/smtc_ralf/src/ralf_lr11xx.c
+	$(SMTC_RADIO_INTERFACE_DIR)/smtc_ralf/src/ralf_lr11xx.c
 
 
 ifeq ($(CRYPTO),LR11XX)
@@ -85,7 +85,7 @@ endif
 # Includes
 #-----------------------------------------------------------------------------
 LBM_C_INCLUDES =  \
-	-Ismtc_modem_core/radio_drivers/lr11xx_driver/src
+	-I$(SMTC_RADIO_DRIVERS_DIR)/lr11xx_driver/src
 
 ifeq ($(CRYPTO),LR11XX)
 LBM_C_INCLUDES += \
@@ -118,8 +118,25 @@ endif
 #-----------------------------------------------------------------------------
 LBM_C_DEFS += \
 	-DLR11XX\
+	-DRAL_DRIVER_DIRECT_DISPATCH\
+	-DRAL_DRIVER_DIRECT_DISPATCH_LR11XX\
 	-DLR11XX_TRANSCEIVER\
 	-DLR11XX_DISABLE_WARNINGS
+
+ifeq ($(RADIO),lr1110)
+LBM_C_DEFS += \
+	-DLR1110
+endif
+
+ifeq ($(RADIO),lr1120)
+LBM_C_DEFS += \
+	-DLR1120
+endif
+
+ifeq ($(RADIO),lr1121)
+LBM_C_DEFS += \
+	-DLR1121
+endif
 
 ifeq ($(CRYPTO),LR11XX)
 LBM_C_DEFS += \

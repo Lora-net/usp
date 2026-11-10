@@ -46,7 +46,7 @@
 #include "lorawan_send_management.h"
 #include "lorawan_cid_request_management.h"
 #include "lorawan_class_b_management.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_supervisor_light.h"
 #include "modem_core.h"
 #include "smtc_real_defs.h"
@@ -81,6 +81,7 @@
 #elif defined( LR11XX )
 #include "ralf_lr11xx.h"
 #elif defined( SX127X )
+#include "sx127x.h"
 #include "ralf_sx127x.h"
 #elif defined( LR20XX )
 #include "ralf_lr20xx.h"
@@ -118,9 +119,9 @@
 #include "aes.h"
 #endif  // USE_LR11XX_CE && ( ADD_FUOTA == 2 )
 
-#if defined( USE_SMTC_RAC )
-#include "smtc_rac_api.h"
-#endif
+// #if defined( USE_SMTC_RAC )
+// #include "smtc_rac_api.h"
+// #endif
 
 /*
  * -----------------------------------------------------------------------------
@@ -191,14 +192,16 @@ typedef struct modem_key_ctx_s
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
 
-#if !defined( USE_SMTC_RAC )
+// Radio Planner instance handling
+#if defined( MODEM_RP_RALF_RAL_INTERNAL )
 static radio_planner_t modem_radio_planner_instance;
 radio_planner_t*       modem_radio_planner = &modem_radio_planner_instance;
 #else
 radio_planner_t* modem_radio_planner = NULL;
-#endif  // #if !defined( USE_SMTC_RAC )
+#endif  // MODEM_RP_RALF_RAL_INTERNAL
 
-#if !defined( USE_SMTC_RAC )
+// RALF instance handling
+#if defined( MODEM_RP_RALF_RAL_INTERNAL )
 #if defined( SX128X )
 static ralf_t modem_radio_instance = RALF_SX128X_INSTANTIATE( NULL );
 #elif defined( SX126X )
@@ -208,16 +211,15 @@ static ralf_t modem_radio_instance = RALF_LR11XX_INSTANTIATE( NULL );
 #elif defined( LR20XX )
 static ralf_t modem_radio_instance = RALF_LR20XX_INSTANTIATE( NULL );
 #elif defined( SX127X )
-#include "sx127x.h"
 static sx127x_t sx127x;
 static ralf_t   modem_radio_instance = RALF_SX127X_INSTANTIATE( &sx127x );
 #else
-#error "Please select radio board.."
+#error "Unknown define for modem radio to use. Please check radio family is properly defined."
 #endif  // #if defined( SX128X )
 ralf_t* modem_radio = &modem_radio_instance;
-#else   // #if !defined( USE_SMTC_RAC )
+#else
 ralf_t* modem_radio = NULL;
-#endif  // #if !defined( USE_SMTC_RAC )
+#endif  // MODEM_RP_RALF_RAL_INTERNAL
 
 struct
 {
@@ -267,19 +269,31 @@ bool smtc_is_modem_initialized( )
     return ( modem_radio_planner != NULL && modem_radio != NULL );
 }
 
+#if !defined( MODEM_RP_RALF_RAL_INTERNAL )
+void smtc_modem_set_rp_ralf_contextes( void* external_rp_p, void* external_ralf_p )
+{
+    if( external_rp_p == NULL || external_ralf_p == NULL )
+    {
+        SMTC_MODEM_HAL_PANIC( "RP and/or RALF contextes NULL. PLease initialize them before calling %s()\n", __func__ );
+    }
+    modem_radio_planner = ( radio_planner_t* ) external_rp_p;
+    modem_radio         = ( ralf_t* ) external_ralf_p;
+}
+#endif
+
 void smtc_modem_init( void ( *callback_event )( void ) )
 {
     SMTC_MODEM_HAL_TRACE_INFO( "Modem Initialization\n" );
-#if defined( USE_SMTC_RAC )
-    modem_radio_planner = smtc_rac_get_rp( );
-    modem_radio         = smtc_rac_get_radio( );
+#if !defined( MODEM_RP_RALF_RAL_INTERNAL )  // RALF and RP are handled externally (e.g by RAC)
     if( modem_radio_planner == NULL || modem_radio == NULL )
     {
-        SMTC_MODEM_HAL_PANIC( "The radio_planner not initialized by RAC" );
+        SMTC_MODEM_HAL_PANIC(
+            "Radio planner instance and/or RALF instance are NULL.\n"
+            "Please call smtc_modem_set_rp_ralf_contextes() before smtc_modem_init()." );
     }
     modem_set_radio_ctx( modem_radio->ral.context );
-    // init radio and put it in sleep mode
-#else
+
+#else  // RALF and RP are handled internally (Legacy LBM mode)
     // init radio and put it in sleep mode
     SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_reset( &( modem_radio->ral ) ) == RAL_STATUS_OK );
     SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_init( &( modem_radio->ral ) ) == RAL_STATUS_OK );
@@ -287,7 +301,7 @@ void smtc_modem_init( void ( *callback_event )( void ) )
 #endif
     smtc_modem_hal_set_ant_switch( false );
 
-#if !defined( USE_SMTC_RAC )
+#if defined( MODEM_RP_RALF_RAL_INTERNAL )
     // init radio planner and attach corresponding radio irq
     rp_init( modem_radio_planner, modem_radio );
 
@@ -296,6 +310,7 @@ void smtc_modem_init( void ( *callback_event )( void ) )
     rp_hook_init( modem_radio_planner, RP_HOOK_ID_SUSPEND, ( void ( * )( void* ) )( empty_callback ),
                   &modem_radio_planner );
 #endif
+
     smtc_secure_element_init( );
     modem_supervisor_init( );
     modem_context_init_light( callback_event, modem_radio_planner );
@@ -316,7 +331,7 @@ uint32_t smtc_modem_run_engine( void )
 
 void smtc_modem_set_radio_context( const void* radio_ctx )
 {
-#if defined( SX1272 ) || defined( SX1276 )
+#if defined( SX127X )
     // update modem_radio context with provided one
     ( ( sx127x_t* ) modem_radio->ral.context )->hal_context = radio_ctx;
 #else
@@ -920,6 +935,9 @@ smtc_modem_return_code_t smtc_modem_get_event( smtc_modem_event_t* event, uint8_
         case SMTC_MODEM_EVENT_NO_DOWNLINK_THRESHOLD:
             event->event_data.no_downlink.status = get_modem_event_status( event->event_type );
             break;
+        case SMTC_MODEM_EVENT_RESET_REQUEST:
+            event->event_data.reset_request.status = get_modem_event_status( event->event_type );
+            break;
         case SMTC_MODEM_EVENT_DOWNDATA:
         case SMTC_MODEM_EVENT_ALARM:
         case SMTC_MODEM_EVENT_JOINED:
@@ -1001,6 +1019,23 @@ smtc_modem_return_code_t smtc_modem_get_modem_version( smtc_modem_version_t* fir
     firmware_version->minor = MODEM_FW_VERSION_MINOR;
     firmware_version->patch = MODEM_FW_VERSION_PATCH;
 
+    return SMTC_MODEM_RC_OK;
+}
+
+smtc_modem_return_code_t smtc_modem_lorawan_set_no_rx_packet_threshold( uint8_t  stack_id,
+                                                                        uint16_t no_rx_packet_reset_threshold )
+{
+    RETURN_BUSY_IF_TEST_MODE( );
+    lorawan_api_set_no_rx_packet_threshold( no_rx_packet_reset_threshold, stack_id );
+    return SMTC_MODEM_RC_OK;
+}
+
+smtc_modem_return_code_t smtc_modem_lorawan_get_no_rx_packet_threshold( uint8_t   stack_id,
+                                                                        uint16_t* no_rx_packet_reset_threshold )
+{
+    RETURN_BUSY_IF_TEST_MODE( );
+    RETURN_INVALID_IF_NULL( no_rx_packet_reset_threshold );
+    *no_rx_packet_reset_threshold = lorawan_api_get_no_rx_packet_threshold( stack_id );
     return SMTC_MODEM_RC_OK;
 }
 
@@ -1130,6 +1165,7 @@ smtc_modem_return_code_t smtc_modem_leave_network( uint8_t stack_id )
 
 smtc_modem_return_code_t smtc_modem_get_suspend_radio_communications( uint8_t stack_id, bool* suspend )
 {
+    RETURN_BUSY_IF_TEST_MODE( );
     *suspend = modem_supervisor_get_modem_is_suspended( stack_id );
     return SMTC_MODEM_RC_OK;
 }
@@ -1184,7 +1220,7 @@ smtc_modem_return_code_t smtc_modem_alarm_clear_timer( void )
 
     if( modem_get_user_alarm( ) == 0 )
     {
-        SMTC_MODEM_HAL_TRACE_WARNING( "Alarm clear timer impossible: no alarm timer is currently running\n" )
+        SMTC_MODEM_HAL_TRACE_WARNING( "Alarm clear timer impossible: no alarm timer is currently running\n" );
         return SMTC_MODEM_RC_NOT_INIT;
     }
     else
@@ -1201,7 +1237,7 @@ smtc_modem_return_code_t smtc_modem_alarm_get_remaining_time( uint32_t* remainin
 
     if( modem_get_user_alarm( ) == 0 )
     {
-        SMTC_MODEM_HAL_TRACE_WARNING( "Alarm get remaining impossible: no alarm timer is currently running\n" )
+        SMTC_MODEM_HAL_TRACE_WARNING( "Alarm get remaining impossible: no alarm timer is currently running\n" );
         return SMTC_MODEM_RC_NOT_INIT;
     }
     else
@@ -1361,6 +1397,35 @@ smtc_modem_return_code_t smtc_modem_get_enabled_datarates( uint8_t stack_id, uin
     RETURN_INVALID_IF_NULL( enabled_datarates_mask );
 
     *enabled_datarates_mask = lorawan_api_mask_tx_dr_channel_up_dwell_time_check( stack_id );
+    return SMTC_MODEM_RC_OK;
+}
+
+smtc_modem_return_code_t smtc_modem_get_channel_mask( uint8_t stack_id, uint8_t* channel_mask, uint8_t* mask_size )
+{
+    RETURN_BUSY_IF_TEST_MODE( );
+    RETURN_INVALID_IF_NULL( channel_mask );
+    RETURN_INVALID_IF_NULL( mask_size );
+
+    lorawan_api_get_channel_mask( stack_id, channel_mask, mask_size );
+    return SMTC_MODEM_RC_OK;
+}
+
+smtc_modem_return_code_t smtc_modem_set_channel_mask( uint8_t stack_id, const uint8_t* ch_mask_cntl,
+                                                      const uint16_t* ch_mask, uint8_t nb_mask )
+{
+    RETURN_BUSY_IF_TEST_MODE( );
+    RETURN_INVALID_IF_NULL( ch_mask_cntl );
+    RETURN_INVALID_IF_NULL( ch_mask );
+
+    if( ( nb_mask == 0 ) || ( nb_mask > SMTC_MODEM_MAX_NB_CHANNEL_MASK ) )
+    {
+        return SMTC_MODEM_RC_INVALID;
+    }
+
+    if( lorawan_api_set_channel_mask( stack_id, ch_mask_cntl, ch_mask, nb_mask ) != OKLORAWAN )
+    {
+        return SMTC_MODEM_RC_INVALID;
+    }
     return SMTC_MODEM_RC_OK;
 }
 
@@ -2952,7 +3017,7 @@ static void modem_store_key_context( void )
 
 static void modem_load_appkey_context( void )
 {
-    modem_key_ctx_t ctx;
+    modem_key_ctx_t ctx = { 0 };
     smtc_modem_hal_context_restore( CONTEXT_KEY_MODEM, 0, ( uint8_t* ) &ctx, sizeof( ctx ) );
 
     if( crc( ( uint8_t* ) &ctx, sizeof( ctx ) - sizeof( ctx.crc ) ) == ctx.crc )

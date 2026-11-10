@@ -38,7 +38,7 @@
  */
 
 #include "relay_mac_parser.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -91,6 +91,8 @@ bool relay_mac_parser( lr1_stack_mac_t* lr1_mac, const relay_cid_info_t* cid, co
             };
 
             SMTC_MODEM_HAL_TRACE_PRINTF( "Relay MAC command : 0x%02x - %s\n", cid[i].cid_req, cid[i].name );
+
+            SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( cid[i].parse_cmd ) );
 
             if( ( cmd_len_remaining >= cid[i].cid_req_min_size ) && cid[i].parse_cmd( lr1_mac, &cmd_to_parse ) == true )
             {

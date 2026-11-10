@@ -32,6 +32,7 @@ endif()
 # Only sx128x, lr1120, lr1121, lr2021, lr2022 support 2.4GHz
 set(RADIOS_SUPPORT_2G4 sx1280 sx1281 lr1120 lr1121 lr2021 lr2022)
 if(NOT ${LBM_RADIO} IN_LIST RADIOS_SUPPORT_2G4)
+    message(STATUS "Removing WW_2G4 region from enabled regions list (incompatible radio).")
     list(REMOVE_ITEM LBM_REGIONS WW_2G4)
 endif()
 
@@ -44,15 +45,8 @@ endif()
 # Region sources and defines
 #-----------------------------------------------------------------------------
 
+# Add real sources in lora_basics_modem target
 target_include_directories(lora_basics_modem PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
-
-# include lr1mac
-target_include_directories(lora_basics_modem PRIVATE ${SMTC_MODEM_CORE_INCLUDE_DIRS})
-target_link_libraries(lora_basics_modem PRIVATE
-    smtc_modem_hal_interface
-
-    smtc_modem_crypto
-)
 
 target_sources(lora_basics_modem PRIVATE src/smtc_real.c)
 
@@ -60,6 +54,8 @@ foreach(region IN LISTS LBM_REGIONS)
     string(TOLOWER "${region}" region_lower)
     target_sources(lora_basics_modem PRIVATE src/region_${region_lower}.c)
     target_compile_definitions(lora_basics_modem PRIVATE REGION_${region})
+    # radio_planner (duty_cycle.c) also depends on the selected regions
+    target_compile_definitions(radio_planner PRIVATE REGION_${region})
 endforeach()
 
 # Custom case for 2.4GHz
@@ -68,10 +64,10 @@ if(WW_2G4 IN_LIST LBM_REGIONS)
 endif()
 
 #-----------------------------------------------------------------------------
-# Regional Parameter Version
+# Regional Parameters Version
 #-----------------------------------------------------------------------------
 
-set(RP_VERSION "RP2_103" CACHE STRING "The Regional Parameter version")
-set_property(CACHE RP_VERSION PROPERTY STRINGS RP2_101 RP2_103)
+set(RP_VERSION "RP2_103" CACHE STRING "The Regional Parameters version")
+set_property(CACHE RP_VERSION PROPERTY STRINGS RP2_101 RP2_103 RP2_104 RP2_105)
 
 target_compile_definitions(lora_basics_modem PRIVATE ${RP_VERSION})

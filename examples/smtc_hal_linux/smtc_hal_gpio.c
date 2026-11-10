@@ -51,6 +51,14 @@
 
 #include "smtc_hal_gpio_pin_names.h"
 #include "smtc_hal_gpio.h"
+#include "smtc_hal_mcu.h"  // hal_mcu_wake_main_thread()
+
+/* Declares smtc_modem_hal_protect_api_call() / _unprotect_api_call(): the RAC
+ * critical-section hook (weak no-op default in smtc_modem_hal.c; an application
+ * may override it with a real lock). The GPIO IRQ delivery thread enters it around
+ * the radio callback so the radio IRQ serializes with the RAC engine -- the Linux
+ * equivalent of an ISR entering the modem's critical section. */
+#include "smtc_core_hal.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -97,10 +105,6 @@ static pthread_mutex_t gpio_irq_mutex          = PTHREAD_MUTEX_INITIALIZER;
 static volatile bool   gpio_irq_thread_running = false;
 static volatile bool   gpio_irq_enabled        = false;
 
-// Main thread TID — captured at hal_gpio_init() time (which runs in the main
-// thread). Used by the GPIO IRQ thread to send SIGUSR2 and interrupt nanosleep.
-static pthread_t gpio_main_thread_tid = 0;
-
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
@@ -112,7 +116,6 @@ static int             gpio_request_event( int gpio_chip_fd, unsigned int offset
 static gpio_context_t* find_gpio_context( hal_gpio_pin_names_t pin );
 static gpio_context_t* add_gpio_context( hal_gpio_pin_names_t pin );
 static void*           gpio_irq_thread_func( void* arg );
-static void            gpio_sigusr2_handler( int sig );
 
 /*
  * -----------------------------------------------------------------------------
@@ -127,40 +130,9 @@ void hal_gpio_init( void )
         return;
     }
 
-    // Capture the calling thread's TID. hal_gpio_init() is always called from
-    // hal_mcu_init() which itself runs in the application's main thread.
-    // The GPIO IRQ thread will use this TID to send SIGUSR2 and immediately
-    // interrupt any nanosleep() the main thread is blocked in.
-    gpio_main_thread_tid = pthread_self( );
-
-    // Register a no-op SIGUSR2 handler so the signal interrupts nanosleep().
-    //
-    // Two design points:
-    //   1. The handler is a real function, not SIG_IGN. SIG_IGN would suppress
-    //      the signal entirely and nanosleep() would NOT be interrupted.
-    //   2. SA_RESTART is intentionally absent. With SA_RESTART the kernel would
-    //      transparently restart nanosleep() after the handler returns, defeating
-    //      the purpose. Without it, nanosleep() returns -1/EINTR immediately,
-    //      which causes the main loop to re-check irq_flag without delay.
-    //
-    // SIGUSR1 is already claimed by smtc_hal_button.c for the virtual button.
-    // SIGUSR2 is reserved by this HAL for DIO edge wake-up. Application code
-    // must not install its own SIGUSR2 handler.
-    struct sigaction sa;
-    memset( &sa, 0, sizeof( sa ) );
-    sa.sa_handler = gpio_sigusr2_handler;
-    sigemptyset( &sa.sa_mask );
-    // no SA_RESTART
-    if( sigaction( SIGUSR2, &sa, NULL ) != 0 )
-    {
-        printf( "GPIO: WARNING — failed to register SIGUSR2 handler, DIO wake-up disabled\n" );
-        gpio_main_thread_tid = 0;
-    }
-    else
-    {
-        printf( "GPIO: SIGUSR2 registered for DIO edge wake-up (main tid=%lu)\n",
-                ( unsigned long ) gpio_main_thread_tid );
-    }
+    // SIGUSR2 is registered by hal_mcu_init(); the IRQ thread below just calls
+    // hal_mcu_wake_main_thread(). SIGUSR1 is claimed by smtc_hal_button.c -
+    // application code must not install its own handler for either signal.
 
     // Open GPIO chip device
     gpio_chip_fd = open( GPIO_CHIP_PATH, O_RDWR );
@@ -237,7 +209,9 @@ void hal_gpio_init_out( const hal_gpio_pin_names_t pin, const uint32_t value )
         return;
     }
 
-    // Register in context
+    // Register in context under gpio_irq_mutex (the IRQ thread reads the table
+    // and pins may be added after it started).
+    pthread_mutex_lock( &gpio_irq_mutex );
     ctx = add_gpio_context( pin );
     if( ctx )
     {
@@ -245,6 +219,7 @@ void hal_gpio_init_out( const hal_gpio_pin_names_t pin, const uint32_t value )
         ctx->is_initialized = true;
         ctx->is_output      = true;
     }
+    pthread_mutex_unlock( &gpio_irq_mutex );
 
     printf( "GPIO: Init output pin %d with value %u (fd=%d)\n", pin, value, line_fd );
 }
@@ -295,7 +270,9 @@ void hal_gpio_init_in( const hal_gpio_pin_names_t pin, const hal_gpio_pull_mode_
         }
     }
 
-    // Register in context
+    // Register in context under gpio_irq_mutex (the IRQ thread reads the table
+    // and pins may be added after it started).
+    pthread_mutex_lock( &gpio_irq_mutex );
     ctx = add_gpio_context( pin );
     if( ctx )
     {
@@ -305,6 +282,7 @@ void hal_gpio_init_in( const hal_gpio_pin_names_t pin, const hal_gpio_pull_mode_
         ctx->is_output      = false;
         ctx->irq            = irq;  // Store IRQ callback (can be NULL initially)
     }
+    pthread_mutex_unlock( &gpio_irq_mutex );
 
     printf( "GPIO: Init input pin %d (pull:%d, irq_mode:%d, line_fd=%d, event_fd=%d)\n", pin, pull_mode, irq_mode,
             line_fd, event_fd );
@@ -430,9 +408,11 @@ static void* gpio_irq_thread_func( void* arg )
 {
     ( void ) arg;
 
-    // Block SIGUSR2 in this thread. SIGUSR2 is only meant for the main thread.
-    // Without this, pthread_kill() targeting the main thread could, under rare
-    // scheduler conditions, be delivered here instead.
+    // Block SIGUSR2 in this thread. The main-loop wake is sent thread-directed via
+    // pthread_kill(main_tid, SIGUSR2), so it always reaches the main thread on its
+    // own. This block is defensive: it guarantees a *process-directed* SIGUSR2 (one
+    // sent to the whole process) can never be handled by this worker thread nor
+    // interrupt its poll()/read() with EINTR.
     sigset_t block_mask;
     sigemptyset( &block_mask );
     sigaddset( &block_mask, SIGUSR2 );
@@ -484,43 +464,43 @@ static void* gpio_irq_thread_func( void* arg )
 
                     if( bytes_read == sizeof( event ) )
                     {
-                        // Find the corresponding GPIO context
-                        pthread_mutex_lock( &gpio_irq_mutex );
+                        // Capture the matching callback under gpio_irq_mutex, then invoke
+                        // it OUTSIDE that lock under the RAC API lock, so the radio IRQ
+                        // handler (which drives the radio planner) serializes with the RAC
+                        // engine and the worker threads. Holding gpio_irq_mutex while
+                        // taking the RAC lock would risk a lock-order inversion.
+                        void ( *callback )( void* ) = NULL;
+                        void* callback_context      = NULL;
 
+                        pthread_mutex_lock( &gpio_irq_mutex );
                         for( int j = 0; j < gpio_context_count; j++ )
                         {
                             if( gpio_contexts[j].event_fd == fds[i].fd )
                             {
-                                // printf( "GPIO IRQ: Event received on pin %d (event_id=%u)\n", gpio_contexts[j].pin,
-                                // event.id );
-
                                 // Check if IRQs are enabled and callback is valid before invoking
                                 if( gpio_irq_enabled && gpio_contexts[j].irq != NULL &&
                                     gpio_contexts[j].irq->callback != NULL )
                                 {
-                                    // printf( "GPIO IRQ: Calling callback for pin %d\n", gpio_contexts[j].pin );
-                                    gpio_contexts[j].irq->callback( gpio_contexts[j].irq->context );
-
-                                    // Wake the main thread immediately. The callback above has set
-                                    // the radio planner IRQ flag. The main thread may be sleeping
-                                    // inside nanosleep() — SIGUSR2 interrupts that sleep (returns
-                                    // EINTR) so it re-checks the flag without waiting up to 1 ms.
-                                    if( gpio_main_thread_tid != 0 )
-                                    {
-                                        pthread_kill( gpio_main_thread_tid, SIGUSR2 );
-                                    }
-                                }
-                                else
-                                {
-                                    // Event consumed but not processed (callback not ready or IRQs disabled)
-                                    // printf( "GPIO IRQ: Event on pin %d consumed but not processed\n",
-                                    // gpio_contexts[j].pin );
+                                    callback         = gpio_contexts[j].irq->callback;
+                                    callback_context = gpio_contexts[j].irq->context;
                                 }
                                 break;
                             }
                         }
-
                         pthread_mutex_unlock( &gpio_irq_mutex );
+
+                        if( callback != NULL )
+                        {
+                            smtc_modem_hal_protect_api_call( );
+                            callback( callback_context );
+                            smtc_modem_hal_unprotect_api_call( );
+
+                            // Wake the main thread immediately. The callback above has set
+                            // the radio planner IRQ flag. The main thread may be sleeping
+                            // inside nanosleep() — SIGUSR2 interrupts that sleep (returns
+                            // EINTR) so it re-checks the flag without waiting up to 1 ms.
+                            hal_mcu_wake_main_thread( );
+                        }
                     }
                 }
             }
@@ -629,14 +609,6 @@ static gpio_context_t* add_gpio_context( hal_gpio_pin_names_t pin )
     ctx->irq            = NULL;
 
     return ctx;
-}
-
-static void gpio_sigusr2_handler( int sig )
-{
-    ( void ) sig;
-    // Intentionally empty. The sole purpose of this handler is to exist as a
-    // non-SIG_IGN, non-SIG_DFL disposition so that nanosleep() returns EINTR
-    // when SIGUSR2 is delivered to the main thread by the GPIO IRQ thread.
 }
 
 /* --- EOF ------------------------------------------------------------------ */

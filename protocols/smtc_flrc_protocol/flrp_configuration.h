@@ -1,4 +1,4 @@
- /**
+/**
  * @file      flrp_configuration.h
  *
  * @brief     Common configuration header for FLRC Protocol parameters.
@@ -9,7 +9,7 @@
  * parts of the application use consistent radio settings and make it easy to adapt the configuration
  * for different regions, hardware, or use cases.
  *
- * 
+ *
  * The Clear BSD License
  * Copyright Semtech Corporation 2026. All rights reserved.
  *
@@ -82,8 +82,8 @@ extern "C" {
 /*********************************
  * WOR LORA parameters
  *********************************/
-#ifndef WOR_865MHz_RF_FREQ_IN_HZ
-#define WOR_865MHz_RF_FREQ_IN_HZ 865100000
+#ifndef WOR_SUBGIG_RF_FREQ_IN_HZ
+#define WOR_SUBGIG_RF_FREQ_IN_HZ 865700000
 #endif
 
 #ifndef WOR_2GHz4_RF_FREQ_IN_HZ
@@ -247,8 +247,8 @@ static const uint8_t flrc_default_syncword_1[4] = { 0x90, 0x56, 0x34, 0x12 };
 static const uint8_t flrc_default_syncword_2[4] = { 0x00, 0x00, 0x00, 0x00 };
 static const uint8_t flrc_default_syncword_3[4] = { 0x00, 0x00, 0x00, 0x00 };
 
-#ifndef DATA_FLRC_865MHz_RF_FREQ_IN_HZ
-#define DATA_FLRC_865MHz_RF_FREQ_IN_HZ WOR_865MHz_RF_FREQ_IN_HZ
+#ifndef DATA_FLRC_SUBGIG_RF_FREQ_IN_HZ
+#define DATA_FLRC_SUBGIG_RF_FREQ_IN_HZ WOR_SUBGIG_RF_FREQ_IN_HZ
 #endif
 
 #ifndef DATA_FLRC_2GHz4_RF_FREQ_IN_HZ
@@ -309,8 +309,8 @@ static const uint8_t flrc_default_syncword_3[4] = { 0x00, 0x00, 0x00, 0x00 };
  * Adjust to keep all DATA_FLRC_NB_FREQ channels (with their bandwidth) inside
  * the regulatory sub-band of the target market.
  */
-#ifndef DATA_FLRC_CHANNEL_STEP_865MHz_HZ
-#define DATA_FLRC_CHANNEL_STEP_865MHz_HZ 2700000
+#ifndef DATA_FLRC_CHANNEL_STEP_SUBGIG_HZ
+#define DATA_FLRC_CHANNEL_STEP_SUBGIG_HZ 2700000
 #endif
 
 #ifndef DATA_FLRC_CHANNEL_STEP_2GHz4_HZ

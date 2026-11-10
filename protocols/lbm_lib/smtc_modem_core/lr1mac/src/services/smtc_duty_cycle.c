@@ -42,7 +42,7 @@
 #include "smtc_duty_cycle.h"
 
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 #include <string.h>  //for memset
 /*

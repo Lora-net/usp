@@ -48,7 +48,7 @@
 #include "flrp_configuration.h"
 #include "flrp_defs.h"
 #include "smtc_flrp_utils.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -179,9 +179,9 @@ void smtc_flrp_mac_prepare_tx_flrc_ack( smtc_rac_context_t* transaction, smtc_fl
     memcpy( flrc_ack.initiator_dev_eui, dest_dev_eui, SMTC_FLRP_EUI_LENGTH );
     memcpy( flrc_ack.receiver_dev_eui, dev_eui, SMTC_FLRP_EUI_LENGTH );
 
-    uint8_t channel_idx    = MAC_INVALID_CHANNEL;
+    uint8_t channel_idx    = mac_radio_config->default_channel;
     bool    channel_config = ( adaptive_link_config->mode == SMTC_FLRP_LINK_ADAPTATION_CHANNEL_SELECTION_ONLY ) ||
-                          ( adaptive_link_config->mode == SMTC_FLRP_LINK_ADAPTATION_FULLY_ENABLED );
+                             ( adaptive_link_config->mode == SMTC_FLRP_LINK_ADAPTATION_FULLY_ENABLED );
     if( channel_config )
     {
         if( !smtc_flrp_mac_get_flrc_req_best_channel( adaptive_link_config->flrc_req_rssi,

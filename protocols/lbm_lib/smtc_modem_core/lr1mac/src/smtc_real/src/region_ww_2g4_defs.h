@@ -55,7 +55,25 @@ extern "C" {
  */
 
 /* clang-format off */
-#define NUMBER_OF_CHANNEL_WW_2G4            (16)
+#if (defined ( RP2_104 ) || defined( RP2_105 ) )
+#define DEFAULT_NUMBER_OF_CHANNEL_WW_2G4    (24)
+#else
+#define DEFAULT_NUMBER_OF_CHANNEL_WW_2G4    (16)
+#endif
+
+#if (defined ( RP2_104 ) || defined( RP2_105 ) )
+    #ifndef USER_ADDED_CHANNELS_WW_2G4          //If not defined from environment
+        #define USER_ADDED_CHANNELS_WW_2G4 0    //The number of ADDED channels
+    #endif
+#else // Before RP2_1.0.4, no user RX/TX channels def were possible
+    #define USER_ADDED_CHANNELS_WW_2G4 0
+#endif
+
+#define NUMBER_OF_CHANNEL_WW_2G4            (DEFAULT_NUMBER_OF_CHANNEL_WW_2G4 + \
+                                            USER_ADDED_CHANNELS_WW_2G4) // Min is 24, end-user can provide a number to add up to 56 to have up to 80 channels
+#if (NUMBER_OF_CHANNEL_WW_2G4 > 80)
+#error "Channel number for WW2G4 can't be > 80. Please reduce USER_ADDED_CHANNELS_RWW_2G4"
+#endif
 #define NUMBER_OF_BOOT_TX_CHANNEL_WW_2G4    (3)             // define the number of channel at boot
 #define JOIN_ACCEPT_DELAY1_WW_2G4           (5)             // define in seconds
 #define JOIN_ACCEPT_DELAY2_WW_2G4           (6)             // define in seconds
@@ -83,7 +101,7 @@ extern "C" {
 #define NEW_CHANNEL_REQ_SUPPORTED_WW_2G4    (true)
 #define DTC_SUPPORTED_WW_2G4                (false)
 #define LBT_SUPPORTED_WW_2G4                (false)
-#define CF_LIST_SUPPORTED_WW_2G4            (CF_LIST_FREQ)
+#define CF_LIST_SUPPORTED_WW_2G4            (uint8_t)( 1 << CF_LIST_FREQ )
 
 // Class B
 #define BEACON_DR_WW_2G4                    (3)
@@ -100,12 +118,11 @@ extern "C" {
 /**
  * Bank contains 8 channels
  */
-typedef enum ww_2g4_channels_bank_e
-{
-    BANK_0_WW_2G4 = 0,  // 0 to 7 channels
-    BANK_1_WW_2G4 = 1,  // 8 to 15 channels
-    BANK_MAX_WW_2G4
-} ww_2g4_channels_bank_t;
+#if ( ( NUMBER_OF_CHANNEL_WW_2G4 % 8 ) != 0 )
+#define BANK_MAX_WW2G4 ( ( NUMBER_OF_CHANNEL_WW_2G4 / 8 ) + 1 )
+#else
+#define BANK_MAX_WW2G4 ( NUMBER_OF_CHANNEL_WW_2G4 / 8 )
+#endif
 
 typedef struct region_ww_2g4_context_s
 {
@@ -116,9 +133,9 @@ typedef struct region_ww_2g4_context_s
     uint8_t  dr_distribution[NUMBER_OF_TX_DR_WW_2G4];
     uint8_t  join_dr_distribution[NUMBER_OF_TX_DR_WW_2G4];
     uint8_t  custom_dr_distribution_init[NUMBER_OF_TX_DR_WW_2G4];
-    uint8_t  channel_index_enabled[BANK_MAX_WW_2G4];  // Contain the index of the activated channel only
-    uint8_t  unwrapped_channel_mask[BANK_MAX_WW_2G4];
-} region_ww_2g4_context_t;
+    uint8_t  tx_channel_index_enabled[BANK_MAX_WW2G4];  // Contain the index of the activated channel only
+    uint8_t  unwrapped_channel_mask[BANK_MAX_WW2G4];
+} region_ww2g4_context_t;
 
 /*
  * -----------------------------------------------------------------------------
@@ -152,7 +169,7 @@ static const uint8_t datarate_offsets_ww_2g4[8][6] = {
  * @brief uplink datarate backoff
  *
  */
-static const uint8_t datarate_backoff_ww_2g4[] = {
+static const uint8_t datarate_backoff_ww_2g4[NUMBER_OF_TX_DR_WW_2G4] = {
     0,  // DR0 -> DR0
     0,  // DR1 -> DR0
     1,  // DR2 -> DR1
@@ -163,23 +180,23 @@ static const uint8_t datarate_backoff_ww_2g4[] = {
     6   // DR7 -> DR6
 };
 
-static const uint8_t NUMBER_RX1_DR_OFFSET_WW_2G4 =
-    sizeof( datarate_offsets_ww_2g4[0] ) / sizeof( datarate_offsets_ww_2g4[0][0] );
+static const uint8_t NUMBER_RX1_DR_OFFSET_WW_2G4 = 6;
 
 /**
  * Data rates table definition
  */
-static const uint8_t datarates_to_sf_ww_2g4[] = { 12, 11, 10, 9, 8, 7, 6, 5 };
+static const uint8_t datarates_to_sf_ww_2g4[NUMBER_OF_TX_DR_WW_2G4] = { 12, 11, 10, 9, 8, 7, 6, 5 };
 
 /**
  * Bandwidths table definition in KHz
  */
-static const uint32_t datarates_to_bandwidths_ww_2g4[] = { BW800, BW800, BW800, BW800, BW800, BW800, BW800, BW800 };
+static const uint32_t datarates_to_bandwidths_ww_2g4[NUMBER_OF_TX_DR_WW_2G4] = { BW800, BW800, BW800, BW800,
+                                                                                 BW800, BW800, BW800, BW800 };
 
 /**
  * Payload max size table definition in bytes
  */
-static const uint8_t M_ww_2g4[8] = { 59, 123, 228, 228, 228, 228, 228, 228 };
+static const uint8_t M_ww_2g4[NUMBER_OF_TX_DR_WW_2G4] = { 59, 123, 228, 228, 228, 228, 228, 228 };
 
 /**
  * Mobile long range datarate distribution
@@ -192,7 +209,7 @@ static const uint8_t M_ww_2g4[8] = { 59, 123, 228, 228, 228, 228, 228, 228 };
  * DR6:  0%,
  * DR7:  0%
  */
-static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_WW_2G4[] = { 2, 2, 3, 3, 0, 0, 0, 0 };
+static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_WW_2G4[NUMBER_OF_TX_DR_WW_2G4] = { 2, 2, 3, 3, 0, 0, 0, 0 };
 
 /**
  * Mobile low power datarate distribution
@@ -205,7 +222,7 @@ static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_WW_2G4[] = { 2, 2, 3, 3, 0
  * DR6:  0%,
  * DR7:  0%
  */
-static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_WW_2G4[] = { 0, 0, 1, 3, 3, 3, 0, 0 };
+static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_WW_2G4[NUMBER_OF_TX_DR_WW_2G4] = { 0, 0, 1, 3, 3, 3, 0, 0 };
 
 /**
  * Join datarate distribution
@@ -218,7 +235,7 @@ static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_WW_2G4[] = { 0, 0, 1, 3, 3, 3
  * DR6:  0%,
  * DR7:  0%
  */
-static const uint8_t JOIN_DR_DISTRIBUTION_WW_2G4[] = { 1, 2, 3, 4, 4, 6, 0, 0 };
+static const uint8_t JOIN_DR_DISTRIBUTION_WW_2G4[NUMBER_OF_TX_DR_WW_2G4] = { 1, 2, 3, 4, 4, 6, 0, 0 };
 
 /**
  * Default datarate distribution
@@ -231,7 +248,7 @@ static const uint8_t JOIN_DR_DISTRIBUTION_WW_2G4[] = { 1, 2, 3, 4, 4, 6, 0, 0 };
  * DR6:   0%,
  * DR7:   0%
  */
-static const uint8_t DEFAULT_DR_DISTRIBUTION_WW_2G4[] = { 1, 0, 0, 0, 0, 0, 0, 0 };
+static const uint8_t DEFAULT_DR_DISTRIBUTION_WW_2G4[NUMBER_OF_TX_DR_WW_2G4] = { 1, 0, 0, 0, 0, 0, 0, 0 };
 
 /*
  * -----------------------------------------------------------------------------

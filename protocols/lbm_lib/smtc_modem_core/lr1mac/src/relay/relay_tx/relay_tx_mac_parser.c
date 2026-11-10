@@ -41,7 +41,7 @@
 #include "relay_mac_parser.h"
 #include "relay_tx_api.h"
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lorawan_api.h"
 #include "smtc_real.h"
 
@@ -94,9 +94,8 @@ const relay_cid_info_t relay_tx_cid_infos[] = {
     },
 };
 
-const uint8_t  nb_relay_mac_cmd_relay_tx     = ( sizeof( relay_tx_cid_infos ) / sizeof( relay_cid_info_t ) );
-const uint16_t ack_offset_khz_realy_tx[]     = { 0, 200, 400, 800, 1600, 3200 };
-
+const uint8_t  nb_relay_mac_cmd_relay_tx = ( sizeof( relay_tx_cid_infos ) / sizeof( relay_cid_info_t ) );
+const uint16_t ack_offset_khz_realy_tx[] = { 0, 200, 400, 800, 1600, 3200 };
 
 /*
  *-----------------------------------------------------------------------------------
@@ -116,7 +115,7 @@ bool relay_tx_mac_parser( lr1_stack_mac_t* lr1_mac )
 static bool relay_tx_mac_update_config_ed_parser( lr1_stack_mac_t* lr1_mac, relay_cmd_parser_t* cmd )
 {
     uint8_t        ack_ret       = cmd->valid_req_ret;
-    const uint16_t settings      = ( uint16_t )( cmd->cmd_buffer[1] + ( cmd->cmd_buffer[2] << 8 ) );
+    const uint16_t settings      = ( uint16_t ) ( cmd->cmd_buffer[1] + ( cmd->cmd_buffer[2] << 8 ) );
     const uint8_t  second_ch_idx = TAKE_N_BITS_FROM( settings, 7, 2 );
 
     relay_tx_config_t config = { .smart_level = 8 << TAKE_N_BITS_FROM( cmd->cmd_buffer[0], 0, 2 ),
@@ -135,7 +134,7 @@ static bool relay_tx_mac_update_config_ed_parser( lr1_stack_mac_t* lr1_mac, rela
         config.second_ch_enable = true;
 
         config.second_ch.freq_hz =
-            ( uint32_t )( cmd->cmd_buffer[3] + ( cmd->cmd_buffer[4] << 8 ) + ( cmd->cmd_buffer[5] << 16 ) ) * 100;
+            ( uint32_t ) ( cmd->cmd_buffer[3] + ( cmd->cmd_buffer[4] << 8 ) + ( cmd->cmd_buffer[5] << 16 ) ) * 100;
         SMTC_MODEM_HAL_TRACE_PRINTF( "Second channel freq: %d Hz\n", config.second_ch.freq_hz );
 
         if( smtc_real_is_frequency_valid( lr1_mac->real, config.second_ch.freq_hz ) != OKLORAWAN )
@@ -153,7 +152,7 @@ static bool relay_tx_mac_update_config_ed_parser( lr1_stack_mac_t* lr1_mac, rela
             SMTC_MODEM_HAL_TRACE_PRINTF( " --> Invalid value\n" );
             ack_ret = RELAY_CLEAR_BIT( ack_ret, RELAY_TX_CID_CONFIG_ED_ACK_BIT_SECOND_CH_DR );
         }
-        else if( smtc_real_get_modulation_type_from_datarate( lr1_mac->real, config.second_ch.dr ) != LORA )
+        else if( smtc_real_get_modulation_type_from_rx_datarate( lr1_mac->real, config.second_ch.dr ) != LORA )
         {
             SMTC_MODEM_HAL_TRACE_PRINTF( " --> Invalid value (NON LORA)\n" );
             ack_ret = RELAY_CLEAR_BIT( ack_ret, RELAY_TX_CID_CONFIG_ED_ACK_BIT_SECOND_CH_DR );
@@ -168,7 +167,8 @@ static bool relay_tx_mac_update_config_ed_parser( lr1_stack_mac_t* lr1_mac, rela
         }
         else
         {
-            config.second_ch.ack_freq_hz = config.second_ch.freq_hz + ack_offset_khz_realy_tx[ack_offset_khz_idx] * 1000;
+            config.second_ch.ack_freq_hz =
+                config.second_ch.freq_hz + ack_offset_khz_realy_tx[ack_offset_khz_idx] * 1000;
 
             SMTC_MODEM_HAL_TRACE_PRINTF( "Second channel ACK freq: %d Hz\n", config.second_ch.ack_freq_hz );
             if( smtc_real_is_frequency_valid( lr1_mac->real, config.second_ch.ack_freq_hz ) != OKLORAWAN )
@@ -183,6 +183,8 @@ static bool relay_tx_mac_update_config_ed_parser( lr1_stack_mac_t* lr1_mac, rela
         SMTC_MODEM_HAL_TRACE_PRINTF( "Additionnal channel index not supported\n" );
         ack_ret = RELAY_CLEAR_BIT( ack_ret, RELAY_TX_CID_CONFIG_ED_ACK_BIT_SECOND_CH_IDX );
     }
+
+    config.number_of_miss_wor_ack_to_switch_in_nosync_mode = 8;
 
     if( ack_ret == cmd->valid_req_ret )
     {

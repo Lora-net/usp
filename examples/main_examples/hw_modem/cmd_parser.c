@@ -151,6 +151,8 @@ static upload_status_t upload_status                    = UPLOAD_NOT_INIT;
 /* Geolocation handling */
 static smtc_modem_gnss_event_data_scan_done_t gnss_scan_data    = { 0 };
 static cmd_serial_rc_code_t                   gnss_scan_done_rc = CMD_RC_FAIL;
+static smtc_modem_wifi_event_data_scan_done_t wifi_scan_done_data = { 0 };
+static cmd_serial_rc_code_t                   wifi_scan_done_rc   = CMD_RC_FAIL;
 #endif /* ADD_APP_GEOLOCATION */
 
 #if defined( USE_FLRC_PROTOCOL )
@@ -162,10 +164,12 @@ static smtc_flrp_burst_rx_stats_t flrp_last_rx_stats            = { 0 };
 static smtc_flrp_wor_rx_stats_t   flrp_last_rx_wor_stats        = { 0 };
 
 /* Snapshots for CMD_FLRP_GET_STATS (flrp_stats_pb_t), updated from FLRP callbacks */
-static bool                    flrp_last_tx_valid = false;
-static smtc_flrp_return_code_t flrp_last_tx_rc    = SMTC_FLRP_RC_OK;
-static bool                    flrp_last_tx_send_successful;
-static uint8_t                 flrp_last_tx_dest[SMTC_FLRP_EUI_LENGTH];
+static bool                       flrp_last_tx_valid = false;
+static smtc_flrp_return_code_t    flrp_last_tx_rc    = SMTC_FLRP_RC_OK;
+static bool                       flrp_last_tx_send_successful;
+static uint8_t                    flrp_last_tx_dest[SMTC_FLRP_EUI_LENGTH];
+static smtc_flrp_burst_tx_stats_t flrp_last_tx_stats     = { 0 };
+static smtc_flrp_wor_rx_stats_t   flrp_last_tx_wor_stats = { 0 };
 
 static bool                    flrp_last_rx_valid = false;
 static smtc_flrp_return_code_t flrp_last_rx_rc    = SMTC_FLRP_RC_OK;
@@ -174,22 +178,9 @@ static uint8_t                 flrp_last_rx_src[SMTC_FLRP_EUI_LENGTH];
 
 static void flrp_fill_tx_test_pattern( uint32_t length );
 static void flrp_tx_done_callback( const void* context, smtc_flrp_return_code_t status, bool send_successful,
-                                   uint8_t* dest_addr );
+                                   uint8_t* dest_addr, smtc_flrp_tx_stats_t flrp_stats );
 static void flrp_rx_done_callback( const void* context, smtc_flrp_return_code_t status, uint32_t payload_size,
                                    uint8_t* src_addr, smtc_flrp_rx_stats_t flrp_stats );
-
-static bool flrc_protocol_initialized = false;
-static bool flrc_protocol_host_ensure_initialized( cmd_response_t* cmd_output );
-static void flrc_protocol_fill_tx_test_pattern( void );
-static bool flrc_protocol_extract_cmd_flags( uint32_t length, const uint8_t* buf, bool* is_initiator_out,
-                                             bool* is_tx_out );
-static void flrc_protocol_copy_slave_dev_eui( uint32_t length, const uint8_t* buf,
-                                              uint8_t slave_dev_eui[SMTC_FLRP_EUI_LENGTH] );
-static void flrc_protocol_apply_initiator_stream_com_config( smtc_flrp_com_config_t* com_cfg,
-                                                             const uint8_t slave_dev_eui[SMTC_FLRP_EUI_LENGTH] );
-static void flrp_display_mask( bit_mask_t mask );
-
-//
 
 #endif  // USE_FLRC_PROTOCOL
 
@@ -291,39 +282,6 @@ static void print_rac_request_params( const smtc_rac_request_pb_t* pb_request )
         break;
     }
 }
-
-#if defined( USE_FLRC_PROTOCOL )
-static void flrp_display_mask( bit_mask_t mask )
-{
-    int                bit_is_present;
-    static const char* TEXT[2] = { "FAILURE", "SUCCESS" };
-
-    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_WOR_TX_SUCCESS ) ) != 0;
-    SMTC_HAL_TRACE_INFO( "WOR_TX: %s\n", TEXT[bit_is_present] );
-    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_WOR_ACK_SUCCESS ) ) != 0;
-    SMTC_HAL_TRACE_INFO( "WOR_ACK: %s\n", TEXT[bit_is_present] );
-    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_ADAPTIVE_LINK_ACTIVE ) ) != 0;
-    SMTC_HAL_TRACE_INFO( "ADAPTIVE_LINK: %s\n", ( bit_is_present ? "yes" : "no" ) );
-    if( bit_is_present )
-    {
-        bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_ADAPTIVE_FLRC_REQ_SUCCESS ) ) != 0;
-        SMTC_HAL_TRACE_INFO( "ADAPTIVE_FLRC_REQ: %s\n", TEXT[bit_is_present] );
-        bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_ADAPTIVE_FLRC_ACK_SUCCESS ) ) != 0;
-        SMTC_HAL_TRACE_INFO( "ADAPTIVE_FLRC_ACK: %s\n", TEXT[bit_is_present] );
-    }
-    else
-    {
-        SMTC_HAL_TRACE_INFO( "ADAPTIVE_FLRC_REQ: N/A\n" );
-        SMTC_HAL_TRACE_INFO( "ADAPTIVE_FLRC_ACK: N/A\n" );
-    }
-
-    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_LAST_BURST_SUCCESS ) ) != 0;
-    SMTC_HAL_TRACE_INFO( "LAST_BURST: %s\n", TEXT[bit_is_present] );
-
-    bit_is_present = ( mask & ( ( bit_mask_t ) SMTC_FLRP_EXCHANGE_LAST_BURST_ACK_SUCCESS ) ) != 0;
-    SMTC_HAL_TRACE_INFO( "LAST_BURST_ACK: %s\n", TEXT[bit_is_present] );
-}
-#endif
 
 // store the radio_id for each priority
 static uint8_t radio_ids[5] = { 0 };
@@ -479,6 +437,7 @@ static const uint8_t host_cmd_tab[CMD_MAX][HOST_CMD_TAB_IDX_COUNT] = {
     [CMD_GNSS_SCAN_AGGREGATE]                   = { 1, 1, 1 },
     [CMD_GNSS_SEND_MODE]                        = { 1, 1, 1 },
     [CMD_GNSS_ALM_DEMOD_START]                  = { 1, 0, 0 },
+    [CMD_GNSS_ALM_DEMOD_STOP]                   = { 1, 0, 0 },
     [CMD_GNSS_ALM_DEMOD_SET_CONSTEL]            = { 1, 1, 1 },
     [CMD_GNSS_ALM_DEMOD_GET_EVENT_DATA_ALM_UPD] = { 1, 0, 0 },
 #if defined( ADD_ALMANAC )
@@ -487,7 +446,9 @@ static const uint8_t host_cmd_tab[CMD_MAX][HOST_CMD_TAB_IDX_COUNT] = {
 #endif /* ADD_ALMANAC */
     [CMD_WIFI_SCAN_START]                = { 1, 4, 4 },
     [CMD_WIFI_SCAN_CANCEL]               = { 1, 0, 0 },
+    [CMD_WIFI_SCAN_MODE]                 = { 1, 1, 1 },
     [CMD_WIFI_GET_SCAN_DONE_SCAN_DATA]   = { 1, 0, 0 },
+    [CMD_WIFI_GET_SCAN_DONE_SCAN_DATA_RESULT] = { 1, 1, 1 },
     [CMD_WIFI_GET_EVENT_DATA_TERMINATED] = { 1, 0, 0 },
     [CMD_WIFI_SET_PORT]                  = { 1, 1, 1 },
     [CMD_WIFI_SEND_MODE]                 = { 1, 1, 1 },
@@ -508,6 +469,10 @@ static const uint8_t host_cmd_tab[CMD_MAX][HOST_CMD_TAB_IDX_COUNT] = {
     [CMD_MODEM_GET_CRASHLOG]                     = { 1, 0, 0 },
     [CMD_MODEM_GET_REPORT_ALL_DOWNLINKS_TO_USER] = { 1, 0, 0 },
     [CMD_MODEM_SET_REPORT_ALL_DOWNLINKS_TO_USER] = { 1, 1, 1 },
+    [CMD_GET_NO_RX_PACKET_THRESHOLD]             = { 1, 0, 0 },
+    [CMD_SET_NO_RX_PACKET_THRESHOLD]             = { 1, 2, 2 },
+    [CMD_GET_CHANNEL_MASK]                       = { 1, 0, 0 },
+    [CMD_SET_CHANNEL_MASK]                       = { 1, 3, 3 * SMTC_MODEM_MAX_NB_CHANNEL_MASK },
 
     [CMD_USP_SUBMIT] = { 1, 1, 255 },  // Protobuf context: min 1 byte, max 255 (if > 255, use CMD_NHM_EXTENDED)
     [CMD_USP_OPEN]   = { 1, 1, 1 },    // Parameter : radio priority
@@ -520,16 +485,13 @@ static const uint8_t host_cmd_tab[CMD_MAX][HOST_CMD_TAB_IDX_COUNT] = {
 
 #if defined( USE_FLRC_PROTOCOL )
     /* FLRC Burst commands (FLRP protocol) */
-    [CMD_FLRC_PROTOCOL_INIT]            = { 1, 2, 10 },   // byte0=is_initiator, byte1=is_tx; bytes2-9 optional EUI
-    [CMD_SET_FLRC_PROTOCOL_PARAMS]      = { 1, 1, 255 },  // Protobuf encoded flrp_radio_config_pb_t
-    [CMD_GET_FLRC_PROTOCOL_STATS]       = { 1, 0, 0 },    // No input parameters, returns stats only
     [CMD_FLRP_INIT]                     = { 1, 1, 255 },  // Protobuf encoded flrp_api_config_pb_t
     [CMD_FLRP_SET_PARAMS]               = { 1, 1, 255 },  // Protobuf encoded flrp_radio_config_pb_t
-    [CMD_FLRP_START_PERIODIC_LISTENING] = { 1, 0, 0 },    // No input parameters
+    [CMD_FLRP_START_PERIODIC_LISTENING] = { 1, 4, 4 },  // uint32_t payload size, big-endian (buffer = flrp_buffer)
     [CMD_FLRP_STOP_PERIODIC_LISTENING]  = { 1, 0, 0 },    // No input parameters
     [CMD_FLRP_SLAVE_DATA_TO_SEND]       = { 1, 4, 4 },    // uint32_t payload size, big-endian (data in flrp_buffer)
     [CMD_FLRP_INITIATE_TRANSMISSION]    = { 1, 1, 255 },  // Protobuf flrp_initiate_transmission_pb_t
-    [CMD_FLRP_INITIATE_RECEPTION]       = { 1, 1, 255 },  // Protobuf flrp_com_config_pb_t
+    [CMD_FLRP_INITIATE_RECEPTION]       = { 1, 1, 255 },  // Protobuf flrp_initiate_reception_pb_t
     [CMD_FLRP_GET_PARAMS]               = { 1, 0, 0 },  // No input parameters, returns protobuf flrp_radio_config_pb_t
     [CMD_FLRP_GET_STATS]                = { 1, 0, 0 },  // Returns protobuf flrp_stats_pb_t
     [CMD_FLRP_SET_PARAMS_ADVANCED]      = { 1, 1, 255 },  // Protobuf encoded flrp_flrc_advanced_radio_config_pb_t
@@ -684,6 +646,7 @@ static const char* host_cmd_str[CMD_MAX] = {
     [CMD_GNSS_SCAN_AGGREGATE]                   = "CMD_GNSS_SCAN_AGGREGATE",
     [CMD_GNSS_SEND_MODE]                        = "CMD_GNSS_SEND_MODE",
     [CMD_GNSS_ALM_DEMOD_START]                  = "CMD_GNSS_ALM_DEMOD_START",
+    [CMD_GNSS_ALM_DEMOD_STOP]                   = "CMD_GNSS_ALM_DEMOD_STOP",
     [CMD_GNSS_ALM_DEMOD_SET_CONSTEL]            = "CMD_GNSS_ALM_DEMOD_SET_CONSTEL",
     [CMD_GNSS_ALM_DEMOD_GET_EVENT_DATA_ALM_UPD] = "CMD_GNSS_ALM_DEMOD_GET_EVENT_DATA_ALM_UPD",
 #if defined( ADD_ALMANAC )
@@ -692,7 +655,9 @@ static const char* host_cmd_str[CMD_MAX] = {
 #endif /* ADD_ALMANAC */
     [CMD_WIFI_SCAN_START]                = "CMD_MODEM_WIFI_SCAN_START",
     [CMD_WIFI_SCAN_CANCEL]               = "CMD_MODEM_WIFI_SCAN_CANCEL",
+    [CMD_WIFI_SCAN_MODE]                 = "CMD_MODEM_WIFI_SCAN_MODE",
     [CMD_WIFI_GET_SCAN_DONE_SCAN_DATA]   = "CMD_MODEM_WIFI_GET_SCAN_DONE_SCAN_DATA",
+    [CMD_WIFI_GET_SCAN_DONE_SCAN_DATA_RESULT] = "CMD_WIFI_GET_SCAN_DONE_SCAN_DATA_RESULT",
     [CMD_WIFI_GET_EVENT_DATA_TERMINATED] = "CMD_MODEM_WIFI_GET_EVENT_DATA_TERMINATED",
     [CMD_WIFI_SET_PORT]                  = "CMD_MODEM_WIFI_SET_PORT",
     [CMD_WIFI_SEND_MODE]                 = "CMD_MODEM_WIFI_SEND_MODE",
@@ -710,6 +675,10 @@ static const char* host_cmd_str[CMD_MAX] = {
     [CMD_MODEM_GET_CRASHLOG]                     = "CMD_GET_CRASHLOG",
     [CMD_MODEM_GET_REPORT_ALL_DOWNLINKS_TO_USER] = "CMD_MODEM_GET_REPORT_ALL_DOWNLINKS_TO_USER",
     [CMD_MODEM_SET_REPORT_ALL_DOWNLINKS_TO_USER] = "CMD_MODEM_SET_REPORT_ALL_DOWNLINKS_TO_USER",
+    [CMD_GET_NO_RX_PACKET_THRESHOLD]             = "CMD_GET_NO_RX_PACKET_THRESHOLD",
+    [CMD_SET_NO_RX_PACKET_THRESHOLD]             = "CMD_SET_NO_RX_PACKET_THRESHOLD",
+    [CMD_GET_CHANNEL_MASK]                       = "CMD_GET_CHANNEL_MASK",
+    [CMD_SET_CHANNEL_MASK]                       = "CMD_SET_CHANNEL_MASK",
 
     [CMD_USP_SUBMIT] = "CMD_USP_SUBMIT",
     [CMD_USP_OPEN]   = "CMD_USP_OPEN",
@@ -721,9 +690,6 @@ static const char* host_cmd_str[CMD_MAX] = {
 
 #if defined( USE_FLRC_PROTOCOL )
     /* FLRC Burst commands */
-    [CMD_FLRC_PROTOCOL_INIT]            = "CMD_FLRC_PROTOCOL_INIT",
-    [CMD_SET_FLRC_PROTOCOL_PARAMS]      = "CMD_SET_FLRC_PROTOCOL_PARAMS",
-    [CMD_GET_FLRC_PROTOCOL_STATS]       = "CMD_GET_FLRC_PROTOCOL_STATS",
     [CMD_FLRP_INIT]                     = "CMD_FLRP_INIT",
     [CMD_FLRP_SET_PARAMS]               = "CMD_FLRP_SET_PARAMS",
     [CMD_FLRP_START_PERIODIC_LISTENING] = "CMD_FLRP_START_PERIODIC_LISTENING",
@@ -811,7 +777,7 @@ static const uint8_t events_lut[SMTC_MODEM_EVENT_MAX] = {
     [SMTC_MODEM_EVENT_REGIONAL_DUTY_CYCLE]               = 0x34,
     [SMTC_MODEM_EVENT_TEST_MODE]                         = 0x35, /*!< Test mode event */
     [SMTC_MODEM_EVENT_NO_DOWNLINK_THRESHOLD]             = 0x36,
-
+    [SMTC_MODEM_EVENT_RESET_REQUEST]                     = 0x37,
 };
 
 /**
@@ -912,7 +878,9 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         cmd_output->length      = 0;
         return PARSE_ERROR;
     }
+#if HAL_DBG_TRACE == HAL_FEATURE_ON
     SMTC_HAL_TRACE_WARNING( "CMD_%s (0x%02x)\n", host_cmd_str[cmd_input->cmd_code], cmd_input->cmd_code );
+#endif
     switch( cmd_input->cmd_code )
     {
     case CMD_GET_EVENT:
@@ -1026,6 +994,10 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             break;
         case SMTC_MODEM_EVENT_NO_DOWNLINK_THRESHOLD:
             cmd_output->buffer[2] = current_event.event_data.no_downlink.status;
+            cmd_output->length    = 3;
+            break;
+        case SMTC_MODEM_EVENT_RESET_REQUEST:
+            cmd_output->buffer[2] = current_event.event_data.reset_request.status;
             cmd_output->length    = 3;
             break;
         default:
@@ -2221,6 +2193,60 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
 
         break;
     }
+    case CMD_GET_NO_RX_PACKET_THRESHOLD:
+    {
+        uint16_t threshold = 0;
+
+        cmd_output->return_code = rc_lut[smtc_modem_lorawan_get_no_rx_packet_threshold( STACK_ID, &threshold )];
+        if( cmd_output->return_code == CMD_RC_OK )
+        {
+            cmd_output->buffer[0] = ( threshold >> 8 ) & 0xFF;
+            cmd_output->buffer[1] = threshold & 0xFF;
+            cmd_output->length    = 2;
+        }
+        break;
+    }
+    case CMD_SET_NO_RX_PACKET_THRESHOLD:
+    {
+        uint16_t threshold = ( uint16_t ) ( ( cmd_input->buffer[0] << 8 ) | cmd_input->buffer[1] );
+
+        cmd_output->return_code = rc_lut[smtc_modem_lorawan_set_no_rx_packet_threshold( STACK_ID, threshold )];
+        break;
+    }
+    case CMD_GET_CHANNEL_MASK:
+    {
+        uint8_t mask_size = 0;
+
+        /* The API requires a buffer of at least 16 bytes */
+        cmd_output->return_code = rc_lut[smtc_modem_get_channel_mask( STACK_ID, cmd_output->buffer, &mask_size )];
+        if( cmd_output->return_code == CMD_RC_OK )
+        {
+            cmd_output->length = mask_size;
+        }
+        break;
+    }
+    case CMD_SET_CHANNEL_MASK:
+    {
+        /* Payload is nb_mask * { ch_mask_cntl (1 byte), ch_mask (2 bytes, big endian) } */
+        uint8_t  ch_mask_cntl[SMTC_MODEM_MAX_NB_CHANNEL_MASK] = { 0 };
+        uint16_t ch_mask[SMTC_MODEM_MAX_NB_CHANNEL_MASK]      = { 0 };
+        uint8_t  nb_mask                                      = cmd_input->length / 3;
+
+        if( ( cmd_input->length % 3 ) != 0 )
+        {
+            cmd_output->return_code = CMD_RC_INVALID;
+            break;
+        }
+
+        for( uint8_t i = 0; i < nb_mask; i++ )
+        {
+            ch_mask_cntl[i] = cmd_input->buffer[( 3 * i )];
+            ch_mask[i]      = ( uint16_t ) ( ( cmd_input->buffer[( 3 * i ) + 1] << 8 ) | cmd_input->buffer[( 3 * i ) + 2] );
+        }
+
+        cmd_output->return_code = rc_lut[smtc_modem_set_channel_mask( STACK_ID, ch_mask_cntl, ch_mask, nb_mask )];
+        break;
+    }
 #if defined( ADD_SMTC_STORE_AND_FORWARD )
     case CMD_STORE_AND_FORWARD_SET_STATE:
     {
@@ -2311,6 +2337,8 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             cmd_output->buffer[scan_done_offset++] = gnss_scan_data.is_valid;
 
             cmd_output->buffer[scan_done_offset++] = gnss_scan_data.token;
+
+            cmd_output->buffer[scan_done_offset++] = gnss_scan_data.time_available;
 
             cmd_output->buffer[scan_done_offset++] = gnss_scan_data.nb_scans_valid;
 
@@ -2476,6 +2504,11 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         cmd_output->return_code = rc_lut[smtc_modem_almanac_demodulation_start( STACK_ID )];
         break;
     }
+    case CMD_GNSS_ALM_DEMOD_STOP:
+    {
+        cmd_output->return_code = rc_lut[smtc_modem_almanac_demodulation_stop( STACK_ID )];
+        break;
+    }
     case CMD_GNSS_ALM_DEMOD_SET_CONSTEL:
     {
         cmd_output->return_code =
@@ -2490,6 +2523,8 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         if( cmd_output->return_code == CMD_RC_OK )
         {
             uint8_t index = 0;
+
+            cmd_output->buffer[index++] = event_data_alm_update.service_state;
 
             cmd_output->buffer[index++] = event_data_alm_update.status_gps;
             cmd_output->buffer[index++] = event_data_alm_update.status_beidou;
@@ -2553,12 +2588,21 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         cmd_output->return_code = rc_lut[smtc_modem_wifi_scan_cancel( STACK_ID )];
         break;
     }
+    case CMD_WIFI_SCAN_MODE:
+    {
+        cmd_output->return_code = rc_lut[smtc_modem_wifi_set_scan_mode( STACK_ID, cmd_input->buffer[0] )];
+        break;
+    }
     case CMD_WIFI_GET_SCAN_DONE_SCAN_DATA:
     {
-        smtc_modem_wifi_event_data_scan_done_t wifi_scan_done_data = { 0 };
+        /* Reset value of static scan data saved struct */
+        memset( &wifi_scan_done_data, 0, sizeof( smtc_modem_wifi_event_data_scan_done_t ) );
 
-        cmd_output->return_code = rc_lut[smtc_modem_wifi_get_event_data_scan_done( STACK_ID, &wifi_scan_done_data )];
-        if( cmd_output->return_code == CMD_RC_OK )
+        /* Get the value of the struct */
+        wifi_scan_done_rc       = rc_lut[smtc_modem_wifi_get_event_data_scan_done( STACK_ID, &wifi_scan_done_data )];
+        cmd_output->return_code = wifi_scan_done_rc;
+
+        if( wifi_scan_done_rc == CMD_RC_OK )
         {
             uint8_t index = 0;
 
@@ -2574,17 +2618,48 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             cmd_output->buffer[index++] = ( wifi_scan_done_data.scan_duration_ms >> 8 ) & 0xff;
             cmd_output->buffer[index++] = ( wifi_scan_done_data.scan_duration_ms & 0xff );
 
-            for( uint8_t scan_index = 0; scan_index < wifi_scan_done_data.nbr_results; scan_index++ )
-            {
-                /* copy LR11XX_WIFI_MAC_ADDRESS_LENGTH bytes of mac address */
-                memcpy( &cmd_output->buffer[index], wifi_scan_done_data.results[scan_index].mac_address,
-                        LR11XX_WIFI_MAC_ADDRESS_LENGTH );
-                index += LR11XX_WIFI_MAC_ADDRESS_LENGTH;
+            cmd_output->length = index;
+        }
+        break;
+    }
+    case CMD_WIFI_GET_SCAN_DONE_SCAN_DATA_RESULT:
+    {
+        cmd_output->return_code = wifi_scan_done_rc;
+        if( cmd_output->return_code == CMD_RC_OK )
+        {
+            uint8_t scan_index = cmd_input->buffer[0];
+            uint8_t index      = 0;
 
-                cmd_output->buffer[index++] = wifi_scan_done_data.results[scan_index].channel;
-                cmd_output->buffer[index++] = wifi_scan_done_data.results[scan_index].type;
-                cmd_output->buffer[index++] = wifi_scan_done_data.results[scan_index].rssi;
+            if( scan_index >= wifi_scan_done_data.nbr_results )
+            {
+                cmd_output->return_code = CMD_RC_INVALID;
+                break;
             }
+
+            cmd_output->buffer[index++] = wifi_scan_done_data.results[scan_index].result_type;
+
+            /* copy LR11XX_WIFI_MAC_ADDRESS_LENGTH bytes of mac address */
+            memcpy( &cmd_output->buffer[index], wifi_scan_done_data.results[scan_index].mac_address,
+                    LR11XX_WIFI_MAC_ADDRESS_LENGTH );
+            index += LR11XX_WIFI_MAC_ADDRESS_LENGTH;
+
+            cmd_output->buffer[index++] = wifi_scan_done_data.results[scan_index].channel;
+            cmd_output->buffer[index++] = wifi_scan_done_data.results[scan_index].type;
+            cmd_output->buffer[index++] = wifi_scan_done_data.results[scan_index].rssi;
+
+            if( wifi_scan_done_data.results[scan_index].result_type == WIFI_RESULT_TYPE_EXTENDED )
+            {
+                /* copy LR11XX_WIFI_STR_COUNTRY_CODE_SIZE bytes of country code */
+                memcpy( &cmd_output->buffer[index], wifi_scan_done_data.results[scan_index].country_code,
+                        LR11XX_WIFI_STR_COUNTRY_CODE_SIZE );
+                index += LR11XX_WIFI_STR_COUNTRY_CODE_SIZE;
+
+                /* copy LR11XX_WIFI_RESULT_SSID_LENGTH bytes of SSID */
+                memcpy( &cmd_output->buffer[index], wifi_scan_done_data.results[scan_index].ssid_bytes,
+                        LR11XX_WIFI_RESULT_SSID_LENGTH );
+                index += LR11XX_WIFI_RESULT_SSID_LENGTH;
+            }
+
             cmd_output->length = index;
         }
         break;
@@ -2889,216 +2964,6 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     }
 
 #if defined( USE_FLRC_PROTOCOL )
-    case CMD_FLRC_PROTOCOL_INIT:
-    {
-        if( !flrc_protocol_host_ensure_initialized( cmd_output ) )
-        {
-            break;
-        }
-
-        bool                    is_initiator = false;
-        bool                    is_tx        = false;
-        smtc_flrp_return_code_t rc           = SMTC_FLRP_RC_ERROR;
-
-        if( !flrc_protocol_extract_cmd_flags( cmd_input->length, cmd_input->buffer, &is_initiator, &is_tx ) )
-        {
-            SMTC_HAL_TRACE_ERROR(
-                "CMD_FLRC_PROTOCOL: bad payload (len=%u); need 2 bytes (is_initiator,is_tx in {0,1}); "
-                "slave len=2; initiator len=2 or 10 (optional EUI)\n",
-                cmd_input->length );
-            cmd_output->return_code = ( cmd_input->length < 2U ) ? CMD_RC_BAD_SIZE : CMD_RC_INVALID;
-            cmd_output->length      = 0;
-            break;
-        }
-
-        if( is_initiator && is_tx )
-        {
-            uint8_t                slave_dev_eui[SMTC_FLRP_EUI_LENGTH];
-            smtc_flrp_com_config_t com_config;
-
-            flrc_protocol_copy_slave_dev_eui( cmd_input->length, cmd_input->buffer, slave_dev_eui );
-            flrc_protocol_apply_initiator_stream_com_config( &com_config, slave_dev_eui );
-            flrc_protocol_fill_tx_test_pattern( );
-
-            SMTC_HAL_TRACE_INFO( "CMD_FLRC_PROTOCOL: initiator tx, slave %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n",
-                                 slave_dev_eui[0], slave_dev_eui[1], slave_dev_eui[2], slave_dev_eui[3],
-                                 slave_dev_eui[4], slave_dev_eui[5], slave_dev_eui[6], slave_dev_eui[7] );
-
-            rc = smtc_flrp_initiate_transmission( flrp_buffer, FLRP_BURST_SIZE, com_config );
-            if( rc != SMTC_FLRP_RC_OK )
-            {
-                SMTC_HAL_TRACE_ERROR( "CMD_FLRC_PROTOCOL: smtc_flrp_initiate_transmission failed (rc=%u)\n", rc );
-            }
-        }
-        if( is_initiator && !is_tx )
-        {
-            uint8_t                slave_dev_eui[SMTC_FLRP_EUI_LENGTH];
-            smtc_flrp_com_config_t com_config;
-
-            flrc_protocol_copy_slave_dev_eui( cmd_input->length, cmd_input->buffer, slave_dev_eui );
-            flrc_protocol_apply_initiator_stream_com_config( &com_config, slave_dev_eui );
-
-            SMTC_HAL_TRACE_INFO( "CMD_FLRC_PROTOCOL: initiator rx, slave %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n",
-                                 slave_dev_eui[0], slave_dev_eui[1], slave_dev_eui[2], slave_dev_eui[3],
-                                 slave_dev_eui[4], slave_dev_eui[5], slave_dev_eui[6], slave_dev_eui[7] );
-
-            rc = smtc_flrp_initiate_reception( flrp_buffer, FLRP_BURST_SIZE, com_config );
-            if( rc != SMTC_FLRP_RC_OK )
-            {
-                SMTC_HAL_TRACE_ERROR( "CMD_FLRC_PROTOCOL: smtc_flrp_initiate_reception failed (rc=%u)\n", rc );
-            }
-        }
-        if( !is_initiator && is_tx )
-        {
-            flrc_protocol_fill_tx_test_pattern( );
-
-            rc = smtc_flrp_slave_prepare_data_to_send( flrp_buffer, FLRP_BURST_SIZE );
-            if( rc != SMTC_FLRP_RC_OK )
-            {
-                SMTC_HAL_TRACE_ERROR( "CMD_FLRC_PROTOCOL: smtc_flrp_slave_prepare_data_to_send failed (rc=%u)\n", rc );
-            }
-            else
-            {
-                SMTC_HAL_TRACE_INFO( "CMD_FLRC_PROTOCOL: slave tx, prepared payload, starting periodic listening\n" );
-                rc = smtc_flrp_start_periodic_listening( flrp_buffer, FLRP_BURST_SIZE );
-                if( rc != SMTC_FLRP_RC_OK )
-                {
-                    SMTC_HAL_TRACE_ERROR( "CMD_FLRC_PROTOCOL: smtc_flrp_start_periodic_listening failed (rc=%u)\n",
-                                          rc );
-                }
-            }
-        }
-        if( !is_initiator && !is_tx )
-        {
-            rc = smtc_flrp_slave_prepare_data_to_send( flrp_buffer, 0 );
-            if( rc != SMTC_FLRP_RC_OK )
-            {
-                SMTC_HAL_TRACE_ERROR( "CMD_FLRC_BURST: smtc_flrp_slave_prepare_data_to_send(0) failed (rc=%u)\n", rc );
-            }
-            else
-            {
-                SMTC_HAL_TRACE_INFO( "CMD_FLRC_BURST: slave rx, starting periodic listening\n" );
-                rc = smtc_flrp_start_periodic_listening( flrp_buffer, FLRP_BURST_SIZE );
-                if( rc != SMTC_FLRP_RC_OK )
-                {
-                    SMTC_HAL_TRACE_ERROR( "CMD_FLRC_BURST: smtc_flrp_start_periodic_listening failed (rc=%u)\n", rc );
-                }
-            }
-        }
-
-        if( cmd_output->return_code != CMD_RC_OK )
-        {
-            break;
-        }
-
-        if( rc != SMTC_FLRP_RC_OK )
-        {
-            cmd_output->return_code = CMD_RC_FAIL;
-            cmd_output->length      = 0;
-            break;
-        }
-
-        cmd_output->buffer[0]   = smtc_flrp_core_get_mac_radio_access_id( );
-        cmd_output->return_code = CMD_RC_OK;
-        cmd_output->length      = 1;
-
-        SMTC_HAL_TRACE_INFO( "CMD_FLRC_BURST: radio_access_id=%u\n", cmd_output->buffer[0] );
-        break;
-    }
-
-    case CMD_SET_FLRC_PROTOCOL_PARAMS:
-    {
-        SMTC_HAL_TRACE_INFO( "CMD_SET_FLRC_PROTOCOL_PARAMS: Received %d bytes\n", cmd_input->length );
-
-        if( !flrc_protocol_host_ensure_initialized( cmd_output ) )
-        {
-            break;
-        }
-
-        flrc_protocol_radio_config_pb_t pb_config = flrc_protocol_radio_config_pb_t_init_zero;
-        pb_istream_t                    stream    = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
-
-        if( !pb_decode( &stream, flrc_protocol_radio_config_pb_t_fields, &pb_config ) )
-        {
-            SMTC_HAL_TRACE_ERROR( "CMD_SET_FLRC_PROTOCOL_PARAMS: Failed to decode protobuf message\n" );
-            cmd_output->return_code = CMD_RC_INVALID;
-            cmd_output->length      = 0;
-            break;
-        }
-
-        smtc_flrp_radio_config_t config = smtc_flrp_get_current_radio_config( );
-        convert_pb_flrc_protocol_radio_config_to_native( &pb_config, &config );
-
-        smtc_flrp_return_code_t rc = smtc_flrp_set_new_radio_config( config );
-        if( rc != SMTC_FLRP_RC_OK )
-        {
-            SMTC_HAL_TRACE_ERROR( "CMD_SET_FLRC_PROTOCOL_PARAMS: smtc_flrp_set_new_radio_config failed (rc=%u)\n", rc );
-            cmd_output->return_code = ( rc == SMTC_FLRP_RC_BUSY ) ? CMD_RC_BUSY : CMD_RC_INVALID;
-            cmd_output->length      = 0;
-            break;
-        }
-
-        smtc_flrp_flrc_advanced_radio_config_t advanced_config = { 0 };
-        convert_pb_flrc_protocol_radio_config_to_native_advanced( &pb_config, &advanced_config );
-        rc = smtc_flrp_set_new_advanced_flrc_radio_config( advanced_config );
-        if( rc != SMTC_FLRP_RC_OK )
-        {
-            SMTC_HAL_TRACE_ERROR(
-                "CMD_SET_FLRC_PROTOCOL_PARAMS: smtc_flrp_set_new_advanced_flrc_radio_config failed (rc=%u)\n", rc );
-            cmd_output->return_code = ( rc == SMTC_FLRP_RC_BUSY ) ? CMD_RC_BUSY : CMD_RC_INVALID;
-            cmd_output->length      = 0;
-            break;
-        }
-
-        SMTC_HAL_TRACE_INFO( "CMD_SET_FLRC_PROTOCOL_PARAMS: nb_channels=%" PRIu8 ", default_ch=%" PRIu8
-                             ", tx_pwr=%" PRId8 " dBm, bit_rate=%s\n",
-                             config.flrc.nb_channels, config.flrc.default_channel, config.flrc.tx_power_in_dbm,
-                             ral_flrc_raw_bit_rate_to_str( config.flrc.raw_bit_rate ) );
-
-        cmd_output->return_code = CMD_RC_OK;
-        cmd_output->length      = 0;
-        break;
-    }
-
-    case CMD_GET_FLRC_PROTOCOL_STATS:
-    {
-        SMTC_HAL_TRACE_INFO( "CMD_GET_FLRC_PROTOCOL_STATS\n" );
-
-        if( !flrc_protocol_initialized )
-        {
-            SMTC_HAL_TRACE_ERROR( "CMD_GET_FLRC_PROTOCOL_STATS: FLRP not initialized\n" );
-            cmd_output->return_code = CMD_RC_FAIL;
-            cmd_output->length      = 0;
-            break;
-        }
-
-        flrc_burst_stats_pb_t pb_stats       = flrc_burst_stats_pb_t_init_zero;
-        pb_stats.rx_data_size                = flrp_last_rx_stats.payload_size_expected;
-        pb_stats.nb_packets_received         = flrp_last_rx_stats.nb_packets_received_ok;
-        pb_stats.nb_packets_crc_error        = flrp_last_rx_stats.nb_packets_check_error;
-        pb_stats.rssi_mean                   = flrp_last_rx_stats.rssi_mean;
-        pb_stats.radio_access_id             = smtc_flrp_core_get_mac_radio_access_id( );
-        pb_stats.exchange_phase_success_mask = flrp_last_rx_stats.exchange_phase_success_mask;
-
-        pb_ostream_t stream = pb_ostream_from_buffer( cmd_output->buffer, 255 );
-        if( !pb_encode( &stream, flrc_burst_stats_pb_t_fields, &pb_stats ) )
-        {
-            SMTC_HAL_TRACE_ERROR( "CMD_GET_FLRC_PROTOCOL_STATS: Failed to encode protobuf message\n" );
-            cmd_output->return_code = CMD_RC_FAIL;
-            cmd_output->length      = 0;
-            break;
-        }
-
-        cmd_output->return_code = CMD_RC_OK;
-        cmd_output->length      = stream.bytes_written;
-
-        SMTC_HAL_TRACE_INFO( "CMD_GET_FLRC_PROTOCOL_STATS: rx_size=%" PRIu32 ", packets_ok=%" PRIu32
-                             ", check_errors=%" PRIu32 ", rssi=%" PRId32 ", radio_id=%u\n",
-                             pb_stats.rx_data_size, pb_stats.nb_packets_received, pb_stats.nb_packets_crc_error,
-                             pb_stats.rssi_mean, pb_stats.radio_access_id );
-        flrp_display_mask( pb_stats.exchange_phase_success_mask );
-        break;
-    }
     case CMD_FLRP_INIT:
     {
         SMTC_HAL_TRACE_INFO( "CMD_FLRP_INIT: Received %d bytes\n", cmd_input->length );
@@ -3189,7 +3054,23 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     case CMD_FLRP_START_PERIODIC_LISTENING:
     {
         SMTC_HAL_TRACE_INFO( "CMD_FLRP_START_PERIODIC_LISTENING: Received %d bytes\n", cmd_input->length );
-        smtc_flrp_return_code_t rc = smtc_flrp_start_periodic_listening( flrp_buffer, FLRP_BURST_SIZE );
+
+        uint32_t payload_size = 0;
+        payload_size |= ( uint32_t ) cmd_input->buffer[0] << 24;
+        payload_size |= ( uint32_t ) cmd_input->buffer[1] << 16;
+        payload_size |= ( uint32_t ) cmd_input->buffer[2] << 8;
+        payload_size |= ( uint32_t ) cmd_input->buffer[3];
+
+        if( payload_size > FLRP_BURST_SIZE )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_START_PERIODIC_LISTENING: payload_size %" PRIu32 " > FLRP_BURST_SIZE\n",
+                                  payload_size );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_return_code_t rc = smtc_flrp_start_periodic_listening( flrp_buffer, payload_size );
         if( rc != SMTC_FLRP_RC_OK )
         {
             SMTC_HAL_TRACE_ERROR(
@@ -3374,10 +3255,10 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     {
         SMTC_HAL_TRACE_INFO( "CMD_FLRP_INITIATE_RECEPTION: Received %d bytes\n", cmd_input->length );
 
-        flrp_com_config_pb_t pb_rx  = flrp_com_config_pb_t_init_zero;
-        pb_istream_t         stream = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
+        flrp_initiate_reception_pb_t pb_rx  = flrp_initiate_reception_pb_t_init_zero;
+        pb_istream_t                 stream = pb_istream_from_buffer( cmd_input->buffer, cmd_input->length );
 
-        if( !pb_decode( &stream, flrp_com_config_pb_t_fields, &pb_rx ) )
+        if( !pb_decode( &stream, flrp_initiate_reception_pb_t_fields, &pb_rx ) )
         {
             SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_RECEPTION: Failed to decode protobuf message\n" );
             cmd_output->return_code = CMD_RC_INVALID;
@@ -3385,8 +3266,16 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             break;
         }
 
+        if( !pb_rx.has_com_config )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_RECEPTION: missing com_config field\n" );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
         smtc_flrp_com_config_t com_config;
-        if( !convert_pb_flrp_com_config_to_native( &pb_rx, &com_config ) )
+        if( !convert_pb_flrp_com_config_to_native( &pb_rx.com_config, &com_config ) )
         {
             SMTC_HAL_TRACE_ERROR(
                 "CMD_FLRP_INITIATE_RECEPTION: invalid com_config (slave_dev_eui must be 8 bytes, enums valid, "
@@ -3395,7 +3284,18 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             cmd_output->length      = 0;
             break;
         }
-        smtc_flrp_return_code_t rc = smtc_flrp_initiate_reception( flrp_buffer, FLRP_BURST_SIZE, com_config );
+
+        uint32_t payload_size = pb_rx.payload_size;
+        if( payload_size > FLRP_BURST_SIZE )
+        {
+            SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_RECEPTION: payload_size %" PRIu32 " > FLRP_BURST_SIZE\n",
+                                  payload_size );
+            cmd_output->return_code = CMD_RC_INVALID;
+            cmd_output->length      = 0;
+            break;
+        }
+
+        smtc_flrp_return_code_t rc = smtc_flrp_initiate_reception( flrp_buffer, payload_size, com_config );
         if( rc != SMTC_FLRP_RC_OK )
         {
             SMTC_HAL_TRACE_ERROR( "CMD_FLRP_INITIATE_RECEPTION: smtc_flrp_initiate_reception failed (rc=%u)\n", rc );
@@ -3425,6 +3325,7 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
         cmd_output->length      = 1;
         break;
     }
+
     case CMD_FLRP_GET_PARAMS:
     {
         SMTC_HAL_TRACE_INFO( "CMD_FLRP_GET_PARAMS: Received %d bytes\n", cmd_input->length );
@@ -3460,6 +3361,14 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
     {
         SMTC_HAL_TRACE_INFO( "CMD_FLRP_GET_STATS: Received %d bytes\n", cmd_input->length );
 
+        if( !flrp_last_tx_valid && !flrp_last_rx_valid && smtc_flrp_is_transaction_active( ) )
+        {
+            SMTC_HAL_TRACE_INFO( "CMD_FLRP_GET_STATS: transaction in progress, stats not ready\n" );
+            cmd_output->return_code = CMD_RC_BUSY;
+            cmd_output->length      = 0;
+            break;
+        }
+
         flrp_stats_pb_t pb = flrp_stats_pb_t_init_zero;
 
         if( flrp_last_tx_valid )
@@ -3469,6 +3378,13 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             pb.stats_tx.send_successfully = flrp_last_tx_send_successful;
             pb.stats_tx.dest_addr.size    = SMTC_FLRP_EUI_LENGTH;
             memcpy( pb.stats_tx.dest_addr.bytes, flrp_last_tx_dest, SMTC_FLRP_EUI_LENGTH );
+            pb.stats_tx.has_payload_stats                  = true;
+            pb.stats_tx.payload_stats.payload_bit_rate_bps = flrp_last_tx_stats.payload_bit_rate_bps;
+            pb.stats_tx.payload_stats.burst_bit_rate_bps   = flrp_last_tx_stats.burst_bit_rate_bps;
+            pb.stats_tx.payload_stats.frequency_hz         = flrp_last_tx_stats.frequency_hz;
+            pb.stats_tx.payload_stats.frequency_offset_hz  = flrp_last_tx_stats.frequency_offset_hz;
+            pb.stats_tx.wor_rssi                           = flrp_last_tx_wor_stats.rssi;
+            pb.stats_tx.wor_snr                            = flrp_last_tx_wor_stats.snr;
         }
 
         if( flrp_last_rx_valid )
@@ -3491,8 +3407,10 @@ cmd_parse_status_t parse_cmd( cmd_input_t* cmd_input, cmd_response_t* cmd_output
             memcpy( pb.stats_rx.payload_stats.last_burst_missed_packets_bitfield.bytes,
                     flrp_last_rx_stats.last_burst_missed_packets_bitfield,
                     pb.stats_rx.payload_stats.last_burst_missed_packets_bitfield.size );
-            pb.stats_rx.wor_rssi = flrp_last_rx_wor_stats.rssi;
-            pb.stats_rx.wor_snr  = flrp_last_rx_wor_stats.snr;
+            pb.stats_rx.payload_stats.frequency_hz        = flrp_last_rx_stats.frequency_hz;
+            pb.stats_rx.payload_stats.frequency_offset_hz = flrp_last_rx_stats.frequency_offset_hz;
+            pb.stats_rx.wor_rssi                          = flrp_last_rx_wor_stats.rssi;
+            pb.stats_rx.wor_snr                           = flrp_last_rx_wor_stats.snr;
         }
 
         pb_ostream_t stream = pb_ostream_from_buffer( cmd_output->buffer, 255 );
@@ -4706,98 +4624,15 @@ static cmd_serial_rc_code_t handle_nhm_rac_get_results_cmd( uint8_t* cmd_payload
  */
 
 #if defined( USE_FLRC_PROTOCOL )
-static bool flrc_protocol_host_ensure_initialized( cmd_response_t* cmd_output )
-{
-    if( flrc_protocol_initialized )
-    {
-        return true;
-    }
-
-    smtc_flrp_api_config_t flrp_config = { 0 };
-    uint8_t                dev_eui[]   = USER_FLRP_SELF_DEVICE_EUI;
-    memcpy( flrp_config.dev_eui, dev_eui, SMTC_FLRP_EUI_LENGTH );
-    flrp_config.crypto_enabled = false;
-    flrp_config.freq_plan      = SMTC_FLRP_FREQ_865MHz;
-    flrp_config.crystal_error  = 10;
-
-    smtc_flrp_return_code_t rc = smtc_flrp_init( flrp_config, flrp_tx_done_callback, flrp_rx_done_callback, NULL );
-    if( rc != SMTC_FLRP_RC_OK )
-    {
-        SMTC_HAL_TRACE_ERROR( "FLRP host init: smtc_flrp_init failed (rc=%u)\n", rc );
-        cmd_output->return_code = CMD_RC_FAIL;
-        cmd_output->length      = 0;
-        return false;
-    }
-
-    flrc_protocol_initialized = true;
-    SMTC_HAL_TRACE_INFO( "FLRP host init: protocol initialized\n" );
-    return true;
-}
-
-static void flrc_protocol_fill_tx_test_pattern( void )
-{
-    uint8_t flrp_tx_counter = 0;
-    for( uint32_t i = 0; i < FLRP_BURST_SIZE; i++ )
-    {
-        if( i % 128u == 0u )
-        {
-            flrp_tx_counter++;
-        }
-        flrp_buffer[i] = flrp_tx_counter;
-    }
-}
-
-static bool flrc_protocol_extract_cmd_flags( uint32_t length, const uint8_t* buf, bool* is_initiator_out,
-                                             bool* is_tx_out )
-{
-    if( length < 2U )
-    {
-        return false;
-    }
-    if( ( buf[0] > 1U ) || ( buf[1] > 1U ) )
-    {
-        return false;
-    }
-    *is_initiator_out = ( buf[0] != 0 );
-    *is_tx_out        = ( buf[1] != 0 );
-
-    if( !( *is_initiator_out ) )
-    {
-        return ( length == 2U );
-    }
-    return ( length == 2U ) || ( length == ( 2U + SMTC_FLRP_EUI_LENGTH ) );
-}
-
-static void flrc_protocol_copy_slave_dev_eui( uint32_t length, const uint8_t* buf,
-                                              uint8_t slave_dev_eui[SMTC_FLRP_EUI_LENGTH] )
-{
-    if( length >= ( 2U + SMTC_FLRP_EUI_LENGTH ) )
-    {
-        memcpy( slave_dev_eui, &buf[2], SMTC_FLRP_EUI_LENGTH );
-    }
-    else
-    {
-        uint8_t default_eui[] = USER_FLRP_TARGET_DEVICE_EUI;
-        memcpy( slave_dev_eui, default_eui, SMTC_FLRP_EUI_LENGTH );
-    }
-}
-
-static void flrc_protocol_apply_initiator_stream_com_config( smtc_flrp_com_config_t* com_cfg,
-                                                             const uint8_t slave_dev_eui[SMTC_FLRP_EUI_LENGTH] )
-{
-    memset( com_cfg, 0, sizeof( *com_cfg ) );
-    com_cfg->com_mode             = SMTC_FLRP_BIDIRECTIONAL;
-    com_cfg->link_adaptation_mode = SMTC_FLRP_LINK_ADAPTATION_CHANNEL_SELECTION_ONLY;
-    memcpy( com_cfg->slave_dev_eui, slave_dev_eui, SMTC_FLRP_EUI_LENGTH );
-}
-
 static void flrp_tx_done_callback( const void* context, smtc_flrp_return_code_t status, bool send_successful,
-                                   uint8_t* dest_addr )
+                                   uint8_t* dest_addr, smtc_flrp_tx_stats_t flrp_stats )
 {
     UNUSED( context );
     flrp_last_tx_valid           = true;
     flrp_last_tx_rc              = status;
     flrp_last_tx_send_successful = send_successful;
+    flrp_last_tx_stats           = flrp_stats.burst;
+    flrp_last_tx_wor_stats       = flrp_stats.wor;
     if( dest_addr != NULL )
     {
         memcpy( flrp_last_tx_dest, dest_addr, SMTC_FLRP_EUI_LENGTH );

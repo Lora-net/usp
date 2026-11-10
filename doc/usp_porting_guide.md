@@ -139,19 +139,22 @@ Define GPIO pin assignments for your board.
 Configure board-specific radio settings based on your hardware schematic. For the Semtech LR2021, follow the [**Semtech LR2021 Reference Design**](https://www.semtech.com/products/wireless-rf/lora-plus/lr2021).
 
 **Reference Implementation:** `examples/radio_hal/ral_{radio}_bsp.c` (shows how STM32L476 configures BSP)
-**Function Definitions:** `smtc_rac_lib/smtc_ral/src/ral_{radio}_bsp.h` (defines required BSP functions)
+**Function Definitions:** `smtc_rac_lib/smtc_radio_interface/smtc_ral/src/ral_{radio}_bsp.h` (defines required BSP functions)
 
 **What to configure:**
 - Power regulator type (DCDC or LDO) & consumption configuration
 - RF switch configuration
 - Clock source (XTAL or TCXO)
+- RSSI calibration tables matching the RF bands used by your board (see [RSSI Calibration Tables Selection](#rssi-calibration-tables-selection-lr20xx))
 - Keep radio-specific parameters (TX power tables, calibration) from reference
 
-If your RF shield hardware **matches the LR2021 reference design**, you can **reuse the existing power PA table** `XXX_PA_XX_CFG_TABLE` provided in BSP files : `examples\radio_hal\lr20xx_pa_pwr_cfg.h`.
+> ⚠️ **LR20xx, new in USP v1.3.0**: the BSP must implement `ral_lr20xx_bsp_get_rssi_calibration_table()`, called by the RAL at radio initialization. There is no default implementation: a LR20xx BSP written for an earlier USP version does not link anymore until this function is added. See [RSSI Calibration Tables Selection](#rssi-calibration-tables-selection-lr20xx).
+
+If your RF shield hardware **matches the LR2021 reference design**, you can **reuse the existing power PA table** provided in `examples/radio_hal/pa_tables_lr20xx_common.c` (copy of the smtc-shields reference tables `examples/radio_hal/smtc_shields/lr20xx/src/smtc_shield_lr20xx_common.c`).
 
 **Radio HAL files:** `examples/radio_hal/{radio}_hal.c` - Include in build without modification
 
-**Note:** The `smtc_rac_lib/smtc_ral/src/` folder also contains RAL core implementation files (e.g., `ral_sx126x.c`, `ral_lr11xx.c`) - these are part of the library and should **not be modified**.
+**Note:** The `smtc_rac_lib/smtc_radio_interface/smtc_ral/src/` folder also contains RAL core implementation files (e.g., `ral_sx126x.c`, `ral_lr11xx.c`) - these are part of the library and should **not be modified**.
 
 **Details:** See [Radio Driver HAL Implementation](#radio-driver-hal-implementation) and [RAL BSP Implementation](#ral-bsp-implementation) sections below for complete details.
 
@@ -169,9 +172,9 @@ A brief description of the necessary steps for this implementation follows.
 The HAL implementation must provide platform-specific read, write, reset, and wake-up implementations.
 
 - Radio driver API functions call the HAL implementation to perform the actual reset, wake, and communication operations needed by the driver.
-- For the `LR20xx`, these functions are documented in [lr20xx_hal.h](/smtc_rac_lib/radio_drivers/lr20xx_driver/inc/lr20xx_hal.h).
-- For the `LR11xx`, these functions are documented in [lr11xx_hal.h](/smtc_rac_lib/radio_drivers/lr11xx_driver/src/lr11xx_hal.h).
-- For the `SX126x`, these functions are documented in [sx126x_hal.h](/smtc_rac_lib/radio_drivers/sx126x_driver/src/sx126x_hal.h).
+- For the `LR20xx`, these functions are documented in [lr20xx_hal.h](/smtc_rac_lib/smtc_radio_interface/radio_drivers/lr20xx_driver/inc/lr20xx_hal.h).
+- For the `LR11xx`, these functions are documented in [lr11xx_hal.h](/smtc_rac_lib/smtc_radio_interface/radio_drivers/lr11xx_driver/src/lr11xx_hal.h).
+- For the `SX126x`, these functions are documented in [sx126x_hal.h](/smtc_rac_lib/smtc_radio_interface/radio_drivers/sx126x_driver/src/sx126x_hal.h).
 
 All radio driver API functions take a 'const void* context' argument:
 
@@ -190,7 +193,7 @@ The USP software imposes a specific requirement on the radio driver HAL implemen
 When compiling the radio driver HAL implementation, it is necessary to add the radio driver source directory to the include path.
 For example, for LR11xx:
 
-- `smtc_rac_lib/radio_drivers/lr11xx_driver/src`
+- `smtc_rac_lib/smtc_radio_interface/radio_drivers/lr11xx_driver/src`
 
 ---
 
@@ -202,14 +205,14 @@ A brief description of the necessary steps follows.
 The RAL provides radio-independent API functions that are similar to those provided by each radio driver.
 The RAL, and a complementary layer called the RALF, are described in the following header functions:
 
-- [ral.h](/smtc_rac_lib/smtc_ral/src/ral.h)
-- [ralf.h](/smtc_rac_lib/smtc_ralf/src/ralf.h)
+- [ral.h](/smtc_rac_lib/smtc_radio_interface/smtc_ral/src/ral.h)
+- [ralf.h](/smtc_rac_lib/smtc_radio_interface/smtc_ralf/src/ralf.h)
 
 The RAL requires the implementer to define a few BSP API functions for the selected transceiver, by providing platform or radio-specific information to the RAL.
 
-- For the `LR20xx`, these functions are described in [ral_lr20xx_bsp.h](/smtc_rac_lib/smtc_ral/src/ral_lr20xx_bsp.h).
-- For the `LR11xx`, these functions are described in [ral_lr11xx_bsp.h](/smtc_rac_lib/smtc_ral/src/ral_lr11xx_bsp.h).
-- For the `SX126x`, these functions are described in [ral_sx126x_bsp.h](/smtc_rac_lib/smtc_ral/src/ral_sx126x_bsp.h).
+- For the `LR20xx`, these functions are described in [ral_lr20xx_bsp.h](/smtc_rac_lib/smtc_radio_interface/smtc_ral/src/ral_lr20xx_bsp.h) (including `ral_lr20xx_bsp_get_rssi_calibration_table()`, mandatory since USP v1.3.0).
+- For the `LR11xx`, these functions are described in [ral_lr11xx_bsp.h](/smtc_rac_lib/smtc_radio_interface/smtc_ral/src/ral_lr11xx_bsp.h).
+- For the `SX126x`, these functions are described in [ral_sx126x_bsp.h](/smtc_rac_lib/smtc_radio_interface/smtc_ral/src/ral_sx126x_bsp.h).
 
 - An LR20xx sample implementation is in the file [ral_lr20xx_bsp.c](/examples/radio_hal/ral_lr20xx_bsp.c).
 - An LR11xx sample implementation is in the file [ral_lr11xx_bsp.c](/examples/radio_hal/ral_lr11xx_bsp.c).
@@ -218,17 +221,106 @@ The RAL requires the implementer to define a few BSP API functions for the selec
 The role of the 'const void* context' variable is described in previous section. It is typically used to store radio-specific information, but depending on the radio driver BSP implementation, it may be NULL if a single transceiver is used.
 When compiling the RAL BSP implementation, it is necessary to add the radio driver source directory and the RAL source directory to the include path. For example, for LR11xx:
 
-- `smtc_rac_lib/radio_drivers/lr11xx_driver/src`
-- `smtc_rac_lib/smtc_ral/src`
+- `smtc_rac_lib/smtc_radio_interface/radio_drivers/lr11xx_driver/src`
+- `smtc_rac_lib/smtc_radio_interface/smtc_ral/src`
+
+#### RSSI Calibration Tables Selection (LR20xx)
+
+The LR20xx RSSI accuracy depends on the gain and noise figure of the whole receive chain, which includes the matching network and the front-end of the board. For this reason the calibration values are not part of the radio driver: they are provided by the BSP through `ral_lr20xx_bsp_get_rssi_calibration_table()`, which the RAL calls once during radio initialization.
+
+> ⚠️ This BSP function is **mandatory since USP v1.3.0** for all the LR20xx radios (LR2021, LR2022, LR2012): it has no default (weak) implementation, so a custom BSP that does not provide it fails at link time. When migrating a custom BSP from an earlier USP version, add it to your `ral_lr20xx_bsp.c`, either selecting one of the reference tables (board equivalent to the Semtech reference design) or a table characterized on your board, as described below.
+
+The function returns two independent tables, one per RF path:
+
+- `rssi_calibration_table_lf`: sub-GHz path (e.g. 490 MHz, 868/915 MHz)
+- `rssi_calibration_table_hf`: 2.xGHz path
+
+Each table is a `lr20xx_radio_common_rssi_calibration_gain_table_t` structure holding 27 entries: one per gain step from `g1` to `g11`, then eight entries for `g12` and eight for `g13` (`g12_boost0` to `g12_boost7` and `g13_boost0` to `g13_boost7`), which correspond to the Rx boost levels available on these two highest gain steps. All 27 entries must be filled: the driver serializes the whole structure (3 bytes per entry, 81 bytes per table) and sends it to the chip as is.
+
+Each entry contains:
+
+- `gain_value`: gain of the receive chain at this gain step, on 10 bits, signed fixed point format 8.2 (2 fractional bits, i.e. a 0.25 resolution). The field is declared as `uint16_t` and transmitted on 16 bits, but only the 10 least significant bits are meaningful: negative gains are written as negative values (as done in the reference tables) and the 6 upper bits are RFU.
+- `noise_figure`: noise figure of the receive chain at this gain step, on 8 bits, unsigned fixed point format 6.2 (2 fractional bits, i.e. a 0.25 resolution).
+
+Refer to the LR2021 datasheet for the reference unit and encoding of these two fields before computing your own values.
+
+**Selecting a reference table**
+
+The reference implementation [ral_lr20xx_bsp.c](/examples/radio_hal/ral_lr20xx_bsp.c) provides ready-to-use tables, characterized on the Semtech LR20xx reference design, one per supported band. Selection is done by simply assigning the address of the wanted table to the corresponding output pointer:
+
+```c
+void ral_lr20xx_bsp_get_rssi_calibration_table(
+    const void* context, const lr20xx_radio_common_rssi_calibration_gain_table_t** rssi_calibration_table_lf,
+    const lr20xx_radio_common_rssi_calibration_gain_table_t** rssi_calibration_table_hf )
+{
+    //Make sure pointers is not affected
+    *rssi_calibration_table_lf = NULL;
+    *rssi_calibration_table_hf = NULL;
+
+    /*Getting High Frequency Calibration Table*/
+
+    //Choosing HF 2.4GHz
+    *rssi_calibration_table_hf = &table_hf_2G4;
+
+
+    /*Getting Low Frequency Calibration Table*/
+
+    //Choosing LF 868 MHz to 915 MHz
+    *rssi_calibration_table_lf = &table_lf_868_915;
+
+    //Choosing LF 490 MHz
+    //*rssi_calibration_table_lf = &table_lf_490;
+}
+```
+
+Guidelines:
+
+- Select the low frequency table according to the sub-GHz band used by your application: keep `table_lf_868_915` for the 868 MHz / 915 MHz regions, or comment it out and uncomment `table_lf_490` (and its definition at the top of the file) when operating around 490 MHz.
+- Only one table can be active per RF path. Uncommenting a second assignment for the same path simply overwrites the previous one.
+- Leaving an output pointer to `NULL` is allowed: the driver then skips the calibration of that RF path, and the radio keeps its default internal values. This is the recommended setting for a path that is not routed on your board (for example, leave `rssi_calibration_table_hf` to `NULL` on a sub-GHz only design).
+
+**Using a custom table for your own board**
+
+The provided tables are only valid for a receive chain equivalent to the reference design. If your board uses a different matching network, an external LNA, a front-end module, an RF switch with a different insertion loss, or a different antenna port routing, the reference values will result in an RSSI offset. In that case, characterize your own board and map a custom table:
+
+1. Measure, for each LNA gain step, the actual gain and noise figure of your receive chain at the frequency of interest.
+2. Declare a new `const lr20xx_radio_common_rssi_calibration_gain_table_t` in your BSP file, following the same layout as the existing tables (all gain steps must be filled), and encode the values in the fixed point formats described above.
+3. Assign its address to the relevant output pointer in `ral_lr20xx_bsp_get_rssi_calibration_table()`, instead of the reference table.
+
+```c
+/* Custom table characterized on <my_board> at 868 MHz */
+static const lr20xx_radio_common_rssi_calibration_gain_table_t table_lf_my_board =
+{
+    .g1  = { .gain_value = -32, .noise_figure = 219 },
+    .g2  = { .gain_value =  -8, .noise_figure = 204 },
+    /* ... all gain steps up to g13_boost7 ... */
+    .g13_boost7 = { .gain_value = 232, .noise_figure = 9 }
+};
+
+void ral_lr20xx_bsp_get_rssi_calibration_table(
+    const void* context, const lr20xx_radio_common_rssi_calibration_gain_table_t** rssi_calibration_table_lf,
+    const lr20xx_radio_common_rssi_calibration_gain_table_t** rssi_calibration_table_hf )
+{
+    *rssi_calibration_table_lf = &table_lf_my_board;
+    *rssi_calibration_table_hf = NULL;  // 2.xGHz path not used on this board
+}
+```
+
+If several radios or several front-end configurations coexist in the same application, the `const void* context` argument can be used to return a different table per transceiver.
+
+The table structure and the fixed point formats are defined in [lr20xx_radio_common_types.h](/smtc_rac_lib/smtc_radio_interface/radio_drivers/lr20xx_driver/inc/lr20xx_radio_common_types.h), and the BSP function is documented in [ral_lr20xx_bsp.h](/smtc_rac_lib/smtc_radio_interface/smtc_ral/src/ral_lr20xx_bsp.h).
 
 ---
 
 ### SMTC Modem HAL Implementation
 
-Porting the USP software to a new MCU architecture requires implementing the modem Hardware Abstraction Layer (HAL) API commands described by the prototypes in the header file [smtc_modem_hal.h](/protocols/lbm_lib/smtc_modem_hal/smtc_modem_hal.h).
+Porting the USP software to a new MCU architecture requires implementing the modem Hardware Abstraction Layer (HAL) API commands. Since USP v1.3.0, the HAL is split in two headers:
+- the core HAL [smtc_core_hal.h](/smtc_rac_lib/smtc_core_hal_interface/smtc_core_hal.h), always required (used by RAC, radio planner, FLRP, LBM, ...): reset, watchdog, time, timer, IRQ, context storage, panic, random, radio environment, trace and RTOS related functions,
+- the LBM specific modem HAL [smtc_modem_hal.h](/protocols/lbm_lib/smtc_modem_hal/smtc_modem_hal.h), only required when LBM is used: battery level, FUOTA, device management, crashlog and store & forward related functions.
+
 Among other things, these API implementations define how timing information is provided to the USP, how random numbers are generated, and how data is stored in non-volatile memory.
 If a TCXO is used on the radio part, its startup timing behavior should be specified in the RAL BSP implementation, and the documentation of the smtc_modem_hal_start_radio_tcxo(), smtc_modem_hal_stop_radio_tcxo(), and smtc_modem_hal_get_radio_tcxo_startup_delay_ms() functions, should be consulted.
-Logging macros are defined in [smtc_modem_hal_dbg_trace.h](/protocols/lbm_lib/smtc_modem_core/logging/smtc_modem_hal_dbg_trace.h). In case the OS has a macro-based logging implementation, the HAL can provide its own header, by removing the `logging` directory from the include list.
+Logging macros are defined in [smtc_core_hal_trace.h](/smtc_rac_lib/smtc_core_hal_interface/smtc_core_hal_trace.h) (formerly `smtc_modem_hal_dbg_trace.h`). In case the OS has a macro-based logging implementation, the HAL can provide its own header (see [Trace management related functions](#trace-management-related-functions)).
 
 An example of implementation on STM32L476 and STM32L073 can be found in [smtc_modem_hal.c](/examples/smtc_modem_hal/smtc_modem_hal.c)
 
@@ -456,10 +548,7 @@ The board delay, in milliseconds.
 
 ### Trace management related functions
 
-The HAL can provide its own trace macros by:
-
-- removing the `smtc_modem_core/logging` from the include list
-- writing its own `smtc_modem_hal_dbg_trace.h` header, based on the content of the existing[smtc_modem_hal_dbg_trace.h](/protocols/lbm_lib/smtc_modem_core/logging/smtc_modem_hal_dbg_trace.h).
+The HAL can provide its own trace macros by writing its own `smtc_core_hal_trace.h` header, based on the content of the existing [smtc_core_hal_trace.h](/smtc_rac_lib/smtc_core_hal_interface/smtc_core_hal_trace.h), and making sure that it is found before the default one in the include path.
 
 #### `void smtc_modem_hal_print_trace( const char* fmt, ... )`
 
@@ -622,7 +711,7 @@ This function is called by the LBM stack on each LBM interruption (radio interru
 ### Phase 1: Porting Tests (**REQUIRED**)
 
 **Application:** `porting_tests`
-**Source:** `examples/main_examples/main_porting_tests.c`
+**Source:** `examples/main_examples/porting_tests_example/main_porting_tests.c`
 
 This validates your HAL implementation.
 
@@ -646,7 +735,7 @@ porting_test_timer_irq_low_power : OK
 ### Phase 2: LoRaWAN Application Test
 
 **Application:** `periodical_uplink`
-**Source:** `examples/main_examples/main_periodical_uplink.c`
+**Source:** `examples/main_examples/periodical_uplink_example/main_periodical_uplink.c`
 
 Configure LoRaWAN credentials:
 
@@ -675,6 +764,7 @@ Event received: TXDONE
 - [ ] Pin definitions for your board
 - [ ] Radio Driver HAL implementation
 - [ ] RAL BSP configuration (if custom radio board)
+- [ ] LR20xx: `ral_lr20xx_bsp_get_rssi_calibration_table()` implemented in the RAL BSP (mandatory since USP v1.3.0)
 
 ### Build System
 - [ ] Configure build system to compile your HAL implementation
@@ -706,6 +796,6 @@ Event received: TXDONE
 - Platform HAL: `examples/smtc_hal_l4/` (STM32L476) or `examples/smtc_hal_l0_LL/` (STM32L073)
 - Pin Configuration: `examples/modem_pinout.h`
 - Radio BSP: `examples/radio_hal/`
-- HAL Interface: `protocols/lbm_lib/smtc_modem_hal/smtc_modem_hal.h`
-- BSP Interfaces: `smtc_rac_lib/smtc_ral/src/ral_xxx_bsp.h`
-- Test Application: `examples/main_examples/main_porting_tests.c`
+- HAL Interfaces: `smtc_rac_lib/smtc_core_hal_interface/smtc_core_hal.h` (core HAL) & `protocols/lbm_lib/smtc_modem_hal/smtc_modem_hal.h` (LBM specific HAL)
+- BSP Interfaces: `smtc_rac_lib/smtc_radio_interface/smtc_ral/src/ral_xxx_bsp.h`
+- Test Application: `examples/main_examples/porting_tests_example/main_porting_tests.c`

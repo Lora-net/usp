@@ -177,6 +177,15 @@ void hal_mcu_disable_low_power_wait( void );
  */
 void hal_mcu_enable_low_power_wait( void );
 
+/*!
+ * Wakes the main thread out of hal_mcu_set_sleep_for_ms().
+ *
+ * Call this from any thread right after it sets an IRQ flag the main loop
+ * needs to react to, so the main loop re-checks it immediately instead of
+ * only once its current sleep elapses. No-op before hal_mcu_init().
+ */
+void hal_mcu_wake_main_thread( void );
+
 #ifdef __cplusplus
 }
 #endif

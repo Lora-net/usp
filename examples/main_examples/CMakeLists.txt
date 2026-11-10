@@ -23,6 +23,8 @@ set(ENABLE_FULL_LBM_FEATURES ON CACHE BOOL "")
 
 # Enable FLRC protocol
 set(USE_FLRC_PROTOCOL ON CACHE BOOL "")
+# Enable LBM
+set(INCLUDE_LBM ON CACHE BOOL "")
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common.cmake)
 

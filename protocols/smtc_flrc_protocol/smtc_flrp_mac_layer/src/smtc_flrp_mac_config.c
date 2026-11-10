@@ -81,18 +81,19 @@ void smtc_flrp_mac_set_radio_params_flrc_mod( smtc_rac_context_t*           tran
 {
     transaction->modulation_type = SMTC_RAC_MODULATION_FLRC;
 
-    transaction->radio_params.flrc.frequency_in_hz           = freq;
-    transaction->radio_params.flrc.rx_frequency_offset_in_hz = freq_offset_hz;
-    transaction->radio_params.flrc.raw_bit_rate              = raw_bit_rate;
-    transaction->radio_params.flrc.tx_power_in_dbm           = mac_radio_config->tx_power_in_dbm;
-    transaction->radio_params.flrc.cr                        = cr;
-    transaction->radio_params.flrc.pulse_shape               = mac_radio_config->pulse_shape;
-    transaction->radio_params.flrc.preamble_len              = mac_radio_config->preambule_len;
-    transaction->radio_params.flrc.sync_word_len             = mac_radio_config->sync_word_len;
-    transaction->radio_params.flrc.tx_syncword_index         = mac_radio_config->tx_syncword_index;
-    transaction->radio_params.flrc.match_sync_word           = mac_radio_config->rx_match_sync_word;
-    transaction->radio_params.flrc.pld_is_fix                = mac_radio_config->pld_is_fix;
-    transaction->radio_params.flrc.crc_type                  = mac_radio_config->crc_type;
+    transaction->radio_params.flrc.frequency_in_hz = freq;
+    transaction->radio_params.flrc.rx_frequency_offset_in_hz =
+        mac_radio_config->frequency_offset_enabled ? freq_offset_hz : 0;
+    transaction->radio_params.flrc.raw_bit_rate      = raw_bit_rate;
+    transaction->radio_params.flrc.tx_power_in_dbm   = mac_radio_config->tx_power_in_dbm;
+    transaction->radio_params.flrc.cr                = cr;
+    transaction->radio_params.flrc.pulse_shape       = mac_radio_config->pulse_shape;
+    transaction->radio_params.flrc.preamble_len      = mac_radio_config->preambule_len;
+    transaction->radio_params.flrc.sync_word_len     = mac_radio_config->sync_word_len;
+    transaction->radio_params.flrc.tx_syncword_index = mac_radio_config->tx_syncword_index;
+    transaction->radio_params.flrc.match_sync_word   = mac_radio_config->rx_match_sync_word;
+    transaction->radio_params.flrc.pld_is_fix        = mac_radio_config->pld_is_fix;
+    transaction->radio_params.flrc.crc_type          = mac_radio_config->crc_type;
 
     transaction->radio_params.flrc.sync_word[0] = &( mac_radio_config->sync_word[0] )[0];
     transaction->radio_params.flrc.sync_word[1] = &( mac_radio_config->sync_word[1] )[0];
@@ -110,17 +111,18 @@ void smtc_flrp_mac_set_radio_params_flrc_burst_mod( smtc_rac_context_t*         
 {
     transaction->modulation_type = SMTC_RAC_MODULATION_FLRC_BURST;
 
-    transaction->radio_params.flrc_burst.frequency_in_hz           = freq;
-    transaction->radio_params.flrc_burst.rx_frequency_offset_in_hz = freq_offset_hz;
-    transaction->radio_params.flrc_burst.raw_bit_rate              = raw_bit_rate;
-    transaction->radio_params.flrc_burst.tx_power_in_dbm           = mac_radio_config->tx_power_in_dbm;
-    transaction->radio_params.flrc_burst.cr                        = cr;
-    transaction->radio_params.flrc_burst.pulse_shape               = mac_radio_config->pulse_shape;
-    transaction->radio_params.flrc_burst.preamble_len              = mac_radio_config->preambule_len;
-    transaction->radio_params.flrc_burst.sync_word_len             = mac_radio_config->sync_word_len;
-    transaction->radio_params.flrc_burst.tx_syncword_index         = mac_radio_config->tx_syncword_index;
-    transaction->radio_params.flrc_burst.match_sync_word           = mac_radio_config->rx_match_sync_word;
-    transaction->radio_params.flrc_burst.pld_is_fix                = mac_radio_config->pld_is_fix;
+    transaction->radio_params.flrc_burst.frequency_in_hz = freq;
+    transaction->radio_params.flrc_burst.rx_frequency_offset_in_hz =
+        mac_radio_config->frequency_offset_enabled ? freq_offset_hz : 0;
+    transaction->radio_params.flrc_burst.raw_bit_rate      = raw_bit_rate;
+    transaction->radio_params.flrc_burst.tx_power_in_dbm   = mac_radio_config->tx_power_in_dbm;
+    transaction->radio_params.flrc_burst.cr                = cr;
+    transaction->radio_params.flrc_burst.pulse_shape       = mac_radio_config->pulse_shape;
+    transaction->radio_params.flrc_burst.preamble_len      = mac_radio_config->preambule_len;
+    transaction->radio_params.flrc_burst.sync_word_len     = mac_radio_config->sync_word_len;
+    transaction->radio_params.flrc_burst.tx_syncword_index = mac_radio_config->tx_syncword_index;
+    transaction->radio_params.flrc_burst.match_sync_word   = mac_radio_config->rx_match_sync_word;
+    transaction->radio_params.flrc_burst.pld_is_fix        = mac_radio_config->pld_is_fix;
     if( crc_disabled )
     {
         transaction->radio_params.flrc_burst.crc_type = RAL_FLRC_CRC_OFF;

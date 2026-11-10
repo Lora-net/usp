@@ -2,7 +2,7 @@
 
 This document presents the current known limitations of USP and their workarounds, when available.
 
-### This USP version includes the first version of FLRP
+### This USP version includes FLRP
 
 Known Limitations specific to FLRP are gathered in the [FLRP documentation](FLRP_guidelines.md#limitations).
 
@@ -31,12 +31,6 @@ At least on `nucleo_l476rg`, `porting_test_get_time/Get time in millisecond` als
 
 Not all samples compile with those platforms.
 Only periodical_uplink sample was tested with limited validation.
-
-### hw_modem integration (#131)
-
-hw_modem is an application embedding most of the USP platform on the tested MCU. This MCU can then be controlled by UART to test USP & LoRa Basics Modem API.
-However, `modem-bridge`, a bridge application between the hw_modem MCU and the controlling computer, is not provided.
-hw_modem documentation will be completed in future releases.
 
 ### US915 TX power index offset via LinkAdrRequest on LR11xx/SX126x (#300)
 
@@ -77,16 +71,14 @@ In future releases, an error will be returned or the firmware will reset with pa
 When using the LR20xx radio with LoRa modulation and BW 7, 10, 15, 20, the software crashes with a Division by zero exception.
 In future releases, an error will be returned or the firmware will reset with panic for out-of-range BW.
 
-### LBM/FUOTA non-functional (multicast issue)
+### SX127X & SX128X radio shields
 
-FUOTA is currently non-functional due to an issue with multicast. A fix is planned for the next release.
+The support of those boards is
+- not available on usp_zephyr
+- limited to LoRa Basics Modem on usp
 
-### LBM instabilities detected in certain regions
+### OnChannelHub & SX126X radio shields (#385)
 
-Instabilities have been identified in the following regions: AS923_GRP1, AS923_GRP4, KR920, and AU915.
-This issue may cause periodic panic reboots. A fix is planned for the next release.
-
-### LBM/Relay WOR window misaligned (US 915 MHz)
-
-In US 915 MHz band, the Relay feature is not operational when using different/mismatched boards (e.g. Nucleo-L476RG and Xiao-nRF54L15), due to WOR window misalignment. We recommend using the same MCU/board on both sides.
+The sensitivity of the device side of the one_channel_hub in US915 or AU915 with an SX126x may be degraded by about 20 dB when RX bandwidth is updated without sleep.
+Observed with Rx BW125 -> standby -> Rx BW500 .
 

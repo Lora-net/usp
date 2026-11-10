@@ -874,29 +874,6 @@ static ral_flrc_preamble_length_pb_t convert_native_flrc_preamble_len_to_pb( ral
 }
 
 #if defined( USE_FLRC_PROTOCOL )
-void convert_pb_flrc_protocol_radio_config_to_native( const flrc_protocol_radio_config_pb_t* pb_config,
-                                                      smtc_flrp_radio_config_t*              native_config )
-{
-    if( pb_config == NULL || native_config == NULL )
-    {
-        return;
-    }
-
-    for( uint8_t i = 0; i < SMTC_FLRP_NB_CHANNELS_MAX; i++ )
-    {
-        native_config->flrc.channels_freq_hz[i] = pb_config->frequencies_hz[i];
-    }
-    native_config->flrc.nb_channels          = ( uint8_t ) pb_config->nb_frequencies;
-    native_config->flrc.default_channel      = ( uint8_t ) pb_config->default_channel;
-    native_config->flrc.raw_bit_rate         = convert_pb_flrc_raw_bit_rate_to_native( pb_config->raw_bit_rate );
-    native_config->flrc.tx_power_in_dbm      = ( int8_t ) pb_config->tx_power_in_dbm;
-    native_config->flrc.interframe_delay_us  = ( uint16_t ) pb_config->interframe_delay_us;
-    native_config->flrc.start_burst_delay_us = ( uint16_t ) pb_config->start_burst_delay_us;
-    native_config->flrc.start_ack_delay_us   = ( uint16_t ) pb_config->start_ack_delay_us;
-    native_config->flrc.adaptive_link_interframe_delay_us = ( uint16_t ) pb_config->adaptive_link_interframe_delay_us;
-    native_config->flrc.burst_target_per                  = ( uint8_t ) pb_config->burst_target_per;
-}
-
 static void flrp_pb_sync_bytes_to_row( pb_size_t size, const uint8_t* bytes,
                                        uint8_t dest[SMTC_FLRP_SIZE_SYNC_WORD_MAX] )
 {
@@ -913,41 +890,25 @@ static void flrp_fill_native_advanced_flrc_from_pb_fields(
     ral_flrc_sync_word_len_pb_t sync_word_len, ral_flrc_tx_syncword_pb_t tx_syncword_index,
     ral_flrc_rx_match_sync_word_pb_t rx_match_sync_word, bool pld_is_fix, ral_flrc_crc_type_pb_t crc_type,
     uint32_t crc_seed, uint32_t crc_polynomial, pb_size_t sw1_size, const uint8_t* sw1_bytes, pb_size_t sw2_size,
-    const uint8_t* sw2_bytes, pb_size_t sw3_size, const uint8_t* sw3_bytes,
+    const uint8_t* sw2_bytes, pb_size_t sw3_size, const uint8_t* sw3_bytes, bool freq_offset_enabled,
     smtc_flrp_flrc_advanced_radio_config_t* advanced_config )
 {
     memset( advanced_config, 0, sizeof( *advanced_config ) );
-    advanced_config->cr                 = convert_pb_flrc_cr_to_native( cr );
-    advanced_config->pulse_shape        = convert_pb_flrc_pulse_shape_to_native( pulse_shape );
-    advanced_config->preambule_len      = convert_pb_flrc_preamble_len_to_native( preamble_len );
-    advanced_config->sync_word_len      = convert_pb_flrc_sync_word_len_to_native( sync_word_len );
-    advanced_config->tx_syncword_index  = convert_pb_flrc_tx_syncword_index_to_native( tx_syncword_index );
-    advanced_config->rx_match_sync_word = convert_pb_flrc_rx_match_to_native( rx_match_sync_word );
-    advanced_config->pld_is_fix         = pld_is_fix;
-    advanced_config->crc_type           = convert_pb_flrc_crc_type_to_native( crc_type );
-    advanced_config->crc_seed           = crc_seed;
-    advanced_config->crc_polynomial     = crc_polynomial;
+    advanced_config->cr                       = convert_pb_flrc_cr_to_native( cr );
+    advanced_config->pulse_shape              = convert_pb_flrc_pulse_shape_to_native( pulse_shape );
+    advanced_config->preambule_len            = convert_pb_flrc_preamble_len_to_native( preamble_len );
+    advanced_config->sync_word_len            = convert_pb_flrc_sync_word_len_to_native( sync_word_len );
+    advanced_config->tx_syncword_index        = convert_pb_flrc_tx_syncword_index_to_native( tx_syncword_index );
+    advanced_config->rx_match_sync_word       = convert_pb_flrc_rx_match_to_native( rx_match_sync_word );
+    advanced_config->pld_is_fix               = pld_is_fix;
+    advanced_config->crc_type                 = convert_pb_flrc_crc_type_to_native( crc_type );
+    advanced_config->crc_seed                 = crc_seed;
+    advanced_config->crc_polynomial           = crc_polynomial;
+    advanced_config->frequency_offset_enabled = freq_offset_enabled;
 
     flrp_pb_sync_bytes_to_row( sw1_size, sw1_bytes, advanced_config->sync_word[0] );
     flrp_pb_sync_bytes_to_row( sw2_size, sw2_bytes, advanced_config->sync_word[1] );
     flrp_pb_sync_bytes_to_row( sw3_size, sw3_bytes, advanced_config->sync_word[2] );
-}
-
-void convert_pb_flrc_protocol_radio_config_to_native_advanced( const flrc_protocol_radio_config_pb_t*  pb_config,
-                                                               smtc_flrp_flrc_advanced_radio_config_t* advanced_config )
-{
-    if( pb_config == NULL || advanced_config == NULL )
-    {
-        return;
-    }
-
-    flrp_fill_native_advanced_flrc_from_pb_fields(
-        pb_config->cr, pb_config->pulse_shape, pb_config->preamble_len, pb_config->sync_word_len,
-        pb_config->tx_syncword_index, pb_config->rx_match_sync_word, pb_config->pld_is_fix, pb_config->crc_type,
-        pb_config->crc_seed, pb_config->crc_polynomial, pb_config->sync_word_1.size,
-        ( const uint8_t* ) pb_config->sync_word_1.bytes, pb_config->sync_word_2.size,
-        ( const uint8_t* ) pb_config->sync_word_2.bytes, pb_config->sync_word_3.size,
-        ( const uint8_t* ) pb_config->sync_word_3.bytes, advanced_config );
 }
 
 void convert_pb_flrp_flrc_advanced_radio_config_to_native( const flrp_flrc_advanced_radio_config_pb_t* pb_config,
@@ -964,7 +925,7 @@ void convert_pb_flrp_flrc_advanced_radio_config_to_native( const flrp_flrc_advan
         pb_config->crc_seed, pb_config->crc_polynomial, pb_config->sync_word_1.size,
         ( const uint8_t* ) pb_config->sync_word_1.bytes, pb_config->sync_word_2.size,
         ( const uint8_t* ) pb_config->sync_word_2.bytes, pb_config->sync_word_3.size,
-        ( const uint8_t* ) pb_config->sync_word_3.bytes, advanced_config );
+        ( const uint8_t* ) pb_config->sync_word_3.bytes, pb_config->frequency_offset_enabled, advanced_config );
 }
 
 void convert_pb_flrp_radio_config( const flrp_radio_config_pb_t* pb_config,

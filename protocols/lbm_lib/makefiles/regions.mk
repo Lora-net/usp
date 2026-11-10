@@ -46,6 +46,14 @@ ifndef RP_VERSION
 LBM_C_DEFS += -DRP2_103
 endif
 
+ifeq ($(RP_VERSION),RP2_105)
+LBM_C_DEFS += -DRP2_105
+endif
+
+ifeq ($(RP_VERSION),RP2_104)
+LBM_C_DEFS += -DRP2_104
+endif
+
 ifeq ($(RP_VERSION),RP2_103)
 LBM_C_DEFS += -DRP2_103
 endif

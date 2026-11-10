@@ -41,7 +41,7 @@
 #include <stdint.h>   // C99 types
 #include <stdbool.h>  // bool type
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "radio_planner.h"
 #include "smtc_modem_hal.h"
 #include "lr1_stack_mac_layer.h"
@@ -133,8 +133,10 @@ void smtc_lora_cad_bt_init( smtc_lora_cad_bt_t* cad_obj, radio_planner_t* rp, ui
                             void* ch_free_context_on_back_off, void ( *abort_callback )( void* abort_context ),
                             void* abort_context )
 {
-    if( ( ch_free_callback == NULL ) || ( ch_busy_callback_update_channel == NULL ) ||
-        ( ch_free_callback_on_back_off == NULL ) || ( abort_callback == NULL ) )
+    if( ( !SMTC_LBM_IS_VALID_FN_PTR( ch_free_callback ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( ch_busy_callback_update_channel ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( ch_free_callback_on_back_off ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( abort_callback ) ) )
     {
         SMTC_MODEM_HAL_PANIC( "cad bt bad init\n" );
     }
@@ -220,8 +222,10 @@ void smtc_lora_cad_bt_listen_channel( smtc_lora_cad_bt_t* cad_obj, uint32_t freq
     }
 
     cad_obj->is_at_time = is_at_time;
-    if( ( cad_obj->ch_free_callback == NULL ) || ( cad_obj->ch_busy_callback_update_channel == NULL ) ||
-        ( cad_obj->ch_free_callback_on_back_off == NULL ) || ( cad_obj->abort_callback == NULL ) )
+    if( ( !SMTC_LBM_IS_VALID_FN_PTR( cad_obj->ch_free_callback ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( cad_obj->ch_busy_callback_update_channel ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( cad_obj->ch_free_callback_on_back_off ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( cad_obj->abort_callback ) ) )
     {
         SMTC_MODEM_HAL_PANIC( "cad_obj bad initialization \n" );
     }
@@ -325,6 +329,7 @@ void smtc_lora_cad_bt_listen_channel( smtc_lora_cad_bt_t* cad_obj, uint32_t freq
     if( rp_task_enqueue( cad_obj->rp, &rp_task, NULL, 0, &radio_params ) != RP_HOOK_STATUS_OK )
     {
         SMTC_MODEM_HAL_TRACE_PRINTF( "Radio planner cad hook %d is busy \n", my_hook_id );
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( cad_obj->abort_callback ) );
         cad_obj->abort_callback( cad_obj->abort_context );
         smtc_lora_cad_bt_reset_to_difs_phase( cad_obj );
     }
@@ -413,6 +418,7 @@ static void smtc_lora_cad_bt_rp_callback( smtc_lora_cad_bt_t* cad_obj )
             else
             {
                 cad_obj->cad_state = SMTC_LORA_CAD_BO;
+                SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( cad_obj->ch_free_callback_on_back_off ) );
                 cad_obj->ch_free_callback_on_back_off( cad_obj->ch_free_context_on_back_off );
             }
         }
@@ -423,6 +429,7 @@ static void smtc_lora_cad_bt_rp_callback( smtc_lora_cad_bt_t* cad_obj )
 
         if( cad_obj->is_at_time == true )
         {
+            SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( cad_obj->abort_callback ) );
             cad_obj->abort_callback( cad_obj->abort_context );
             smtc_lora_cad_bt_reset_to_difs_phase( cad_obj );
         }
@@ -433,6 +440,7 @@ static void smtc_lora_cad_bt_rp_callback( smtc_lora_cad_bt_t* cad_obj )
             {
                 cad_obj->max_ch_change_cnt--;
                 cad_obj->cad_state = SMTC_LORA_CAD_DIFS;
+                SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( cad_obj->ch_busy_callback_update_channel ) );
                 cad_obj->ch_busy_callback_update_channel( cad_obj->ch_busy_context_update_channel );
             }
             else
@@ -454,6 +462,7 @@ static void smtc_lora_cad_bt_rp_callback( smtc_lora_cad_bt_t* cad_obj )
                                         my_hook_id );
         }
 #endif
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( cad_obj->abort_callback ) );
         cad_obj->abort_callback( cad_obj->abort_context );
         smtc_lora_cad_bt_reset_to_difs_phase( cad_obj );
     }
@@ -470,6 +479,7 @@ static void smtc_lora_cad_bt_reset_to_difs_phase( smtc_lora_cad_bt_t* cad_obj )
 
 static void smtc_lora_cad_bt_channel_is_free( smtc_lora_cad_bt_t* cad_obj )
 {
+    SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( cad_obj->ch_free_callback ) );
     cad_obj->ch_free_callback( cad_obj->ch_free_context );
     smtc_lora_cad_bt_reset_to_difs_phase( cad_obj );
 }

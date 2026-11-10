@@ -34,7 +34,7 @@
 
 #include "smtc_lbt.h"
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "radio_planner.h"
 #include "stddef.h"
 #include "smtc_modem_hal.h"
@@ -48,7 +48,8 @@ void smtc_lbt_init( smtc_lbt_t* lbt_obj, radio_planner_t* rp, uint8_t lbt_id_rp,
                     void ( *busy_callback )( void* busy_context ), void*   busy_context,
                     void ( *abort_callback )( void* abort_context ), void* abort_context )
 {
-    if( ( free_callback == NULL ) || ( busy_callback == NULL ) || ( abort_callback == NULL ) )
+    if( ( !SMTC_LBM_IS_VALID_FN_PTR( free_callback ) ) || ( !SMTC_LBM_IS_VALID_FN_PTR( busy_callback ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( abort_callback ) ) )
     {
         SMTC_MODEM_HAL_PANIC( "lbt bad init\n" );
     }
@@ -148,8 +149,9 @@ void smtc_lbt_listen_channel( smtc_lbt_t* lbt_obj, uint32_t freq, bool is_at_tim
                               uint32_t tx_duration_ms )
 {
     lbt_obj->is_at_time = is_at_time;
-    if( ( lbt_obj->free_callback == NULL ) || ( lbt_obj->busy_callback == NULL ) ||
-        ( lbt_obj->abort_callback == NULL ) )
+    if( ( !SMTC_LBM_IS_VALID_FN_PTR( lbt_obj->free_callback ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( lbt_obj->busy_callback ) ) ||
+        ( !SMTC_LBM_IS_VALID_FN_PTR( lbt_obj->abort_callback ) ) )
     {
         SMTC_MODEM_HAL_PANIC( "lbt_obj bad initialization \n" );
     }
@@ -199,6 +201,7 @@ void smtc_lbt_listen_channel( smtc_lbt_t* lbt_obj, uint32_t freq, bool is_at_tim
     if( rp_task_enqueue( lbt_obj->rp, &rp_task, NULL, 0, &radio_params ) != RP_HOOK_STATUS_OK )
     {
         SMTC_MODEM_HAL_TRACE_PRINTF( "Radio planner hook %d is busy \n", my_hook_id );
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( lbt_obj->abort_callback ) );
         lbt_obj->abort_callback( lbt_obj->abort_context );
     }
     else
@@ -217,6 +220,7 @@ void smtc_lbt_rp_callback( smtc_lbt_t* lbt_obj )
     rp_get_status( lbt_obj->rp, my_hook_id, &tcurrent_ms, &( rp_status ) );
     if( rp_status == RP_STATUS_LBT_FREE_CHANNEL )
     {
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( lbt_obj->free_callback ) );
         lbt_obj->free_callback( lbt_obj->free_context );
     }
     else if( rp_status == RP_STATUS_LBT_BUSY_CHANNEL )
@@ -224,27 +228,24 @@ void smtc_lbt_rp_callback( smtc_lbt_t* lbt_obj )
         if( lbt_obj->is_at_time == true )
         {
             SMTC_MODEM_HAL_TRACE_PRINTF( "lbt abort max retry reach \n" );
+            SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( lbt_obj->abort_callback ) );
             lbt_obj->abort_callback( lbt_obj->abort_context );
         }
         else
         {
+            SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( lbt_obj->busy_callback ) );
             lbt_obj->busy_callback( lbt_obj->busy_context );
         }
     }
     else
     {
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( lbt_obj->abort_callback ) );
         lbt_obj->abort_callback( lbt_obj->abort_context );
     }
 }
 
 smtc_lbt_t* smtc_lbt_get_obj( uint8_t stack_id )
 {
-    if( stack_id < NUMBER_OF_STACKS )
-    {
-        return ( &lbt_obj_declare[stack_id] );
-    }
-    else
-    {
-        return NULL;
-    }
+    SMTC_MODEM_HAL_PANIC_ON_FAILURE( stack_id < NUMBER_OF_STACKS );
+    return ( &lbt_obj_declare[stack_id] );
 }

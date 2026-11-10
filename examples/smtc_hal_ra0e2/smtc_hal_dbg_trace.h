@@ -64,10 +64,6 @@ extern "C" {
 #ifndef HAL_DBG_TRACE_COLOR
 #define HAL_DBG_TRACE_COLOR                         HAL_FEATURE_ON
 #endif
-
-#ifndef HAL_DBG_TRACE_RP
-#define HAL_DBG_TRACE_RP                            HAL_FEATURE_OFF
-#endif
 /* clang-format on */
 
 /*
@@ -98,7 +94,7 @@ extern "C" {
     #define HAL_DBG_TRACE_COLOR_DEFAULT ""
 #endif
 
-#if ( HAL_DBG_TRACE )
+#if( HAL_DBG_TRACE == HAL_FEATURE_ON )
 
     #define SMTC_HAL_TRACE_PRINTF( ... )  hal_trace_print_var (  __VA_ARGS__ )
 
@@ -160,14 +156,25 @@ extern "C" {
     } while( 0 );
 
 #else
-    #define SMTC_HAL_TRACE_PRINTF( ... )
-    #define SMTC_HAL_TRACE_MSG( msg )
-    #define SMTC_HAL_TRACE_MSG_COLOR( msg, color )
-    #define SMTC_HAL_TRACE_INFO( ... )
-    #define SMTC_HAL_TRACE_WARNING( ... )
-    #define SMTC_HAL_TRACE_ERROR( ... )
-    #define SMTC_HAL_TRACE_ARRAY( msg, array, len )
-    #define SMTC_HAL_TRACE_PACKARRAY( ... )
+    // Arguments stay referenced in dead code (removed by the compiler) to avoid unused variable warnings
+    #define SMTC_HAL_TRACE_PRINTF( ... )                                            \
+    do                                                                              \
+    {                                                                               \
+        if( 0 )                                                                     \
+        {                                                                           \
+            hal_trace_print_var( __VA_ARGS__ );                                     \
+        }                                                                           \
+    } while( 0 )
+
+    #define SMTC_HAL_TRACE_MSG( msg ) SMTC_HAL_TRACE_PRINTF( "%s", msg )
+    #define SMTC_HAL_TRACE_MSG_COLOR( msg, color ) SMTC_HAL_TRACE_PRINTF( "%s%s", color, msg )
+    #define SMTC_HAL_TRACE_INFO( ... ) SMTC_HAL_TRACE_PRINTF( __VA_ARGS__ )
+    #define SMTC_HAL_TRACE_WARNING( ... ) SMTC_HAL_TRACE_PRINTF( __VA_ARGS__ )
+    #define SMTC_HAL_TRACE_ERROR( ... ) SMTC_HAL_TRACE_PRINTF( __VA_ARGS__ )
+    #define SMTC_HAL_TRACE_ARRAY( msg, array, len ) \
+        SMTC_HAL_TRACE_PRINTF( "%s%p%lu", msg, ( const void* ) ( array ), ( unsigned long ) ( len ) )
+    #define SMTC_HAL_TRACE_PACKARRAY( msg, array, len ) \
+        SMTC_HAL_TRACE_PRINTF( "%s%p%lu", msg, ( const void* ) ( array ), ( unsigned long ) ( len ) )
 
 #endif
 

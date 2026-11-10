@@ -44,8 +44,8 @@
 #include "radio_planner.h"
 #include "ral.h"
 #include "ralf.h"
-#include "smtc_modem_hal_dbg_trace.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal_trace.h"
+#include "smtc_core_hal.h"
 #include "smtc_rac_api.h"
 #include "smtc_rac_lbt.h"
 #include "smtc_rac_local_func.h"
@@ -101,10 +101,7 @@
 #elif defined( LR20XX )
 #include "ralf_lr20xx.h"
 #endif
-#define SMTC_RAC_LRFHSS_DEFAULT_SYNC_WORD \
-    {                                     \
-        0x2C, 0x0F, 0x79, 0x95            \
-    }
+#define SMTC_RAC_LRFHSS_DEFAULT_SYNC_WORD { 0x2C, 0x0F, 0x79, 0x95 }
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE MACROS-----------------------------------------------------------

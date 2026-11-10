@@ -125,7 +125,9 @@ ASFLAGS += -fno-builtin $(MCU_FLAGS) $(AS_DEFS) $(AS_INCLUDES) $(LBM_OPT) $(WFLA
 
 # Common C definitions
 LBM_C_DEFS += \
-	-DNUMBER_OF_STACKS=$(NB_OF_STACK)
+	-DNUMBER_OF_STACKS=$(NB_OF_STACK) \
+	-DUSE_LBM=1 \
+	-DMODEM_RP_RALF_RAL_INTERNAL
 
 ifeq ($(MODEM_TRACE),yes)
 LBM_C_DEFS += \
@@ -373,7 +375,8 @@ SMTC_MODEM_CRYPTO_C_SOURCES += \
 	smtc_modem_core/smtc_modem_crypto/smtc_modem_crypto.c
 
 RADIO_PLANNER_C_SOURCES += \
-	smtc_modem_core/radio_planner/src/radio_planner.c
+	$(RADIO_PLANNER_DIR)/src/duty_cycle.c\
+	$(RADIO_PLANNER_DIR)/src/radio_planner.c
 
 LBM_C_INCLUDES +=  \
 	-I.\
@@ -386,17 +389,18 @@ LBM_C_INCLUDES +=  \
 	-Ismtc_modem_core/lorawan_packages/lorawan_certification\
 	-Ismtc_modem_core/lorawan_manager\
 	-Ismtc_modem_core/lorawan_api\
-	-Ismtc_modem_core/smtc_ral/src\
-	-Ismtc_modem_core/smtc_ralf/src\
+	-I$(SMTC_RADIO_INTERFACE_DIR)/smtc_ral/src\
+	-I$(SMTC_RADIO_INTERFACE_DIR)/smtc_ralf/src\
 	-Ismtc_modem_core/lr1mac\
 	-Ismtc_modem_core/lr1mac/src\
 	-Ismtc_modem_core/lr1mac/src/services\
-	-Ismtc_modem_core/radio_planner/src\
+	-I$(RADIO_PLANNER_DIR)/src\
 	-Ismtc_modem_core/smtc_modem_crypto\
 	-Ismtc_modem_core/smtc_modem_crypto/smtc_secure_element\
 	-Ismtc_modem_core/lorawan_api\
 	-Ismtc_modem_core/lr1mac/src/smtc_real/src\
-	-Ismtc_modem_hal
+	-Ismtc_modem_hal\
+	-I$(SMTC_CORE_HAL_DIR)
 
 
 ifeq ($(LBM_FUOTA),yes)

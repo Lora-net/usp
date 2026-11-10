@@ -41,7 +41,7 @@
 #include <stdbool.h>  // bool type
 
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 #include "lr1mac_core.h"
 
@@ -65,6 +65,12 @@
 #include "smtc_modem_crypto.h"
 #include "lorawan_api.h"
 
+#define PANIC_IF_STACK_ID_TOO_HIGH( x )                          \
+    do                                                           \
+    {                                                            \
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( x < NUMBER_OF_STACKS ); \
+    } while( 0 )
+
 static struct
 {
     lr1_stack_mac_t lr1_mac_obj[NUMBER_OF_STACKS];
@@ -84,8 +90,6 @@ static struct
 #endif  // SMTC_MULTICAST
 
 } lr1mac_core_context;
-
-lorawan_down_metadata_t lorawan_down_metadata;
 
 #define lr1_mac_obj lr1mac_core_context.lr1_mac_obj
 
@@ -110,11 +114,11 @@ void lorawan_api_init( radio_planner_t* rp, uint8_t stack_id,
 #if defined( ADD_CLASS_C ) || defined( ADD_CLASS_B )
     lr1mac_rx_session_param_t* multicast_rx_sessions    = NULL;
     uint8_t                    nb_multicast_rx_sessions = 0;
-#endif
 #if defined( SMTC_MULTICAST )
     multicast_rx_sessions    = multicast_obj[stack_id].rx_session_param;
     nb_multicast_rx_sessions = LR1MAC_MC_NUMBER_OF_SESSION;
     smtc_multicast_init( &multicast_obj[stack_id], stack_id );
+#endif
 #endif
 
 #if defined( ADD_CLASS_C )
@@ -389,10 +393,16 @@ uint8_t lorawan_api_next_dr_get( uint8_t stack_id )
     return lr1mac_core_next_dr_get( &lr1_mac_obj[stack_id] );
 }
 
-modulation_type_t lorawan_api_get_modulation_type_from_datarate( uint8_t stack_id, uint8_t datarate )
+modulation_type_t lorawan_api_get_modulation_type_from_tx_datarate( uint8_t stack_id, uint8_t datarate )
 {
     PANIC_IF_STACK_ID_TOO_HIGH( stack_id );
-    return smtc_real_get_modulation_type_from_datarate( lr1_mac_obj[stack_id].real, datarate );
+    return smtc_real_get_modulation_type_from_tx_datarate( lr1_mac_obj[stack_id].real, datarate );
+}
+
+modulation_type_t lorawan_api_get_modulation_type_from_rx_datarate( uint8_t stack_id, uint8_t datarate )
+{
+    PANIC_IF_STACK_ID_TOO_HIGH( stack_id );
+    return smtc_real_get_modulation_type_from_rx_datarate( lr1_mac_obj[stack_id].real, datarate );
 }
 
 uint32_t lorawan_api_next_frequency_get( uint8_t stack_id )
@@ -411,6 +421,37 @@ uint16_t lorawan_api_mask_tx_dr_channel_up_dwell_time_check( uint8_t stack_id )
 {
     PANIC_IF_STACK_ID_TOO_HIGH( stack_id );
     return smtc_real_mask_tx_dr_channel_up_dwell_time_check( lr1_mac_obj[stack_id].real );
+}
+
+void lorawan_api_get_channel_mask( uint8_t stack_id, uint8_t* channel_mask, uint8_t* mask_size )
+{
+    PANIC_IF_STACK_ID_TOO_HIGH( stack_id );
+    smtc_real_get_channel_mask( lr1_mac_obj[stack_id].real, channel_mask, mask_size );
+}
+
+status_lorawan_t lorawan_api_set_channel_mask( uint8_t stack_id, const uint8_t* ch_mask_cntl, const uint16_t* ch_mask,
+                                               uint8_t nb_mask )
+{
+    PANIC_IF_STACK_ID_TOO_HIGH( stack_id );
+    status_channel_t status_channel = OKCHANNEL;
+    smtc_real_init_channel_mask( lr1_mac_obj[stack_id].real );
+    for( uint8_t i = 0; i < nb_mask; i++ )
+    {
+        status_channel = smtc_real_build_channel_mask( lr1_mac_obj[stack_id].real, ch_mask_cntl[i], ch_mask[i] );
+
+        if( status_channel == ERROR_CHANNEL_CNTL )
+        {
+            return ERRORLORAWAN;
+        }
+    }
+
+    // Look at the last status to validate the command
+    if( status_channel == ERROR_CHANNEL_MASK )
+    {
+        return ERRORLORAWAN;
+    }
+    smtc_real_set_channel_mask( lr1_mac_obj[stack_id].real );
+    return OKLORAWAN;
 }
 
 uint8_t lorawan_api_min_tx_dr_get( uint8_t stack_id )
@@ -757,7 +798,12 @@ void lorawan_api_set_network_type( bool network_type, uint8_t stack_id )
 bool lorawan_api_get_network_type( uint8_t stack_id )
 {
     PANIC_IF_STACK_ID_TOO_HIGH( stack_id );
-    uint8_t sync_word = smtc_real_get_sync_word( lr1_mac_obj[stack_id].real );
+    // uint8_t            sf = 0;
+    // lr1mac_bandwidth_t bw = BW_RFU;
+    // smtc_real_lora_tx_dr_to_sf_bw( lr1_mac_obj[stack_id].real, lr1_mac_obj[stack_id].tx_data_rate, &sf, &bw );
+    // uint8_t sync_word = smtc_real_get_sync_word( lr1_mac_obj[stack_id].real, sf );
+    uint8_t sync_word =
+        smtc_real_get_sync_word( lr1_mac_obj[stack_id].real, 10 );  // SF10 always represent current network type
     return ( ( sync_word == smtc_real_get_public_sync_word( lr1_mac_obj[stack_id].real ) ) ? true : false );
 }
 
@@ -906,10 +952,16 @@ bool lorawan_api_get_class_b_status( uint8_t stack_id )
     return lr1mac_core_get_class_b_status( &lr1_mac_obj[stack_id] );
 }
 
-void lorawan_api_lora_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw, uint8_t stack_id )
+void lorawan_api_lora_tx_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw, uint8_t stack_id )
 {
     PANIC_IF_STACK_ID_TOO_HIGH( stack_id );
-    smtc_real_lora_dr_to_sf_bw( lr1_mac_obj[stack_id].real, in_dr, out_sf, out_bw );
+    smtc_real_lora_tx_dr_to_sf_bw( lr1_mac_obj[stack_id].real, in_dr, out_sf, out_bw );
+}
+
+void lorawan_api_lora_rx_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw, uint8_t stack_id )
+{
+    PANIC_IF_STACK_ID_TOO_HIGH( stack_id );
+    smtc_real_lora_rx_dr_to_sf_bw( lr1_mac_obj[stack_id].real, in_dr, out_sf, out_bw );
 }
 
 uint8_t lorawan_api_get_frequency_factor( uint8_t stack_id )
@@ -963,6 +1015,11 @@ uint32_t lorawan_api_decode_freq_from_24bits_buf( uint8_t stack_id, uint8_t freq
 status_lorawan_t lorawan_api_is_frequency_valid( uint8_t stack_id, uint32_t freq )
 {
     return smtc_real_is_frequency_valid( lr1_mac_obj[stack_id].real, freq );
+}
+
+bool lorawan_api_is_beacon_hopping( uint8_t stack_id )
+{
+    return smtc_real_is_beacon_hopping( lr1_mac_obj[stack_id].real );
 }
 
 status_lorawan_t lorawan_api_is_datarate_valid( uint8_t stack_id, uint8_t dr )

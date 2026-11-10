@@ -203,7 +203,7 @@ typedef struct region_cn470_context_s
     uint8_t                   dr_distribution[NUMBER_OF_TX_DR_CN_470];
     uint8_t                   join_dr_distribution[NUMBER_OF_TX_DR_CN_470];
     uint8_t                   custom_dr_distribution_init[NUMBER_OF_TX_DR_CN_470];
-    uint8_t                   channel_index_enabled[BANK_MAX_CN470];  // Contain the index of the activated channel only
+    uint8_t                   tx_channel_index_enabled[BANK_MAX_CN470];  // Contain the index of the activated channel only
     uint8_t                   unwrapped_channel_mask[BANK_MAX_CN470];
     uint8_t                   activated_by_join_channel;  // Channel used to join
     channel_plan_type_cn470_t activated_channel_plan;

@@ -39,7 +39,7 @@
 #include <stdint.h>   // C99 types
 #include <stdbool.h>  // bool type
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_ping_slot.h"
 #include "radio_planner.h"
 #include "lr1mac_defs.h"
@@ -127,6 +127,14 @@ static void smtc_ping_slot_compute_next_ping_offset_time( smtc_ping_slot_t* ping
 static void smtc_ping_slot_search_closest_ping_offset_time( smtc_ping_slot_t* ping_slot_obj, uint32_t timestamp_rtc );
 
 /**
+ * @brief Compute the ping slot parameters of a session for the current beacon period
+ *
+ * @param ping_slot_obj
+ * @param session       // session index (unicast, multicast0, ...)
+ */
+static void smtc_ping_slot_compute_session_ping_slots( smtc_ping_slot_t* ping_slot_obj, rx_session_type_t session );
+
+/**
  * @brief Compute Time On Air of a payload size
  *
  * @param lr1_mac
@@ -209,6 +217,8 @@ void smtc_ping_slot_init_after_beacon( smtc_ping_slot_t* ping_slot_obj, uint32_t
                                        uint32_t next_beacon_timestamp, uint32_t beacon_reserved_ms,
                                        uint32_t beacon_guard_ms, uint32_t beacon_epoch_time )
 {
+    ping_slot_obj->beacon_timestamp      = beacon_timestamp;
+    ping_slot_obj->beacon_epoch_time     = beacon_epoch_time;
     ping_slot_obj->next_beacon_timestamp = next_beacon_timestamp;
     ping_slot_obj->beacon_reserved_ms    = beacon_reserved_ms;
     ping_slot_obj->beacon_guard_ms       = beacon_guard_ms;
@@ -229,16 +239,7 @@ void smtc_ping_slot_init_after_beacon( smtc_ping_slot_t* ping_slot_obj, uint32_t
         // Compute Ping Slot for each enabled session
         if( ping_slot_obj->rx_session_param[i]->enabled == true )
         {
-            ping_slot_obj->rx_session_param[i]->ping_slot_parameters.ping_number =
-                1 << ( 7 - ping_slot_obj->rx_session_param[i]->ping_slot_periodicity );
-            ping_slot_obj->rx_session_param[i]->ping_slot_parameters.ping_period =
-                1 << ( 5 + ping_slot_obj->rx_session_param[i]->ping_slot_periodicity );
-
-            ping_slot_obj->rx_session_param[i]->ping_slot_parameters.ping_offset_time =
-                smtc_ping_slot_compute_first_slot( beacon_timestamp, beacon_reserved_ms, beacon_epoch_time,
-                                                   ping_slot_obj->rx_session_param[i]->dev_addr,
-                                                   ping_slot_obj->rx_session_param[i]->ping_slot_parameters.ping_period,
-                                                   ping_slot_obj->lr1_mac->stack_id );
+            smtc_ping_slot_compute_session_ping_slots( ping_slot_obj, i );
         }
     }
 }
@@ -266,7 +267,7 @@ void smtc_ping_slot_start( smtc_ping_slot_t* ping_slot_obj )
     uint32_t          ping_slot_fractional_second;
     uint32_t          ping_slot_freq;
     uint8_t           ping_slot_dr;
-    modulation_type_t modulation_type;
+    modulation_type_t rx_modulation_type;
     rp_radio_params_t rp_radio_params = { 0 };
     uint32_t          rx_timeout_symb_in_ms_tmp;
     uint32_t          rx_timeout_symb_locked_in_ms_tmp;
@@ -333,7 +334,8 @@ void smtc_ping_slot_start( smtc_ping_slot_t* ping_slot_obj )
 
         ping_slot_dr = RX_SESSION_PARAM_CURRENT->rx_data_rate;
 
-        modulation_type = smtc_real_get_modulation_type_from_datarate( ping_slot_obj->lr1_mac->real, ping_slot_dr );
+        rx_modulation_type =
+            smtc_real_get_modulation_type_from_rx_datarate( ping_slot_obj->lr1_mac->real, ping_slot_dr );
 
         smtc_real_get_rx_window_parameters( ping_slot_obj->lr1_mac->real, RX_SESSION_PARAM_CURRENT->rx_data_rate,
                                             ( RX_SESSION_PARAM_CURRENT->ping_slot_parameters.ping_offset_time -
@@ -342,16 +344,16 @@ void smtc_ping_slot_start( smtc_ping_slot_t* ping_slot_obj )
                                             &rx_timeout_symb_locked_in_ms_tmp, RX_BEACON_TIMESTAMP_ERROR,
                                             ping_slot_obj->lr1_mac->crystal_error );
 
-        if( modulation_type == LORA )
+        if( rx_modulation_type == LORA )
         {
             uint8_t            sf;
             lr1mac_bandwidth_t bw;
-            smtc_real_lora_dr_to_sf_bw( ping_slot_obj->lr1_mac->real, ping_slot_dr, &sf, &bw );
+            smtc_real_lora_rx_dr_to_sf_bw( ping_slot_obj->lr1_mac->real, ping_slot_dr, &sf, &bw );
 
             ralf_params_lora_t lora_param;
             memset( &lora_param, 0, sizeof( ralf_params_lora_t ) );
 
-            lora_param.sync_word       = smtc_real_get_sync_word( ping_slot_obj->lr1_mac->real );
+            lora_param.sync_word       = smtc_real_get_sync_word( ping_slot_obj->lr1_mac->real, sf );
             lora_param.symb_nb_timeout = RX_SESSION_PARAM_CURRENT->rx_window_symb;
             lora_param.rf_freq_in_hz   = ping_slot_freq;
 
@@ -375,7 +377,7 @@ void smtc_ping_slot_start( smtc_ping_slot_t* ping_slot_obj )
             rp_radio_params.rx.lora          = lora_param;
             rp_radio_params.rx.timeout_in_ms = rx_timeout_symb_locked_in_ms_tmp;
         }
-        else if( modulation_type == FSK )
+        else if( rx_modulation_type == FSK )
         {
             SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( "MODULATION FSK\n" );
             uint8_t kbitrate;
@@ -468,6 +470,7 @@ void smtc_ping_slot_rp_callback( smtc_ping_slot_t* ping_slot_obj )
     if( rp_status == RP_STATUS_RX_PACKET )
     {
         SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( "--> RP_STATUS_RX_PACKET\n" );
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( ping_slot_obj->rx_callback ) );
         ping_slot_obj->rx_callback( ping_slot_obj->rx_context );
     }
     else
@@ -575,6 +578,7 @@ void smtc_ping_slot_mac_rp_callback( smtc_ping_slot_t* ping_slot_obj )
                 RX_DOWN_DATA.rx_metadata.rx_frequency_hz = RX_SESSION_PARAM_CURRENT->rx_frequency;
                 RX_DOWN_DATA.rx_metadata.rx_window       = RECEIVE_ON_RXB + ( uint8_t ) ping_slot_obj->rx_session_index;
 
+                SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( ping_slot_obj->push_callback ) );
                 ping_slot_obj->push_callback( ping_slot_obj->push_context );
             }
         }
@@ -665,8 +669,18 @@ smtc_multicast_config_rc_t smtc_ping_slot_multicast_b_start_session( smtc_ping_s
     // Reset session fcntdown counter
     ping_slot_obj->rx_session_param[mc_group_id + 1]->fcnt_dwn = ~0;
 
-    // Set the enable bit to true to activate the session
-    ping_slot_obj->rx_session_param[mc_group_id + 1]->waiting_beacon_to_start = true;
+    // Class B is running so the current beacon period is known: start the session right now instead of waiting the
+    // next beacon, the ping slots are computed again at each beacon as for all enabled sessions
+    smtc_ping_slot_compute_session_ping_slots( ping_slot_obj, ( rx_session_type_t ) ( mc_group_id + 1 ) );
+    ping_slot_obj->rx_session_param[mc_group_id + 1]->waiting_beacon_to_start = false;
+    ping_slot_obj->rx_session_param[mc_group_id + 1]->enabled                 = true;
+
+    // Reschedule the closest ping slot, the scheduled one is replaced in the radio planner (not burnt). If a ping slot
+    // is running, the new session is taken into account when it ends
+    if( ping_slot_obj->rp->tasks[ping_slot_obj->ping_slot_id4rp].state != RP_TASK_STATE_RUNNING )
+    {
+        smtc_ping_slot_start( ping_slot_obj );
+    }
 
     return SMTC_MC_RC_OK;
 }
@@ -801,6 +815,19 @@ static void smtc_ping_slot_compute_next_ping_offset_time( smtc_ping_slot_t* ping
             }
         }
     }
+}
+
+static void smtc_ping_slot_compute_session_ping_slots( smtc_ping_slot_t* ping_slot_obj, rx_session_type_t session )
+{
+    ping_slot_obj->rx_session_param[session]->ping_slot_parameters.ping_number =
+        1 << ( 7 - ping_slot_obj->rx_session_param[session]->ping_slot_periodicity );
+    ping_slot_obj->rx_session_param[session]->ping_slot_parameters.ping_period =
+        1 << ( 5 + ping_slot_obj->rx_session_param[session]->ping_slot_periodicity );
+
+    ping_slot_obj->rx_session_param[session]->ping_slot_parameters.ping_offset_time = smtc_ping_slot_compute_first_slot(
+        ping_slot_obj->beacon_timestamp, ping_slot_obj->beacon_reserved_ms, ping_slot_obj->beacon_epoch_time,
+        ping_slot_obj->rx_session_param[session]->dev_addr,
+        ping_slot_obj->rx_session_param[session]->ping_slot_parameters.ping_period, ping_slot_obj->lr1_mac->stack_id );
 }
 
 static void smtc_ping_slot_search_closest_ping_offset_time( smtc_ping_slot_t* ping_slot_obj, uint32_t timestamp_rtc )
@@ -1137,7 +1164,8 @@ static uint32_t smtc_ping_slot_get_duration_timeout_ms( smtc_ping_slot_t* ping_s
                                                         uint8_t datarate )
 {
     uint32_t time_symb_ms =
-        ( nb_rx_window_symb * smtc_real_get_symbol_duration_us( ping_slot_obj->lr1_mac->real, datarate ) ) / 1000;
+        ( nb_rx_window_symb * smtc_real_get_symbol_duration_us( ping_slot_obj->lr1_mac->real, datarate, DOWN_LINK ) ) /
+        1000;
     return ( ( time_symb_ms < 1 ) ? 1 : time_symb_ms );
 }
 
@@ -1145,13 +1173,13 @@ static uint32_t smtc_ping_slot_compute_downlink_toa( lr1_stack_mac_t* lr1_mac, u
 {
     uint32_t toa = 0;
 
-    modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate( lr1_mac->real, datarate );
+    modulation_type_t rx_modulation_type = smtc_real_get_modulation_type_from_rx_datarate( lr1_mac->real, datarate );
 
-    if( modulation_type == LORA )
+    if( rx_modulation_type == LORA )
     {
         uint8_t            sf;
         lr1mac_bandwidth_t bw;
-        smtc_real_lora_dr_to_sf_bw( lr1_mac->real, datarate, &sf, &bw );
+        smtc_real_lora_rx_dr_to_sf_bw( lr1_mac->real, datarate, &sf, &bw );
 
         ralf_params_lora_t lora_param;
         memset( &lora_param, 0, sizeof( ralf_params_lora_t ) );
@@ -1169,7 +1197,7 @@ static uint32_t smtc_ping_slot_compute_downlink_toa( lr1_stack_mac_t* lr1_mac, u
         toa = ral_get_lora_time_on_air_in_ms( ( &lr1_mac->rp->radio->ral ), ( &lora_param.pkt_params ),
                                               ( &lora_param.mod_params ) );
     }
-    else if( modulation_type == FSK )
+    else if( rx_modulation_type == FSK )
     {
         uint8_t bitrate;
         smtc_real_fsk_dr_to_bitrate( lr1_mac->real, datarate, &bitrate );
@@ -1188,7 +1216,7 @@ static uint32_t smtc_ping_slot_compute_downlink_toa( lr1_stack_mac_t* lr1_mac, u
     }
     else
     {
-        SMTC_MODEM_HAL_PANIC( "TX MODULATION NOT SUPPORTED\n" );
+        SMTC_MODEM_HAL_PANIC( "RX MODULATION NOT SUPPORTED\n" );
     }
 
     SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( "Toa = %u\n", toa );

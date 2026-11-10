@@ -43,7 +43,7 @@
 #include "modem_supervisor_light.h"
 #include "smtc_modem_api.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_event_utilities.h"
 #include "lorawan_send_management.h"
 #include "lorawan_api.h"
@@ -75,12 +75,20 @@
  * -----------------------------------------------------------------------------
  * --- PRIVATE TYPES -----------------------------------------------------------
  */
+typedef struct lorawan_dwn_ack_management_s
+{
+    uint8_t  adr_backoff_event_bitfield;
+    uint32_t spare[3];
+
+} lorawan_dwn_ack_management_t;
+
+static lorawan_dwn_ack_management_t lorawan_dwn_ack_management_obj[NUMBER_OF_STACKS];
 
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE VARIABLES -------------------------------------------------------
  */
-static uint8_t adr_backoff_event_bitfield[NUMBER_OF_STACKS];
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
@@ -120,9 +128,11 @@ void lorawan_dwn_ack_management_init( uint8_t* service_id, uint8_t task_id,
     *on_launch_callback = lorawan_dwn_ack_management_on_launch;
     *on_update_callback = lorawan_dwn_ack_management_on_update;
     *context_callback   = ( void* ) modem_supervisor_get_task( );
+
+    memset( lorawan_dwn_ack_management_obj, 0, sizeof( lorawan_dwn_ack_management_obj ) );
     for( uint8_t i = 0; i < NUMBER_OF_STACKS; i++ )
     {
-        adr_backoff_event_bitfield[i] = 0;
+        lorawan_dwn_ack_management_obj[i].adr_backoff_event_bitfield = 0;
     }
 }
 
@@ -185,12 +195,14 @@ static uint8_t lorawan_dwn_ack_management_downlink_handler( lr1_stack_mac_down_d
 
     // Gather no_downlink_limit_bitfield from lr1mac context (from api), check if true and send event if true.
     lr1_stack_mac_t* mac_stack = lorawan_api_stack_mac_get( rx_down_data->stack_id );
-    if( ( mac_stack->no_downlink_limit_bitfield != adr_backoff_event_bitfield[rx_down_data->stack_id] ) )
+    if( ( mac_stack->no_downlink_limit_bitfield !=
+          lorawan_dwn_ack_management_obj[rx_down_data->stack_id].adr_backoff_event_bitfield ) )
     {
         // Send full bitfield to user to parse
         increment_asynchronous_msgnumber( SMTC_MODEM_EVENT_NO_DOWNLINK_THRESHOLD, mac_stack->no_downlink_limit_bitfield,
                                           rx_down_data->stack_id );
-        adr_backoff_event_bitfield[rx_down_data->stack_id] = mac_stack->no_downlink_limit_bitfield;
+        lorawan_dwn_ack_management_obj[rx_down_data->stack_id].adr_backoff_event_bitfield =
+            mac_stack->no_downlink_limit_bitfield;
     }
 
     return MODEM_DOWNLINK_UNCONSUMED;

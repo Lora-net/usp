@@ -63,42 +63,6 @@
  */
 #define WATCHDOG_RELOAD_PERIOD_MS 20000
 
-#ifdef ADD_FUOTA
-static uint32_t prv_get_hw_version_for_fuota( void )
-{
-    return 1;
-}
-
-static uint32_t prv_get_fw_version_for_fuota( void )
-{
-    return 1;
-}
-
-static uint8_t prv_get_fw_status_available_for_fuota( void )
-{
-    return 1;
-}
-
-static uint32_t prv_get_next_fw_version_for_fuota( void )
-{
-    return 1;
-}
-
-static uint8_t prv_get_fw_delete_status_for_fuota( uint32_t version )
-{
-    return 0;
-}
-
-/* Callbacks for HAL implementation */
-static struct lorawan_fuota_cb prv_fuota_cb = {
-    .get_hw_version          = prv_get_hw_version_for_fuota,
-    .get_fw_version          = prv_get_fw_version_for_fuota,
-    .get_fw_status_available = prv_get_fw_status_available_for_fuota,
-    .get_next_fw_version     = prv_get_next_fw_version_for_fuota,
-    .get_fw_delete_status    = prv_get_fw_delete_status_for_fuota,
-};
-#endif /* CONFIG_LORA_BASICS_MODEM_FUOTA */
-
 int main( void )
 {
     // Disable IRQ to avoid unwanted behavior during init

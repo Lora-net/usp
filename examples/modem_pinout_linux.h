@@ -62,14 +62,48 @@ extern "C" {
 // Radio specific pinout (adjust these for your actual hardware connections)
 #define RADIO_NRST RPI_GPIO12
 #define RADIO_BUSY_PIN RPI_GPIO5
-#define RADIO_DIO_MAIN RPI_GPIO16
 
+// DIO interrupt pin varies by radio family - adjust to match your hardware wiring
+#if defined( LR11XX_TRANSCEIVER ) || defined( SX126X )
+#define RADIO_DIO_MAIN RPI_GPIO13
+#elif defined( LR20XX )
+#define RADIO_DIO_MAIN RPI_GPIO16
+#else
+#define RADIO_DIO_MAIN NC
+#endif
+
+// SX126x antenna switch control
+#if defined( SX126X )
+#define SX126X_RADIO_RF_SWITCH_CTRL RPI_GPIO19
+#else
+#define SX126X_RADIO_RF_SWITCH_CTRL NC
+#endif
+
+// RX/TX Status LEDs
+#if defined( SX126X ) || defined( LR11XX_TRANSCEIVER )
+#define SMTC_LED_RX RPI_GPIO3 /* green LED */
+#define SMTC_LED_TX RPI_GPIO2 /* red LED */
+#else
 #define SMTC_LED_RX NC
 #define SMTC_LED_TX NC
+#endif
+
+// Scan LED: only meaningful for LR11xx (WiFi / GNSS scan)
+#if defined( LR11XX_TRANSCEIVER )
+#define SMTC_LED_SCAN RPI_GPIO6
+#else
 #define SMTC_LED_SCAN NC
+#endif
 
+// LNA control pin for LR11xx (GNSS LNA control)
+#if defined( LR11XX_TRANSCEIVER )
+#define RADIO_LNA_CTRL RPI_GPIO21
+#else
+#define RADIO_LNA_CTRL NC
+#endif
+
+// Not used on Linux (kept for API consistency with the non-Linux pinout).
 #define EXTI_BUTTON NC
-
 #define HW_MODEM_COMMAND_PIN NC
 #define HW_MODEM_EVENT_PIN NC
 #define HW_MODEM_BUSY_PIN NC

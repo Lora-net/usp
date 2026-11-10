@@ -76,7 +76,32 @@ void hw_modem_uart_dma_start_rx( uint8_t* buff, uint16_t size );
 void hw_modem_uart_dma_stop_rx( void );
 
 void hw_modem_uart_tx( uint8_t* buff, uint8_t len );
-void trace_uart_tx( uint8_t* buff, uint8_t len );
+void trace_uart_tx( uint8_t* buff, uint16_t len );
+
+#if defined( HAL_UART_RX_ENABLED )
+
+/**
+ * @brief Arm continuous (circular) reception on the trace UART into a caller-owned buffer
+ *
+ * The HAL is the producer half of a single-producer/single-consumer ring: it fills @p buff
+ * continuously in the background and only reports how far it has written (hal_uart_rx_write_index()).
+ * The caller owns the buffer and all consume-side logic (read cursor, peek, drain). No application
+ * buffering lives in the HAL.
+ *
+ * @param [in] buff Ring buffer to receive into (owned by the caller)
+ * @param [in] size Buffer size in bytes; also the modulus of the returned write index
+ */
+void hal_uart_rx_start( uint8_t* buff, uint16_t size );
+
+/**
+ * @brief Producer write cursor: number of bytes received so far, modulo the buffer size
+ *
+ * Monotonically advances (mod size) as bytes land in the buffer passed to hal_uart_rx_start().
+ * The caller computes availability as (write_index - read_cursor) mod size.
+ */
+uint16_t hal_uart_rx_write_index( void );
+
+#endif  // HAL_UART_RX_ENABLED
 
 #ifdef __cplusplus
 }

@@ -80,6 +80,12 @@ void hal_spi_de_init( void );
  */
 int hal_spi_transfer( const uint8_t* tx_buf, uint8_t* rx_buf, size_t len );
 
+/*!
+ * Assert NSS low for duration_us microseconds with no SPI clock activity, then release it.
+ * Useful for radio wake-up sequences that require a clean NSS pulse without data.
+ */
+int hal_spi_nss_pulse( uint16_t duration_us );
+
 #ifdef __cplusplus
 }
 #endif

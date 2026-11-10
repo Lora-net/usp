@@ -44,8 +44,8 @@
 #include "radio_planner.h"
 #include "ral.h"
 #include "ralf.h"
-#include "smtc_modem_hal_dbg_trace.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal_trace.h"
+#include "smtc_core_hal.h"
 #include "smtc_rac_api.h"
 #include "smtc_rac_lbt.h"
 #include "smtc_rac_local_func.h"
@@ -110,10 +110,7 @@
 /*!
  * \brief Default FSK synchronization word
  */
-#define SMTC_RAC_FSK_DEFAULT_SYNC_WORD \
-    {                                  \
-        0xC1, 0x94, 0xC1               \
-    }
+#define SMTC_RAC_FSK_DEFAULT_SYNC_WORD { 0xC1, 0x94, 0xC1 }
 /*!
  * \brief Default FSK configuration constants
  */
@@ -185,9 +182,9 @@ smtc_rac_return_code_t smtc_rac_fsk( uint8_t radio_access_id )
         .duration_time_ms           = ral_get_gfsk_time_on_air_in_ms(
             RAL_RADIO_POINTER,
             ( rac_config->radio_params.fsk.is_tx == true ) ? &( rp_radio_params.tx.gfsk.pkt_params )
-                                                                     : &( rp_radio_params.rx.gfsk.pkt_params ),
+                                                           : &( rp_radio_params.rx.gfsk.pkt_params ),
             ( rac_config->radio_params.fsk.is_tx == true ) ? &( rp_radio_params.tx.gfsk.mod_params )
-                                                                     : &( rp_radio_params.rx.gfsk.mod_params ) ),
+                                                           : &( rp_radio_params.rx.gfsk.mod_params ) ),
         .start_time_ms = rac_config->scheduler_config.start_time_ms,
         .launch_task_callbacks =
             ( rac_config->radio_params.fsk.is_tx == true ) ? smtc_rac_fsk_tx_callback : smtc_rac_fsk_rx_callback,

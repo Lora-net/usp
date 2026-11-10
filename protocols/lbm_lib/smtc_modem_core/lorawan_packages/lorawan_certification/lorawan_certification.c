@@ -40,10 +40,11 @@
 #include <stdint.h>   // C99 types
 #include <stdbool.h>  // bool type
 
+#include "modem_event_utilities.h"
 #include "modem_supervisor_light.h"
 #include "lorawan_api.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_duty_cycle.h"
 #include "smtc_modem_test_api.h"
 #include "modem_core.h"
@@ -572,7 +573,7 @@ static lorawan_certification_requested_tx_type_t lorawan_certification_parser(
         if( rx_buffer_length == LORAWAN_CERTIFICATION_DUT_RESET_REQ_SIZE )
         {
             SMTC_MODEM_HAL_TRACE_PRINTF( "Certif mcu reset\n" );
-            smtc_modem_hal_reset_mcu( );
+            increment_asynchronous_msgnumber( SMTC_MODEM_EVENT_RESET_REQUEST, 0, lorawan_certification->stack_id );
         }
         else
         {
@@ -659,6 +660,11 @@ static lorawan_certification_requested_tx_type_t lorawan_certification_parser(
     {
         if( rx_buffer_length == LORAWAN_CERTIFICATION_TX_PERIODICITY_CHANGE_REQ_SIZE )
         {
+            if( rx_buffer[1] >= LORAWAN_CERTIFICATION_PERIODICITY_MAX )
+            {
+                SMTC_MODEM_HAL_TRACE_ERROR( "bad periodicity\n" );
+                break;
+            }
             lorawan_certification->ul_periodicity_s = lorawan_certification_periodicity_table_s[rx_buffer[1]];
         }
         else
@@ -695,6 +701,11 @@ static lorawan_certification_requested_tx_type_t lorawan_certification_parser(
                 MIN( rx_buffer_length,
                      lorawan_api_next_max_payload_length_get( lorawan_certification->stack_id ) - *tx_buffer_length );
 
+            if( max_len == 0 )
+            {
+                SMTC_MODEM_HAL_TRACE_ERROR( "max_len is 0, tx_buffer already at capacity\n" );
+                break;
+            }
             // The first byte is the command ID
             max_len -= 1;
 
@@ -917,7 +928,7 @@ static lorawan_certification_requested_tx_type_t lorawan_certification_parser(
         {
             lorawan_certification->enabled = false;
             lorawan_api_modem_certification_set( false, lorawan_certification->stack_id );
-            smtc_modem_hal_reset_mcu( );
+            increment_asynchronous_msgnumber( SMTC_MODEM_EVENT_RESET_REQUEST, 0, lorawan_certification->stack_id );
         }
         else
         {
@@ -992,7 +1003,7 @@ static void lorawan_certification_build_beacon_rx_status_ind( lorawan_certificat
 
     uint8_t            beacon_sf;
     lr1mac_bandwidth_t beacon_bw;
-    lorawan_api_lora_dr_to_sf_bw( beacon_dr, &beacon_sf, &beacon_bw, lorawan_certification->stack_id );
+    lorawan_api_lora_rx_dr_to_sf_bw( beacon_dr, &beacon_sf, &beacon_bw, lorawan_certification->stack_id );
 
     uint32_t epoch_time   = smtc_decode_beacon_epoch_time( beacon_buffer, beacon_sf );
     uint8_t  beacon_param = smtc_decode_beacon_param( beacon_buffer, beacon_sf );

@@ -52,7 +52,7 @@
 #include "modem_supervisor_light.h"
 #include "modem_event_utilities.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_modem_geolocation_api.h"
 #include "radio_planner.h"
 #include "radio_planner_hook_id_defs.h"
@@ -98,7 +98,7 @@
 #ifndef WIFI_SCAN_DEEP_DBG_TRACE
 #define WIFI_SCAN_DEEP_DBG_TRACE MODEM_HAL_FEATURE_OFF
 #endif
-#if ( WIFI_SCAN_DEEP_DBG_TRACE )
+#if( WIFI_SCAN_DEEP_DBG_TRACE )
 #define WIFI_SCAN_TRACE_PRINTF_DEBUG( ... ) SMTC_MODEM_HAL_TRACE_PRINTF( __VA_ARGS__ )
 #define WIFI_SCAN_TRACE_ARRAY_DEBUG( ... ) SMTC_MODEM_HAL_TRACE_ARRAY( __VA_ARGS__ )
 #else
@@ -364,10 +364,10 @@ static uint8_t mw_wifi_scan_service_downlink_handler( lr1_stack_mac_down_data_t*
     return MODEM_DOWNLINK_UNCONSUMED;
 }
 
-#if ( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
+#if( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
 static void trace_print_scan_results( const wifi_scan_result_t* results )
 {
-#if ( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
+#if( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
     char        ap_addr[WIFI_AP_ADDRESS_SIZE * 3 + 1];
     char        country_code[LR11XX_WIFI_STR_COUNTRY_CODE_SIZE + 1];
     char        ssid[LR11XX_WIFI_RESULT_SSID_LENGTH + 1];
@@ -444,7 +444,7 @@ static void trace_print_scan_results( const wifi_scan_result_t* results )
 
 static void trace_print_event_data_scan_done( const smtc_modem_wifi_event_data_scan_done_t* data )
 {
-#if ( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
+#if( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
     if( data != NULL )
     {
         SMTC_MODEM_HAL_TRACE_PRINTF( "SCAN_DONE info:\n" );

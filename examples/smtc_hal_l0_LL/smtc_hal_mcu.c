@@ -72,7 +72,9 @@
  */
 
 // Low power is enabled (0 will disable it)
+#ifndef LOW_POWER_MODE
 #define LOW_POWER_MODE 1
+#endif
 
 // 1 to enable debug with probe (ie do not de init pins)
 #ifndef HW_DEBUG_PROBE

@@ -16,13 +16,15 @@ project(full_almanac_update LANGUAGES C ASM DESCRIPTION "${DESCRIPTION}")
 
 set(LBM_GEOLOCATION ON CACHE BOOL "")
 
+# LBM is used in this sample
+set(INCLUDE_LBM ON CACHE BOOL "")
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../../common.cmake)
 
 ################################################################################
 # Radio compatibility check
 
-if(NOT RAC_RADIO IN_LIST lr11xx_radios)
-    message(STATUS "Skipping full_almanac_update example (requires LR11XX radio, got ${RAC_RADIO})")
+if(NOT RAC_RADIO IN_LIST geoloc_radios)
+    message(STATUS "Skipping full_almanac_update example (requires a geolocation-capable radio lr1110/lr1120, got ${RAC_RADIO})")
     return()
 endif()
 

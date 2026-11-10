@@ -45,8 +45,8 @@
 #include "aes_fast.h"
 #include "cmac_fast.h"
 
-#include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal.h"
+#include "smtc_core_hal_trace.h"
 
 #include <string.h>  //for memset, memcpy
 

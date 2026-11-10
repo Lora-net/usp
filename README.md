@@ -1,14 +1,16 @@
 # Unified Software Platform (USP)
 
-> **USP RELEASE v1.2.1' - Stable Release**
+> **USP RELEASE v1.3.0 - Maintenance Release**
 >
 ## Overview
 
 USP provides an abstraction layer for scheduling and managing multiple radio access across available modulations (LoRa, FSK, LR-FHSS, FLRC) and protocols (LoRaWAN). The library enables applications to request radio access, configure transmissions/receptions, and schedule operations with priority management.
 
-Current Version is v1.2.1:
+Current Version is v1.3.0:
 - [Changelog](CHANGELOG.md)
 - [known limitations](doc/KNOWN_LIMITATIONS.md)
+- [Validation & Performances](doc/VALIDATION_AND_PERFORMANCES.md) (validation configuration, build options and SPI clock speeds)
+- [LoRa Plus&trade; Evaluation Kit](doc/LORA_PLUS_EVK.md) (LR2021 / LR2022 / LR2012 + XIAO nRF54L15)
 
 <table width="100%">
 <tr>
@@ -16,21 +18,13 @@ Current Version is v1.2.1:
 
 <h3>&#10024; What's new in this release</h3>
 
-<a href="doc/FLRP.md"><img alt="New feature: FLRP" src="doc/assets/badge_flrp.svg"></a>
-&nbsp;<b><a href="doc/FLRP.md">FLRP &mdash; Fast LoRa communication Protocol</a></b><br>
-Principles, API and examples for the high-speed LoRa&nbsp;+&nbsp;FLRC protocol.
-
-<br>
-
-<a href="doc/LORA_PLUS_EVK.md"><img alt="New hardware: LoRa Plus EVK" src="doc/assets/badge_evk.svg"></a>
-&nbsp;<b><a href="doc/LORA_PLUS_EVK.md">LoRa Plus&trade; Evaluation Kit</a></b><br>
-New EVK based on LR2021 / LR2022 / LR2012 (+ XIAO nRF54L15).
-
-<br>
-
-<a href="doc/VALIDATION_AND_PERFORMANCES.md"><img alt="Validation and Performances" src="doc/assets/badge_validation.svg"></a>
-&nbsp;<b><a href="doc/VALIDATION_AND_PERFORMANCES.md">Validation &amp; Performances</a></b><br>
-Validation configuration, build options and SPI clock speeds (memory footprint coming next).
+- <b>New modular architecture</b>: LBM & RAC decoupling, radio drivers, RAL & RALF in the new `smtc_radio_interface` submodule, HAL split in a core HAL (`smtc_core_hal.h`) and the LBM specific modem HAL: application includes may have to be updated, see the [Changelog](CHANGELOG.md)
+- <b>FLRP bugfixing</b>: see the [FLRP documentation](doc/FLRP.md) and the [flrp_api](examples/main_examples/flrp_api_example/README.md) applications
+- <b>LBM: USP is now the only official place for LoRa Basics Modem</b>: [SWL2001](https://github.com/Lora-net/SWL2001) is now in Maintenance Mode. To move an SWL2001 application to USP, see the <b>[SWL2001 to USP porting guide &rarr;](doc/usp_lbm_porting_guide.md)</b>
+- <b>LBM v4.9.3</b>: bugfixing & experimental LoRaWAN Regional Parameters RP2-1.0.4 & RP2-1.0.5, selected with the cmake symbol `-DRP_VERSION=RP2_104` or `-DRP_VERSION=RP2_105` (default: `RP2_103`) when building an LBM application such as [periodical_uplink](examples/main_examples/periodical_uplink_example/README.md), see [LBM Regional Parameters](protocols/lbm_lib/README.md#regional-parameters)
+- <b>LR20XX & LR11XX</b>: [LR20XX driver v2.1.0](smtc_rac_lib/smtc_radio_interface/radio_drivers/lr20xx_driver) and [LR11XX driver v3.0.0](smtc_rac_lib/smtc_radio_interface/radio_drivers/lr11xx_driver), LR11xx shields are now validated
+- <b>One Channel Hub for USP Linux & LR20XX / LR11XX / SX126X</b>: 1-channel LoRaWAN gateway + optional LBM end-device sharing a single radio, see the [One Channel Hub application](examples/main_examples/one_channel_hub_example/README.md)
+- <b>LINUX bugfixing</b>: SX126X & LR11XX Linux radio HAL, radio sleep management, low power timer, see the [Linux HAL documentation](examples/smtc_hal_linux/README.md)
 
 </td>
 </tr>
@@ -38,19 +32,22 @@ Validation configuration, build options and SPI clock speeds (memory footprint c
 
 ### Supported Software & Hardware
 
-The USP repository includes LoRa Basics Modem 4.9.0.
+The USP repository includes LoRa Basics Modem 4.9.3.
 
 The supported Semtech radios are:
-- Validated[<sup>1</sup>](#notes) on [LoRa Plus EVK(LoRa Plus Expansion Board + Wio-LR2021/Wio-LR2022/Wio-LR2012 radios)](https://www.semtech.com/products/wireless-rf/lora-plus/lr2021)[<sup>2</sup>](#notes)
-- buildable[<sup>1</sup>](#notes) on [LR11xx shield radios](https://www.semtech.com/products/wireless-rf/lora-connect/lr1121)
+- Validated[<sup>1</sup>](#notes) on [LoRa Plus EVK(LoRa Plus Expansion Board + Wio-LR2021/Wio-LR2022/Wio-LR2012 radios)](https://www.semtech.com/products/wireless-rf/lora-plus/lr2021)[<sup>2</sup>](#notes), see [LoRa Plus&trade; EVK](doc/LORA_PLUS_EVK.md)
+- Validated[<sup>1</sup>](#notes) on [LR11xx shield radios](https://www.semtech.com/products/wireless-rf/lora-connect/lr1121)
 - buildable[<sup>1</sup>](#notes) on [SX126x shield radios](https://www.semtech.com/products/wireless-rf/lora-connect/sx1262)
+- Experimental[<sup>1</sup>](#notes) on [SX127x](https://www.semtech.com/products/wireless-rf/lora-connect/sx1276) & [SX128x](https://www.semtech.com/products/wireless-rf/lora-connect/sx1280) shield radios: only LoRa Basics Modem was tested, the supported platforms being the same as SWL2001 (NUCLEO-STM32L476RG & NUCLEO-STM32L073RZ)
 
 The supported platforms are:
 - Validated[<sup>1</sup>](#notes) on STMicro NUCLEO-STM32L476RG
 - buildable[<sup>1</sup>](#notes) on Linux (x86/x86_64 native + ARM cross-compilation for Raspberry Pi, embedded Linux).
   - For documentation, see the "Build Examples on ARM Linux" in the following chapters below
   - if required, check also the [Linux Porting Documentation](examples/smtc_hal_linux/README.md) )
-  - Linux porting was only tested with **LR2021**. The radio_hal for other radios shall be implemented before use.
+  - One Channel Hub was validated on LR2021, LR11XX & SX126X.
+  - The other examples have not gone through the full Semtech validation process.
+  - There is no Linux radio HAL for SX127X & SX128X.
 - Experimental[<sup>1</sup>](#notes) on Renesas FPB-RA0E2 (R7FA0E209, see [FPB-RA0E2 Porting Documentation](examples/smtc_hal_ra0e2/README.md))
   - only tested with LoRa Plus EVK (LR2021)
   - only tested with porting_tests & periodical_uplink applications (CLASS A, US915 region)
@@ -69,14 +66,14 @@ The USP architecture, its main SW components (RAC, protocols, MCU/Radio HAL & BS
 | Component | Description | Documentation |
 |-----------|-------------|---------------|
 | **USP/RAC Library** | Radio Access Component (RAC) API for Semtech transceiver management, including also RAL & Semtech Radio Drivers | **[View Full API Documentation →](smtc_rac_lib/README.md)** |
-| **LoRa Basics Modem** | Integrated LoRaWAN stack (v4.9.0) | **[LBM User Guide →](protocols/lbm_lib/README.md)** |
+| **LoRa Basics Modem** | Integrated LoRaWAN stack (v4.9.3) | **[LBM User Guide →](protocols/lbm_lib/README.md)** &middot; **[SWL2001 to USP porting guide →](doc/usp_lbm_porting_guide.md)** |
 | **FLRP (Fast LoRa communication Protocol)** | High-speed LoRa + FLRC protocol (up to 2.6 Mbps) with LoRa WOR time/frequency synchronization | **[FLRP Documentation →](doc/FLRP.md)** &middot; **[flrp_api Example →](examples/main_examples/flrp_api_example/README.md)** |
-| **Semtech Radio Drivers** | Legacy Drivers for supported Semtech Radios | **[Semtech Radio Drivers](smtc_rac_lib/radio_drivers)**
+| **Semtech Radio Drivers** | Drivers for supported Semtech Radios (LR20XX, LR11XX, SX126X, SX127X, SX128X), provided with RAL & RALF by the `smtc_radio_interface` submodule | **[Semtech Radio Drivers](smtc_rac_lib/smtc_radio_interface/radio_drivers)** |
 | **Examples Core** | Sample applications demonstrating RAC API usage that can be compiled for baremetal | **[USP Samples Guide →](examples/main_examples)** |
 
 ### Key Features
 
-- **Priority-based scheduling** - Manage radio access with configurable priorities
+- **Priority-based scheduling** - Manage radio access with 5 priority levels (from `RAC_VERY_HIGH_PRIORITY` to `RAC_VERY_LOW_PRIORITY`, given to `smtc_rac_open_radio()`), see [USP Architecture](doc/USP_Architecture.md)
 - **Multi-modulation support** - LoRa, FSK, LR-FHSS, and FLRC modulations
 - **LoRa capabilities** - Full support for transmission, reception, and ranging
 - **Precise timing** - Schedule radio operations with accurate timing control
@@ -96,7 +93,7 @@ The USP software was tested with:
 
 ### Available Applications
 
-The Samples & documentation &re available here : **[USP Samples Guide →](examples/main_examples)**.<br>
+The Samples & documentation are available here : **[USP Samples Guide →](examples/main_examples)**.<br>
 
 #### FLRP (Fast LoRa communication Protocol)
 
@@ -126,6 +123,7 @@ The Samples & documentation &re available here : **[USP Samples Guide →](examp
 #### Modulation Examples
 
 - **`lrfhss_tx`**: LR-FHSS transmission example
+- **`fhss_example`**: LoRa intra-packet frequency hopping ping-pong example (LR20XX only)
 
 #### Certification & Testing
 
@@ -144,9 +142,10 @@ The Samples & documentation &re available here : **[USP Samples Guide →](examp
 - **`immediate_radio_access`**: Immediate radio access example (Use USP/RAC API to manage radio)
 - **`geolocation`**: Manage geolocation of LR1110 & LR1120 radio family
 - **`full_almanac_update`**: Manage almanac update of LR1110 & LR1120 radio family
-- **`wifi_region_detect`**: Manage wifi region detection for LR1110 & LR1120 radio family
+- **`wifi_region_detection`**: Manage wifi region detection for LR1110 & LR1120 radio family
 - **`hw_modem`**: Drive USP based MCU through UART (only LBM is currently stable)
 - **`cad`**: Channel Activity Detection example
+- **`one_channel_hub`**: 1-channel LoRaWAN hub: gateway + client sharing one radio (Linux only)
 
 
 ### Build Basics
@@ -196,23 +195,23 @@ cmake --build build --target periodical_uplink
 
 #### Available Examples
 
-When pointing to `examples/main_examples`, the cmake configuration will display available examples:
+When pointing to `examples/main_examples`, the cmake configuration will display available examples (the list depends on the selected `BOARD` & `RAC_RADIO`):
 
 ```
 -- Available examples:
 --   - flrp_api_initiator     : FLRP API (initiator)
 --   - flrp_api_slave         : FLRP API (slave)
---   - flrc_burst_tx          : FLRC burst data transfer (transmitter)
---   - flrc_burst_rx          : FLRC burst data transfer (receiver)
 --   - full_almanac_update    : Full almanac update (LR11XX only)
 --   - geolocation            : Geolocation example (LR11XX only)
 --   - cad                    : Channel Activity Detection (LR20XX only)
 --   - direct_driver_access   : Direct radio driver access (LR20XX only)
+--   - fhss_example           : LR20xx LoRa intra-packet frequency hopping ping-pong example
 --   - immediate_radio_access : Immediate radio access (LR20XX only)
 --   - hw_modem               : Hardware modem with serial interface
 --   - lctt_certif            : LCTT LoRaWAN certification example
 --   - lrfhss_tx              : LR-FHSS transmission example
 --   - multiprotocol          : Multiprotocol (LoRaWAN + ranging) example
+--   - one_channel_hub        : 1-channel LoRaWAN hub: gateway + client sharing one radio (Linux only)
 --   - per_tx                 : Packet error rate - LoRa (transmitter)
 --   - per_rx                 : Packet error rate - LoRa (receiver)
 --   - per_flrc_tx            : Packet error rate - FLRC (transmitter)
@@ -236,8 +235,10 @@ When pointing to `examples/main_examples`, the cmake configuration will display 
 #### Radio-Specific Examples
 
 Some examples have radio-specific requirements:
-- **geolocation**: Only available for LR11XX radios (lr1110, lr1120, lr1121). Automatically skipped for other radios.
-- **hw_modem**: Supports all radios. Geolocation features are automatically enabled only for LR11XX radios.
+- **geolocation**: Only available for LR1110 & LR1120 radios (not LR1121). Automatically skipped for other radios.
+- **hw_modem**: Supports all radios. Geolocation features are automatically enabled only for LR1110 & LR1120 radios.
+- **fhss_example**: Only available for LR20XX radios. Automatically skipped for other radios.
+- **one_channel_hub**: Only available on Linux (`LINUX`, `LINUX_ARM`, `LINUX_ARM64`) with LR20XX, LR11XX or SX126X radios. Automatically skipped otherwise.
 
 Example building geolocation for lr1120:
 
@@ -308,6 +309,7 @@ CCACHE_PROGRAM:FILEPATH=/usr/bin/ccache
 CMAKE_BUILD_TYPE:STRING=MinSizeRel
 CMAKE_INSTALL_PREFIX:PATH=/usr/local
 CMAKE_TOOLCHAIN_FILE:FILEPATH=xxx/examples/smtc_hal_l4/cmake_stm32l4_toolchain.cmake
+HAL_DBG_TRACE:BOOL=ON
 INFINITE_PREAMBLE:BOOL=OFF
 LBM_ALC_SYNC:BOOL=ON
 LBM_ALC_SYNC_VERSION:STRING=1
@@ -342,6 +344,7 @@ LBM_STORE_AND_FORWARD:BOOL=ON
 LBM_STREAM:BOOL=ON
 LBM_TEST_BYPASS_JOIN_DUTY_CYCLE:BOOL=OFF
 LEGACY_EVK_LR20XX:BOOL=OFF
+MODEM_HAL_DBG_TRACE:BOOL=ON
 NOTIFICATION_MODE:STRING=NOTIFICATIONS_OFF
 RAC_CORE_LOG_API_ENABLE:BOOL=OFF
 RAC_CORE_LOG_CONFIG_ENABLE:BOOL=ON
@@ -354,20 +357,50 @@ RAC_FSK_LOG_ENABLE:BOOL=OFF
 RAC_LIB_LOG_PROFILE:STRING=DEFAULT
 RAC_LOG_ENABLE:BOOL=ON
 RAC_LOG_PROFILE:STRING=DEFAULT
-RAC_LORA_LOG_CONFIG_ENABLE:BOOL=ON
-RAC_LORA_LOG_DEBUG_ENABLE:BOOL=OFF
 RAC_LORA_LOG_ENABLE:BOOL=OFF
-RAC_LORA_LOG_ERROR_ENABLE:BOOL=ON
-RAC_LORA_LOG_INFO_ENABLE:BOOL=OFF
-RAC_LORA_LOG_RX_ENABLE:BOOL=ON
-RAC_LORA_LOG_TX_ENABLE:BOOL=ON
-RAC_LORA_LOG_WARN_ENABLE:BOOL=OFF
 RAC_LRFHSS_LOG_ENABLE:BOOL=OFF
 RAC_RADIO:STRING=lr2021
 RP_MARGIN_DELAY:STRING=8
 RP_VERSION:STRING=RP2_103
+SMTC_RADIO_PLANNER_TRACE:BOOL=ON
+SMTC_RADIO_PLANNER_TRACE_DBG:BOOL=OFF
 TYPE_OF_CAD:STRING=CAD_ONLY
 ```
+
+#### Disabling traces
+
+Traces are enabled by default. To remove them from the build (smaller flash footprint), use the following cmake symbols:
+
+| cmake symbol | Default | Scope |
+|---|---|---|
+| `MODEM_HAL_DBG_TRACE` | `ON` | Global switch: when `OFF`, defines `MODEM_HAL_DBG_TRACE=0` for every target linking `smtc_core_hal_interface` (radio planner, RAC, modem HAL, radio HAL, ...) |
+| `LBM_MODEM_TRACE` | `ON` | LoRa Basics Modem traces. Must be set to `OFF` in addition to `MODEM_HAL_DBG_TRACE=OFF`, otherwise LBM keeps its traces |
+| `LBM_MODEM_TRACE_DEEP` | `OFF` | LoRa Basics Modem deep traces (only when `LBM_MODEM_TRACE=ON`) |
+| `SMTC_RADIO_PLANNER_TRACE` | `ON` | Radio planner traces only (useful to remove them while keeping the other traces) |
+| `SMTC_RADIO_PLANNER_TRACE_DBG` | `OFF` | Radio planner deep (debug) traces (only when `SMTC_RADIO_PLANNER_TRACE=ON`) |
+| `RAC_LOG_ENABLE` | `ON` | RAC core logs only (`RAC_CORE_LOG_*`, level selected with `RAC_LOG_PROFILE`, see [USP Samples Guide](examples/main_examples/README.md)) |
+| `HAL_DBG_TRACE` | `ON` | MCU HAL traces (`SMTC_HAL_TRACE_*`) for the l0, l4 and ra0e2 HALs |
+
+`SMTC_RADIO_PLANNER_TRACE` & `RAC_LOG_ENABLE` are only useful to remove the radio planner or RAC traces while keeping the other ones: with `MODEM_HAL_DBG_TRACE=OFF`, they are already removed.
+
+Example, building without any trace:
+
+```bash
+rm -Rf build/
+cmake -S examples/main_examples/periodical_uplink_example -B build \
+    -DCMAKE_BUILD_TYPE=MinSizeRel \
+    -DBOARD=NUCLEO_L476 \
+    -DRAC_RADIO=lr2021 \
+    -DMODEM_HAL_DBG_TRACE=OFF \
+    -DLBM_MODEM_TRACE=OFF \
+    -DHAL_DBG_TRACE=OFF \
+    -G Ninja
+cmake --build build
+```
+
+Note: messages given to `SMTC_MODEM_HAL_PANIC` are not traces and are kept, as they are stored in the crash log.
+
+For a build with a minimal memory footprint (traces and unused LBM features removed), see the [SWL2001 to USP porting guide](doc/usp_lbm_porting_guide.md#memory-footprint).
 
 ### Build Examples on NUCLEO-STM32L476RG
 
@@ -384,8 +417,8 @@ cmake --build build
 
 Options
 
-- **`RAC_RADIO`**: Target radio (`sx1261`, `sx1262`, `sx1268`, `lr1110`, `lr1120`, `lr1121`, `lr2021`, `udp_pf`)
-- **`BOARD`**: Target platform: `NUCLEO_L476`, `NUCLEO_L073`, `FPB_RA0E2`, `LINUX`, or `LINUX_ARM`
+- **`RAC_RADIO`**: Target radio (`sx1261`, `sx1262`, `sx1268`, `sx1272`, `sx1276`, `sx1280`, `sx1281`, `lr1110`, `lr1120`, `lr1121`, `lr2012`, `lr2021`, `lr2022`, `udp_pf`)
+- **`BOARD`**: Target platform: `NUCLEO_L476`, `NUCLEO_L073`, `FPB_RA0E2`, `LINUX`, `LINUX_ARM` or `LINUX_ARM64`
 - Other options are related to examples
 
 Example of `openocd`command to flash:

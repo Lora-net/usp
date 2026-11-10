@@ -39,7 +39,7 @@
 
 #include <string.h>
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 #include "lr11xx_wifi.h"
 #include "lr11xx_system.h"

@@ -119,6 +119,8 @@ typedef struct smtc_ping_slot_s
     lr1mac_rx_session_param_t* rx_session_param[LR1MAC_NUMBER_OF_CLASS_B_SESSION];  // Array of pointer to address
                                                                                     // Unicast and Multicast session
 
+    uint32_t beacon_timestamp;   // start of the beacon of the current beacon period
+    uint32_t beacon_epoch_time;  // gps epoch time of the beacon of the current beacon period
     uint32_t next_beacon_timestamp;
     uint32_t beacon_reserved_ms;
     uint32_t beacon_guard_ms;

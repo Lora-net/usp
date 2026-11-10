@@ -168,7 +168,15 @@ status_lorawan_t region_au_915_is_acceptable_tx_dr( smtc_real_t* real, uint8_t d
  * @param datarate
  * @return modulation_type_t
  */
-modulation_type_t region_au_915_get_modulation_type_from_datarate( uint8_t datarate );
+modulation_type_t region_au_915_get_modulation_type_from_tx_datarate( uint8_t datarate );
+
+/**
+ * @brief Get the corresponding RF modulation from a Datarate
+ *
+ * @param datarate
+ * @return modulation_type_t
+ */
+modulation_type_t region_au_915_get_modulation_type_from_rx_datarate( uint8_t datarate );
 
 /**
  * @brief Convert LoRaWAN Datarate to LoRa SF and BW
@@ -177,7 +185,16 @@ modulation_type_t region_au_915_get_modulation_type_from_datarate( uint8_t datar
  * @param out_sf
  * @param out_bw
  */
-void region_au_915_lora_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw );
+void region_au_915_lora_tx_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw );
+
+/**
+ * @brief Convert LoRaWAN Datarate to LoRa SF and BW
+ *
+ * @param in_dr
+ * @param out_sf
+ * @param out_bw
+ */
+void region_au_915_lora_rx_dr_to_sf_bw( uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw );
 
 /**
  * @brief Convert LoRaWAN Datarate to LR-FHSS CR and BW
@@ -194,7 +211,16 @@ void region_au_915_lr_fhss_dr_to_cr_bw( uint8_t in_dr, lr_fhss_v1_cr_t* out_cr, 
  * \param [IN]  none
  * \param [OUT] return
  */
-uint32_t region_au_915_get_tx_frequency_channel( smtc_real_t* real, uint8_t index );
+uint32_t region_au_915_get_tx_frequency_channel_fix( smtc_real_t* real, uint8_t index );
+
+/**
+ * \brief
+ * \remark
+ * \param [IN]  none
+ * \param [OUT] return
+ */
+uint32_t region_au_915_get_default_rx1_frequency_channel( smtc_real_t* real, uint8_t index );
+
 /**
  * \brief
  * \remark

@@ -43,7 +43,7 @@
 
 #include "flrp_configuration.h"
 #include "smtc_flrp_utils.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_rac.h"
 #include "smtc_rac_api.h"
 #include "smtc_flrp_mac_layer.h"
@@ -109,7 +109,7 @@ static uint16_t get_packet_payload_size( ral_flrc_cr_t cr );
 
 static uint32_t get_burst_timeout( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer );
 
-static smtc_flrp_mac_layer_status_t smtc_flrp_mac_set_common_config( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer,
+static smtc_flrp_mac_layer_status_t smtc_flrp_mac_set_common_config( smtc_flrp_mac_layer_t*        smtc_flrp_mac_layer,
                                                                      const smtc_flrp_mac_config_t* mac_config );
 
 static bool is_burst_transmission_possible_before_timeout( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer,
@@ -374,7 +374,7 @@ void smtc_flrp_mac_layer_process( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer )
 
 smtc_flrp_mac_layer_status_t smtc_flrp_mac_layer_start_tx_transaction( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer,
                                                                        uint32_t start_time, uint8_t* data_buffer,
-                                                                       uint32_t               buffer_size,
+                                                                       uint32_t                      buffer_size,
                                                                        const smtc_flrp_mac_config_t* mac_config )
 {
     if( smtc_flrp_mac_layer->state != SMTC_FLRP_MAC_LAYER_STATE_IDLE )
@@ -390,6 +390,9 @@ smtc_flrp_mac_layer_status_t smtc_flrp_mac_layer_start_tx_transaction( smtc_flrp
     smtc_flrp_mac_layer->trx_type                  = SMTC_FLRP_MAC_TX;
     smtc_flrp_mac_layer->payload                   = data_buffer;
     smtc_flrp_mac_layer->burst_info.payload_length = buffer_size;
+    smtc_flrp_mac_layer->timestamp_start_mac_ms    = start_time;
+
+    memset( &smtc_flrp_mac_layer->tx_stats, 0, sizeof( smtc_flrp_burst_tx_stats_t ) );
 
     smtc_flrp_mac_layer_status_t status = smtc_flrp_mac_set_common_config( smtc_flrp_mac_layer, mac_config );
     if( status != SMTC_FLRP_MAC_LAYER_STATUS_OK )
@@ -420,7 +423,7 @@ smtc_flrp_mac_layer_status_t smtc_flrp_mac_layer_start_tx_transaction( smtc_flrp
 
 smtc_flrp_mac_layer_status_t smtc_flrp_mac_layer_start_rx_transaction( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer,
                                                                        uint32_t start_time, uint8_t* data_buffer,
-                                                                       uint32_t               buffer_size,
+                                                                       uint32_t                      buffer_size,
                                                                        const smtc_flrp_mac_config_t* mac_config )
 {
     if( smtc_flrp_mac_layer->state != SMTC_FLRP_MAC_LAYER_STATE_IDLE )
@@ -464,6 +467,7 @@ smtc_flrp_mac_layer_status_t smtc_flrp_mac_layer_start_rx_transaction( smtc_flrp
         phase |= ( bit_mask_t ) SMTC_FLRP_EXCHANGE_ADAPTIVE_LINK_ACTIVE;
     }
     smtc_flrp_mac_layer->payload_stats.exchange_phase_success_mask = phase;
+    smtc_flrp_mac_layer->timestamp_start_mac_ms                    = start_time;
 
     if( smtc_flrp_mac_layer->adaptive_link_config.mode == SMTC_FLRP_LINK_ADAPTATION_DISABLED )
     {
@@ -642,7 +646,7 @@ static bool is_burst_transmission_possible_before_timeout( smtc_flrp_mac_layer_t
            smtc_flrp_mac_layer->burst_transmission_timeout;
 }
 
-static smtc_flrp_mac_layer_status_t smtc_flrp_mac_set_common_config( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer,
+static smtc_flrp_mac_layer_status_t smtc_flrp_mac_set_common_config( smtc_flrp_mac_layer_t*        smtc_flrp_mac_layer,
                                                                      const smtc_flrp_mac_config_t* mac_config )
 {
     smtc_flrp_mac_layer_status_t status = SMTC_FLRP_MAC_LAYER_STATUS_OK;
@@ -969,7 +973,7 @@ static void smtc_flrp_mac_set_channels_to_test_in_adaptive_link_phase( smtc_flrp
 
 static uint32_t smtc_flrp_mac_channel_get_frequency( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer, uint8_t channel_idx )
 {
-    if( channel_idx > smtc_flrp_mac_layer->mac_radio_config.nb_frequencies )
+    if( channel_idx >= smtc_flrp_mac_layer->mac_radio_config.nb_frequencies )
     {
         SMTC_MODEM_HAL_TRACE_ERROR( "Mac channel requested %u is invalid \n", channel_idx );
         return smtc_flrp_mac_layer->mac_radio_config.frequencies_hz[0];
@@ -1077,8 +1081,9 @@ static void smtc_flrp_mac_layer_prepare_tx_burst_ack( smtc_flrp_mac_layer_t* smt
         smtc_flrp_mac_layer->burst_retry_needed = true;
         if( burst_ack.link_adaptation_req )
         {
-            burst_ack.recommended_channel = smtc_flrp_mac_get_freq_channel( 
-                (const smtc_flrp_mac_radio_config_t*) &(smtc_flrp_mac_layer->mac_radio_config), smtc_flrp_mac_layer->burst_info.frequency_hz );
+            burst_ack.recommended_channel = smtc_flrp_mac_get_freq_channel(
+                ( const smtc_flrp_mac_radio_config_t* ) &( smtc_flrp_mac_layer->mac_radio_config ),
+                smtc_flrp_mac_layer->burst_info.frequency_hz );
             if( burst_ack.recommended_channel == MAC_INVALID_CHANNEL )
             {
                 SMTC_MODEM_HAL_TRACE_ERROR( "FLRC Rx MAC Layer: Current frequency is invalid\n" );
@@ -1386,6 +1391,25 @@ static void go_to_burst_state_if_remaining_burst( smtc_flrp_mac_layer_t* smtc_fl
     }
     else
     {
+        uint32_t duration_ms = smtc_flrp_mac_layer->transaction->smtc_rac_data_result.radio_end_timestamp_ms -
+                               smtc_flrp_mac_layer->timestamp_start_mac_ms;
+
+        if( duration_ms > 0 )
+        {
+            if( smtc_flrp_mac_layer->trx_type == SMTC_FLRP_MAC_TX )
+            {
+                smtc_flrp_mac_layer->tx_stats.payload_bit_rate_bps =
+                    ( uint32_t ) ( ( ( uint64_t ) smtc_flrp_mac_layer->burst_info.payload_length * 8U * 1000U ) /
+                                   duration_ms );
+            }
+            else
+            {
+                smtc_flrp_mac_layer->payload_stats.payload_bit_rate_bps =
+                    ( uint32_t ) ( ( ( uint64_t ) smtc_flrp_mac_layer->burst_info.payload_length * 8U * 1000U ) /
+                                   duration_ms );
+            }
+        }
+
         add_bit_to_rx_mask( smtc_flrp_mac_layer, SMTC_FLRP_EXCHANGE_LAST_BURST_SUCCESS );
         if( smtc_flrp_mac_layer->burst_ack_enabled )
         {
@@ -1598,6 +1622,9 @@ static smtc_flrp_mac_layer_status_t enter_state_burst_rx( smtc_flrp_mac_layer_t*
     uint8_t number_of_packets_in_burst            = get_nb_packets_in_burst( smtc_flrp_mac_layer );
     smtc_flrp_mac_layer->timestamp_start_burst_ms = start_timestamp_ms;
 
+    smtc_flrp_mac_layer->payload_stats.frequency_hz        = smtc_flrp_mac_layer->burst_info.frequency_hz;
+    smtc_flrp_mac_layer->payload_stats.frequency_offset_hz = smtc_flrp_mac_layer->frequency_offset_hz;
+
     missed_packets_bitfield_reset( smtc_flrp_mac_layer, number_of_packets_in_burst );
 
     smtc_flrp_mac_layer_prepare_rx_data_packet(
@@ -1622,6 +1649,9 @@ static smtc_flrp_mac_layer_status_t enter_state_burst_tx( smtc_flrp_mac_layer_t*
 
     reset_tx_burst_param( smtc_flrp_mac_layer );
     missed_packets_bitfield_reset( smtc_flrp_mac_layer, nb_packets_in_burst );
+
+    smtc_flrp_mac_layer->tx_stats.frequency_hz        = smtc_flrp_mac_layer->burst_info.frequency_hz;
+    smtc_flrp_mac_layer->tx_stats.frequency_offset_hz = smtc_flrp_mac_layer->frequency_offset_hz;
 
     smtc_flrp_mac_layer_prepare_tx_data_packet( smtc_flrp_mac_layer, smtc_flrp_mac_layer->payload,
                                                 smtc_flrp_mac_layer->burst_info.payload_length, nb_packets_in_burst );
@@ -1705,8 +1735,6 @@ static smtc_flrp_mac_layer_status_t enter_state_burst_ack_tx( smtc_flrp_mac_laye
 static void go_to_state_idle_and_return_status( smtc_flrp_mac_layer_t*       smtc_flrp_mac_layer,
                                                 smtc_flrp_mac_layer_status_t mac_status, uint32_t data_size )
 {
-    go_to_mac_state( smtc_flrp_mac_layer, SMTC_FLRP_MAC_LAYER_STATE_IDLE );
-
     if( smtc_flrp_mac_layer->trx_type == SMTC_FLRP_MAC_TX )
     {
         if( smtc_flrp_mac_layer->mac_tx_done_cb != NULL )
@@ -1723,6 +1751,8 @@ static void go_to_state_idle_and_return_status( smtc_flrp_mac_layer_t*       smt
                                                  smtc_flrp_mac_layer->destination_dev_eui );
         }
     }
+
+    go_to_mac_state( smtc_flrp_mac_layer, SMTC_FLRP_MAC_LAYER_STATE_IDLE );
 }
 
 static void enter_state_idle( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer )
@@ -1814,6 +1844,20 @@ static void post_tx_transaction_callback( rp_status_t status )
     case RP_STATUS_RADIO_UNLOCKED:
         if( smtc_flrp_mac_layer->state == SMTC_FLRP_MAC_LAYER_STATE_BURST )
         {
+            // Compute data bit rate only for the first burst
+            if( smtc_flrp_mac_layer->burst_number == 0 )
+            {
+                uint32_t duration_ms = smtc_flrp_mac_layer->transaction->smtc_rac_data_result.radio_end_timestamp_ms -
+                                       smtc_flrp_mac_layer->transaction->smtc_rac_data_result.radio_start_timestamp_ms;
+
+                if( duration_ms > 0 )
+                {
+                    smtc_flrp_mac_layer->tx_stats.burst_bit_rate_bps =
+                        ( smtc_flrp_mac_layer->transaction->radio_params.flrc_burst.burst_tx_size * 8U * 1000U ) /
+                        duration_ms;
+                }
+            }
+
             smtc_flrp_mac_layer->radio_event = SMTC_FLRP_MAC_RADIO_EVENT_TRX_OK;
         }
         break;
@@ -1998,14 +2042,30 @@ static void post_rx_transaction_callback( rp_status_t status )
             }
 #endif
             smtc_flrp_mac_layer->radio_event = SMTC_FLRP_MAC_RADIO_EVENT_TRX_OK;
+
+            uint32_t duration_ms = smtc_flrp_mac_layer->transaction->smtc_rac_data_result.radio_end_timestamp_ms -
+                                   smtc_flrp_mac_layer->transaction->smtc_rac_data_result.radio_start_timestamp_ms;
+
+            if( duration_ms > 0 )
+            {
+                smtc_flrp_mac_layer->payload_stats.burst_bit_rate_bps =
+                    ( smtc_flrp_mac_layer->nb_bytes_received * 8U * 1000U ) / duration_ms;
+            }
         }
         break;
     case RP_STATUS_RX_TIMEOUT:
     case RP_STATUS_RX_CRC_ERROR:
     {
-        smtc_flrp_mac_layer->radio_end_timestamp_ms =
-            smtc_flrp_mac_layer->transaction->smtc_rac_data_result.radio_start_timestamp_ms +
-            SMTC_FLRP_TX_DELAY_MARGIN_MS + smtc_flrp_mac_layer->transaction->scheduler_config.duration_time_ms;
+        // For FLRC REQ and ACK, the expected end timestamp (in case of success) is computed to stay synchronized with
+        // the other device. For an ACK, the device is on RX until timeout. In this case the end timestamp if the real
+        // timestamp of the error (timeout or CRC). For a burst, only the status UNLOCK ends the burst.
+        if( ( smtc_flrp_mac_layer->state == SMTC_FLRP_MAC_LAYER_STATE_FLRC_REQ ) ||
+            ( smtc_flrp_mac_layer->state == SMTC_FLRP_MAC_LAYER_STATE_FLRC_ACK ) )
+        {
+            smtc_flrp_mac_layer->radio_end_timestamp_ms =
+                smtc_flrp_mac_layer->transaction->smtc_rac_data_result.radio_start_timestamp_ms +
+                SMTC_FLRP_TX_DELAY_MARGIN_MS + smtc_flrp_mac_layer->transaction->scheduler_config.duration_time_ms;
+        }
 
         if( smtc_flrp_mac_layer->state == SMTC_FLRP_MAC_LAYER_STATE_BURST )
         {

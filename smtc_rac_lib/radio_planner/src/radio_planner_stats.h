@@ -50,7 +50,7 @@ extern "C" {
 #include "radio_planner_types.h"
 
 #if defined( RP_STAT_PRINT_ENBALE )
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #endif  // RP_STAT_PRINT_ENBALE
 
 /*
@@ -214,37 +214,37 @@ static inline void rp_stats_sniff_update( rp_stats_t* rp_stats, uint32_t timesta
  */
 static inline void rp_stats_print( rp_stats_t* rp_stats )
 {
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "###### ===================================== ######\n" );
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "###### ===== Radio Planner Statistics ====== ######\n" );
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "###### ===================================== ######\n" );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "###### ===================================== ######\n" );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "###### ===== Radio Planner Statistics ====== ######\n" );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "###### ===================================== ######\n" );
     for( int32_t i = 0; i < RP_NB_HOOKS; i++ )
     {
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Tx consumption hook #%ld = %lu ms\n", i, rp_stats->tx_consumption_ms[i] );
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Tx consumption hook #%ld = %lu ua\n", i, rp_stats->tx_consumption_ma[i] );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "Tx consumption hook #%ld = %lu ms\n", i, rp_stats->tx_consumption_ms[i] );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "Tx consumption hook #%ld = %lu ua\n", i, rp_stats->tx_consumption_ma[i] );
     }
     for( int32_t i = 0; i < RP_NB_HOOKS; i++ )
     {
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Rx consumption hook #%ld = %lu ms\n", i, rp_stats->rx_consumption_ms[i] );
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Rx consumption hook #%ld = %lu ua\n", i, rp_stats->rx_consumption_ma[i] );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "Rx consumption hook #%ld = %lu ms\n", i, rp_stats->rx_consumption_ms[i] );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "Rx consumption hook #%ld = %lu ua\n", i, rp_stats->rx_consumption_ma[i] );
     }
     for( int32_t i = 0; i < RP_NB_HOOKS; i++ )
     {
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( "None consumption hook #%ld = %lu ms\n", i, rp_stats->none_consumption_ms[i] );
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( "None consumption hook #%ld = %lu ua\n", i, rp_stats->none_consumption_ma[i] );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "None consumption hook #%ld = %lu ms\n", i, rp_stats->none_consumption_ms[i] );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "None consumption hook #%ld = %lu ua\n", i, rp_stats->none_consumption_ma[i] );
     }
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Tx total consumption     = %lu ms\n", rp_stats->tx_total_consumption_ms );
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Tx total consumption     = %lu uA\n", rp_stats->tx_total_consumption_ma );
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Rx total consumption     = %lu ms\n", rp_stats->rx_total_consumption_ms );
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Rx total consumption     = %lu uA\n", rp_stats->rx_total_consumption_ma );
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "None total consumption   = %lu ms\n", rp_stats->none_total_consumption_ms );
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "None total consumption   = %lu uA\n", rp_stats->none_total_consumption_ma );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "Tx total consumption     = %lu ms\n", rp_stats->tx_total_consumption_ms );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "Tx total consumption     = %lu uA\n", rp_stats->tx_total_consumption_ma );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "Rx total consumption     = %lu ms\n", rp_stats->rx_total_consumption_ms );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "Rx total consumption     = %lu uA\n", rp_stats->rx_total_consumption_ma );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "None total consumption   = %lu ms\n", rp_stats->none_total_consumption_ms );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "None total consumption   = %lu uA\n", rp_stats->none_total_consumption_ma );
 
     for( int32_t i = 0; i < RP_NB_HOOKS; i++ )
     {
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( "Number of aborted tasks for hook #%ld = %lu \n", i,
-                                        rp_stats->task_hook_aborted_nb[i] );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "Number of aborted tasks for hook #%ld = %lu \n", i,
+                                    rp_stats->task_hook_aborted_nb[i] );
     }
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "RP: number of errors is %lu\n\n\n", rp_stats->rp_error );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "RP: number of errors is %lu\n\n\n", rp_stats->rp_error );
 }
 #endif  // RP_STAT_PRINT_ENBALE
 

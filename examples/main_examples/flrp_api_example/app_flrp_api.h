@@ -148,8 +148,8 @@ bool flrp_api_initiate_tx( uint8_t* target_device_eui );
 bool flrp_api_initiate_rx( uint8_t* target_device_eui );
 void user_rx_callback( const void* context, smtc_flrp_return_code_t status, uint32_t payload_size, uint8_t* src_addr,
                        smtc_flrp_rx_stats_t flrp_stats );
-void user_tx_callback( const void* context, smtc_flrp_return_code_t err_code, bool send_successful,
-                       uint8_t* dest_addr );
+void user_tx_callback( const void* context, smtc_flrp_return_code_t err_code, bool send_successful, uint8_t* dest_addr,
+                       smtc_flrp_tx_stats_t flrp_stats );
 void flrp_api_setup_tx_buffer( void );
 
 #endif  // APP_FLRP_API_H

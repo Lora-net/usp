@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v4.9.3] 2026-11-03
+
+### Changed
+
+* The HAL is split in two: LBM specific functions remain in `smtc_modem_hal.h`, generic functions moved to `smtc_core_hal` (`lbm/smtc_core_hal_interface`)
+  * moved: `smtc_modem_hal_context_restore()`, `smtc_modem_hal_context_store()`, `smtc_modem_hal_context_flash_pages_erase()`, `smtc_modem_hal_get_board_delay_ms()` and the `UNUSED()` macro
+  * `smtc_modem_hal_dbg_trace.h` renamed `smtc_core_hal_trace.h`
+* Trace and compilation logs can be disabled with a dedicated option
+
 ## [v4.9.0] 2025-07-XX
 
 ### Added

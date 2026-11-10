@@ -70,9 +70,20 @@ extern "C" {
  */
 
 /**
+ * @brief Set the radio planner and ralf pointers that are used by LBM modem
+ * @remark This function shall only be called if Radio Planner and radio are handled above LBM, and not directly by it
+ * (e.g when using Semtech RAC).
+ * @remark Both input parameters must have been defined beforehand.
+ *
+ * @param [in] external_rp_p radio_planner_t* pointer to the radio_planner instance to pass to LBM
+ * @param [in] external_ralf_p ralf_t* pointer to the ralf instance to pass to LBM
+ */
+void smtc_modem_set_rp_ralf_contextes( void* external_rp_p, void* external_ralf_p );
+
+/**
  * @brief Init the soft modem and set the modem event chosen callback
  * @remark The callback will be called each time an modem event is raised internally
- * @remark This function shall be called after radio_planner initialisation (smtc_rac_init())
+ * @remark This function shall be called AFTER radio_planner is initialized (if)
  *
  * @param [in] event_callback User event callback prototype
  */
@@ -121,8 +132,8 @@ const void* smtc_modem_get_radio_context( void );
 /**
  * @brief Check if the radio is used by the radio planner
  * @returns true if the radio isn't used by the radio planner, false otherwise
-*/
-bool smtc_modem_radio_is_free(void);
+ */
+bool smtc_modem_radio_is_free( void );
 #ifdef __cplusplus
 }
 #endif

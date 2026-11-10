@@ -104,7 +104,7 @@ extern "C" {
 #define RADIO_SPI_MISO PA_6
 #define RADIO_SPI_SCLK PA_5
 
-#if defined( SX1272 ) || defined( SX1276 )
+#if defined( SX127X )
 #define RADIO_NSS PB_6
 #define RADIO_DIO_0 PA_10
 #define RADIO_DIO_1 PB_3

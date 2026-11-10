@@ -57,7 +57,15 @@ add_library(smtc_hal STATIC
 
 target_include_directories(smtc_hal PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_CURRENT_LIST_DIR}/..
+    ${CMAKE_CURRENT_LIST_DIR}/.. # For smtc_hal and its consumers to access modem_pinout.h (in parent folder)
 )
 
 target_link_libraries(smtc_hal PRIVATE st_hal)
+
+# Optional: Disable HAL debug trace
+# Disable with -DHAL_DBG_TRACE=OFF
+option(HAL_DBG_TRACE "Enable HAL debug trace output" ON)
+if(NOT HAL_DBG_TRACE)
+    target_compile_definitions(smtc_hal PUBLIC HAL_DBG_TRACE=0)
+    message(STATUS "HAL_DBG_TRACE: OFF")
+endif()

@@ -44,8 +44,8 @@
 #include "radio_planner.h"
 #include "ral.h"
 #include "ralf.h"
-#include "smtc_modem_hal_dbg_trace.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal_trace.h"
+#include "smtc_core_hal.h"
 #include "smtc_rac_api.h"
 #include "smtc_rac_lbt.h"
 #include "smtc_rac_local_func.h"
@@ -104,6 +104,7 @@
 #elif defined( LR20XX )
 #include "ralf_lr20xx.h"
 #include "lr20xx_regmem.h"
+#include "lr20xx_workarounds.h"
 #endif
 
 /*
@@ -112,15 +113,6 @@
  */
 #define RALF_RADIO_POINTER smtc_rac_get_rp( )->radio
 #define RAL_RADIO_POINTER &( smtc_rac_get_rp( )->radio->ral )
-
-#if defined( LR20XX )
-/* ShapeCfg = "Generic TX Modulator" (Genmod), base 0xF30900 + offset 0x04.
- * See dig_top_rif_1_1.html / LR20xx datasheet. */
-#define LR20XX_GENMOD_SHAPECFG_REG_ADDR ( 0x00F30904UL )
-/* DblRate = bit 8: interpolate by 16 instead of 8.
- * Datasheet: "Can only be enabled for symbol rate inferior or equal to 2Mb/s". */
-#define LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK ( 1UL << 8 )
-#endif
 
 /*
  * -----------------------------------------------------------------------------
@@ -322,17 +314,13 @@ static void smtc_rac_flrc_tx_callback( void* rp_void )
 
 #if defined( LR20XX )
     /* DblRate only applies to FLRC and for a bit rate <= 2 Mb/s (i.e. everything except 2.08 / 2.6 Mbps).
-     * Written AFTER ralf_setup_flrc, because SetFlrcModulationParams rewrites ShapeCfg.
-     * Masked read-modify-write: only bit 8 is touched, the rest of ShapeCfg is preserved.
+     * Written AFTER ralf_setup_flrc, because SetFlrcModulationParams rewrites DblRate.
      * Explicitly write 0 when the bit rate is >= 2 Mb/s to stay deterministic.
-     * No leak to other modulations: GFSK clears it back to 0 on set_pkt_type, and LoRa ignores ShapeCfg. */
+     * No leak to other modulations: GFSK clears it back to 0 on set_pkt_type, and LoRa ignores DblRate. */
     {
         const bool enable_dbl_rate =
             ( radio_params->tx.flrc.mod_params.raw_bit_rate < RAL_FLRC_RAW_BIT_RATE_2_080_MBPS );
-
-        lr20xx_regmem_write_regmem32_mask( rp->radio->ral.context, LR20XX_GENMOD_SHAPECFG_REG_ADDR,
-                                           LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK,
-                                           enable_dbl_rate ? LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK : 0U );
+        lr20xx_workarounds_flrc_configure_double_rate_sampling( rp->radio->ral.context, enable_dbl_rate );
     }
 #endif
 

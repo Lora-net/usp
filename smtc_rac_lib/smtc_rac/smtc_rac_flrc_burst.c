@@ -46,8 +46,8 @@
 #include "ral_defs.h"
 #include "ral_drv.h"
 #include "ralf.h"
-#include "smtc_modem_hal_dbg_trace.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal_trace.h"
+#include "smtc_core_hal.h"
 #include "smtc_rac_api.h"
 #include "smtc_rac_lbt.h"
 #include "smtc_rac_local_func.h"
@@ -109,6 +109,7 @@
 #include "lr20xx_system.h"
 #include "lr20xx_radio_flrc.h"
 #include "lr20xx_radio_common.h"
+#include "lr20xx_workarounds.h"
 #endif
 
 /*
@@ -132,13 +133,6 @@
 
 #define RALF_RADIO_POINTER smtc_rac_get_rp( )->radio
 #define RAL_RADIO_POINTER &( smtc_rac_get_rp( )->radio->ral )
-
-#if defined( LR20XX )
-/* ShapeCfg = "Generic TX Modulator" (Genmod), base 0xF30900 + offset 0x04.
- * DblRate = bit 8: interpolate by 16 instead of 8, only allowed for a bit rate <= 2 Mb/s. */
-#define LR20XX_GENMOD_SHAPECFG_REG_ADDR ( 0x00F30904UL )
-#define LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK ( 1UL << 8 )
-#endif
 
 /*
  * -----------------------------------------------------------------------------
@@ -315,7 +309,7 @@ smtc_rac_return_code_t smtc_rac_flrc_burst( uint8_t radio_access_id )
             ( ( nb_packets - 1 ) * rac_config->radio_params.flrc_burst.min_interframe_delay_us );
 
         time_on_air_us = ( time_on_air_us + interframes_duration_us ) / 1000 +
-                        rac_config->radio_params.flrc_burst.rx_burst_timeout_margin_ms;
+                         rac_config->radio_params.flrc_burst.rx_burst_timeout_margin_ms;
         time_on_air_us = time_on_air_us + ( time_on_air_us * 10 ) / 100;
         time_on_air_us = MAX( 11, time_on_air_us ); // A burst cannot be smaller than 11ms (even for 1 packet). To be reworked
         smtc_rac_set_active_time_out( radio_access_id, time_on_air_us );
@@ -577,6 +571,8 @@ static void smtc_rac_flrc_post_tx_callback( rp_status_t status )
         ral_irq_t radio_irq = RAL_IRQ_TX_TIMESTAMP;
 
         // SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_get_irq_status( &rp->radio->ral, &radio_irq ) == RAL_STATUS_OK );
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_clear_irq_status( &rp->radio->ral, radio_irq | RAL_IRQ_TX_DONE ) ==
+                                         RAL_STATUS_OK );
         if( ( radio_irq & RAL_IRQ_ERROR ) == RAL_IRQ_ERROR )
         {
 #if defined( LR20XX ) && defined( RAC_FLRC_BURST_DEBUG_ENABLE )
@@ -647,8 +643,6 @@ static void smtc_rac_flrc_post_tx_callback( rp_status_t status )
                 push_packet_to_radio_fifo( );
             }
         }
-        SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_clear_irq_status( &rp->radio->ral, radio_irq | RAL_IRQ_TX_DONE ) ==
-                                         RAL_STATUS_OK );
     }
     else if( status == RP_STATUS_RADIO_UNLOCKED )
     {
@@ -766,16 +760,13 @@ static void smtc_rac_flrc_tx_callback( void* rp_void )
 
 #if defined( LR20XX )
     /* DblRate only applies to FLRC and for a bit rate <= 2 Mb/s.
-     * Written AFTER ralf_setup_flrc (which rewrites ShapeCfg), as a masked read-modify-write on bit 8.
+     * Written AFTER ralf_setup_flrc (which rewrites DblRate).
      * Explicitly write 0 when the bit rate is >= 2 Mb/s to stay deterministic.
-     * No leak to other modulations: GFSK clears it back to 0 on set_pkt_type, and LoRa ignores ShapeCfg. */
+     * No leak to other modulations: GFSK clears it back to 0 on set_pkt_type, and LoRa ignores DblRate. */
     {
         const bool enable_dbl_rate =
             ( flrc_burst_rp_radio_params.tx.flrc.mod_params.raw_bit_rate < RAL_FLRC_RAW_BIT_RATE_2_080_MBPS );
-
-        lr20xx_regmem_write_regmem32_mask( rp->radio->ral.context, LR20XX_GENMOD_SHAPECFG_REG_ADDR,
-                                           LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK,
-                                           enable_dbl_rate ? LR20XX_GENMOD_SHAPECFG_DBLRATE_MASK : 0U );
+        lr20xx_workarounds_flrc_configure_double_rate_sampling( rp->radio->ral.context, enable_dbl_rate );
     }
 #endif
 

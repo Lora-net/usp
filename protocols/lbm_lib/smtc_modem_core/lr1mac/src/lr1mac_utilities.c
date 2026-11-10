@@ -44,7 +44,7 @@
 #include "lr1mac_defs.h"
 
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 uint32_t lr1mac_utilities_crc( uint8_t* buf, int len )
 {
@@ -203,25 +203,35 @@ int lr1mac_rx_fhdr_extract( uint8_t* rx_payload, uint8_t rx_payload_size, uint8_
 
     *fcnt_dwn_tmp    = rx_payload[6] + ( rx_payload[7] << 8 );
     *rx_fopts_length = *rx_fctrl & 0x0F;
-    memcpy( &rx_fopts[0], &rx_payload[FHDROFFSET], *rx_fopts_length );
+
+    *rx_fport         = 0;
+    *rx_fport_present = false;
+
     // case empty payload without fport :
-    if( rx_payload_size > FHDROFFSET + MICSIZE + *rx_fopts_length )
+    if( rx_payload_size > ( FHDROFFSET + MICSIZE + *rx_fopts_length ) )
     {
         *rx_fport         = rx_payload[FHDROFFSET + *rx_fopts_length];
         *rx_fport_present = true;
     }
-    else
+    else if( rx_payload_size == ( FHDROFFSET + MICSIZE + *rx_fopts_length ) )
     {
-        *rx_fport         = 0;
-        *rx_fport_present = false;
         SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( " EMPTY MSG \n" );
     }
+    else
+    {
+        status = ERRORLORAWAN;  // malformed frame
+    }
+
     /**************************/
     /* manage Fctrl Byte      */
     /**************************/
     if( status == ERRORLORAWAN )
     {
-        SMTC_MODEM_HAL_TRACE_ERROR( " Bad DevAddr 0x%x\n", dev_addr_tmp );
+        SMTC_MODEM_HAL_TRACE_ERROR( " Bad DevAddr 0x%x or malformed frame\n", dev_addr_tmp );
+    }
+    else
+    {
+        memcpy( &rx_fopts[0], &rx_payload[FHDROFFSET], *rx_fopts_length );
     }
     return ( status );
 }
@@ -263,7 +273,12 @@ uint8_t lr1_stack_mac_cmd_ans_cut( uint8_t* nwk_ans, uint8_t nwk_ans_size_in, ui
 
     while( p_tmp - nwk_ans < MIN( nwk_ans_size_in, max_allowed_size ) )
     {
-        p_tmp += lr1mac_cmd_mac_ans_size[nwk_ans[p_tmp - nwk_ans]];
+        uint8_t cid = nwk_ans[p_tmp - nwk_ans];
+        if( cid >= NB_MAC_CMD_ANS )
+        {
+            break;
+        }
+        p_tmp += lr1mac_cmd_mac_ans_size[cid];
 
         if( ( p_tmp - nwk_ans ) <= max_allowed_size )
         {

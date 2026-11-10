@@ -25,6 +25,13 @@ target_include_directories(smtc_hal PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/..  # For modem_pinout.h
 )
 
+# For smtc_modem_hal.h, which declares the RAC critical-section hooks
+# (smtc_modem_hal_protect_api_call / _unprotect_api_call) entered by the IRQ/timer
+# delivery threads to serialize with the RAC engine.
+target_include_directories(smtc_hal PRIVATE
+    ${EXAMPLES_DIR}/../smtc_rac_lib/smtc_modem_hal
+)
+
 target_compile_definitions(smtc_hal PUBLIC
     LINUX_PLATFORM
     _DEFAULT_SOURCE
@@ -48,6 +55,13 @@ target_compile_options(smtc_hal PRIVATE
     -Wpedantic
     -Wno-unused-parameter
 )
+
+# Optional: log LP-timer arm->fire latency/jitter (for timer-accuracy validation)
+option(LP_TIMER_LATENCY_LOG "Log LP-timer arm->fire latency/jitter" OFF)
+if(LP_TIMER_LATENCY_LOG)
+    target_compile_definitions(smtc_hal PRIVATE LP_TIMER_LATENCY_LOG)
+    message(STATUS "Linux HAL: LP-timer latency logging ENABLED")
+endif()
 
 message(STATUS "Linux HAL configured")
 

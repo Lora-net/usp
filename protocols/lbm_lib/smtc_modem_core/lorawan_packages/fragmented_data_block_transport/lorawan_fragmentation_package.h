@@ -174,6 +174,7 @@ void lorawan_fragmentation_package_service_get_id( uint8_t* pkt_id, uint8_t* pkt
  * @return false    parsing error
  */
 bool lorawan_fragmentation_package_service_mpa_injector( uint8_t stack_id, uint8_t* payload_in,
+                                                         uint8_t  payload_in_length,
                                                          uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window,
                                                          uint8_t* payload_out, uint8_t* payload_out_length,
                                                          const uint8_t max_payload_out_length,

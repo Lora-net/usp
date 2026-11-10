@@ -43,7 +43,8 @@
 #include "lr1mac_core.h"
 #include "lr1mac_defs.h"
 #include "lr1mac_utilities.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
+#include "smtc_modem_hal.h"
 #include "smtc_modem_api.h"
 #include "modem_event_utilities.h"
 #include "lorawan_api.h"
@@ -280,22 +281,14 @@ bool smtc_relay_tx_update_config( uint8_t relay_stack_id, const relay_tx_config_
             return false;
         }
 
-        if( smtc_real_get_modulation_type_from_datarate( infos->real, relay_config->second_ch.dr ) != LORA )
+        if( smtc_real_get_modulation_type_from_rx_datarate( infos->real, relay_config->second_ch.dr ) != LORA )
         {
             SMTC_MODEM_HAL_TRACE_PRINTF( "Invalid second channel dr (%d)\n", relay_config->second_ch.dr );
             return false;
         }
     }
-    uint8_t temp_number_of_miss_wor_ack_to_switch_in_nosync_mode = 8;
-    if( relay_config->activation == RELAY_TX_ACTIVATION_MODE_ED_CONTROLED )
-    {
-        temp_number_of_miss_wor_ack_to_switch_in_nosync_mode =
-            infos->relay_tx_config.number_of_miss_wor_ack_to_switch_in_nosync_mode;
-    }
-
     memcpy( &( infos->relay_tx_config ), relay_config, sizeof( relay_tx_config_t ) );
-    infos->relay_tx_config.number_of_miss_wor_ack_to_switch_in_nosync_mode =
-        temp_number_of_miss_wor_ack_to_switch_in_nosync_mode;
+
     if( infos->activation_mode != infos->relay_tx_config.activation )
     {
         infos->activation_mode = infos->relay_tx_config.activation;
@@ -444,7 +437,8 @@ bool smtc_relay_tx_prepare_wor( uint8_t relay_stack_id, uint32_t target_time, co
     // Compute preamble len based on drift_error
     lr1mac_bandwidth_t bw;
     uint8_t            sf;
-    smtc_real_lora_dr_to_sf_bw( infos->real, conf->dr, &sf, &bw );
+    // Relay channel datarate is defined in the RX datarate table (ex: DR10 SF10/BW500 for US915/AU915)
+    smtc_real_lora_rx_dr_to_sf_bw( infos->real, conf->dr, &sf, &bw );
 
     const uint32_t symb_time_us = lr1mac_utilities_get_symb_time_us( 1, ( ral_lora_sf_t ) sf, ( ral_lora_bw_t ) bw );
 
@@ -488,7 +482,7 @@ bool smtc_relay_tx_prepare_wor( uint8_t relay_stack_id, uint32_t target_time, co
     wor_tx->freq_hz        = conf->freq_hz;
     wor_tx->target_time_ms = infos->last_timestamp_ms - smtc_modem_hal_get_radio_tcxo_startup_delay_ms( );
     wor_tx->dr             = conf->dr;
-    smtc_real_lora_dr_to_sf_bw( infos->real, conf->dr, &wor_tx->sf, ( lr1mac_bandwidth_t* ) &wor_tx->bw );
+    smtc_real_lora_rx_dr_to_sf_bw( infos->real, conf->dr, &wor_tx->sf, ( lr1mac_bandwidth_t* ) &wor_tx->bw );
     return true;
 }
 
@@ -515,7 +509,7 @@ bool smtc_relay_tx_send_wor( uint8_t relay_stack_id, const wor_tx_prepare_t* wor
         .payload_len       = infos->buffer_len,
         .wor_at_time       = wor_tx->at_time,
         .start_time_ms     = wor_tx->target_time_ms,
-        .sync_word         = smtc_real_get_sync_word( infos->real ),
+        .sync_word         = smtc_real_get_sync_word( infos->real, wor_tx->sf ),
         .cr                = smtc_real_get_coding_rate( infos->real ),
         .output_pwr_in_dbm = smtc_real_clamp_output_power_eirp_vs_freq_and_dr(
             infos->real, smtc_real_get_default_max_eirp( infos->real ), wor_tx->freq_hz, wor_tx->dr ),
@@ -677,9 +671,9 @@ static void relay_tx_callback_rp( uint8_t* stack_id )
             wor_ack.payload     = infos->buffer;
             wor_ack.payload_len = WOR_ACK_LENGTH;
             wor_ack.cr          = smtc_real_get_coding_rate( infos->real );
-            wor_ack.sync_word   = smtc_real_get_sync_word( infos->real );
 
-            smtc_real_lora_dr_to_sf_bw( infos->real, conf->dr, &wor_ack.sf, ( lr1mac_bandwidth_t* ) &wor_ack.bw );
+            smtc_real_lora_rx_dr_to_sf_bw( infos->real, conf->dr, &wor_ack.sf, ( lr1mac_bandwidth_t* ) &wor_ack.bw );
+            wor_ack.sync_word            = smtc_real_get_sync_word( infos->real, wor_ack.sf );
             wor_ack.preamble_len_in_symb = smtc_real_get_preamble_len( infos->real, wor_ack.sf );
 
             if( wor_schedule_rx_wor_ack( RP_HOOK_ID_RELAY_TX + relay_stack_id, infos->rp, &wor_ack ) == false )
@@ -815,6 +809,7 @@ static void relay_tx_callback_rp( uint8_t* stack_id )
 
     if( cancel_lr1mac_process == true )
     {
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( infos->abort_callback ) );
         infos->abort_callback( NULL );
     }
     else if( has_to_send_data == true )
@@ -825,6 +820,7 @@ static void relay_tx_callback_rp( uint8_t* stack_id )
             .stack_id   = relay_stack_id,
         };
 
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( infos->free_callback ) );
         infos->free_callback( ( void* ) &cb_param );
     }
 }

@@ -46,7 +46,7 @@
 #include "lorawan_send_management.h"
 #include "modem_supervisor_light.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_core.h"
 #include "lr1mac_defs.h"
 #include "lorawan_api.h"
@@ -223,8 +223,9 @@ typedef struct lorawan_mpa_package_s
  * @return true
  * @return false
  */
-static bool mpa_package_parser_internal( uint8_t stack_id, uint8_t* payload_in, uint8_t* nb_bytes_read_payload_in,
-                                         receive_win_t rx_window, uint8_t* payload_out, uint8_t* payload_out_length,
+static bool mpa_package_parser_internal( uint8_t stack_id, uint8_t* payload_in, uint8_t payload_in_length,
+                                         uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window,
+                                         uint8_t* payload_out, uint8_t* payload_out_length,
                                          const uint8_t max_payload_out_length, uint32_t rx_timestamp_ms );
 
 /**
@@ -261,8 +262,9 @@ static ptr_func_service_get_id mpa_service_get_id[MPA_NB_PACKAGES] = {
  * @return true     successfully parsed
  * @return false    parsing error
  */
-typedef bool ( *ptr_func_mpa_injector )( uint8_t stack_id, uint8_t* payload_in, uint8_t* nb_bytes_read_payload_in,
-                                         receive_win_t rx_window, uint8_t* payload_out, uint8_t* payload_out_length,
+typedef bool ( *ptr_func_mpa_injector )( uint8_t stack_id, uint8_t* payload_in, uint8_t payload_in_length,
+                                         uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window,
+                                         uint8_t* payload_out, uint8_t* payload_out_length,
                                          const uint8_t max_payload_out_length, uint32_t rx_timestamp_ms );
 
 static ptr_func_mpa_injector mpa_service_push_payload_to_targeted_package[MPA_NB_PACKAGES] = {
@@ -586,7 +588,8 @@ static mpa_status_t mpa_package_parser( lorawan_mpa_package_ctx_t* ctx, uint8_t*
         ctx->nb_cmd_parsed++;
 
         if( mpa_service_push_payload_to_targeted_package[pkg_id_tmp & 0x7F](
-                ctx->stack_id, &mpa_package_rx_buffer[mpa_package_rx_buffer_index], &nb_bytes_read_payload_in,
+                ctx->stack_id, &mpa_package_rx_buffer[mpa_package_rx_buffer_index],
+                ( uint8_t ) ( mpa_package_rx_buffer_length - mpa_package_rx_buffer_index ), &nb_bytes_read_payload_in,
                 rx_window, tmp_tx_ans, &payload_out_length, sizeof( tmp_tx_ans ), rx_timestamp_ms ) == false )
         {
             return MPA_STATUS_ERROR;
@@ -651,8 +654,9 @@ static bool is_received_on_multicast_window( receive_win_t rx_window )
     }
 }
 
-static bool mpa_package_parser_internal( uint8_t stack_id, uint8_t* payload_in, uint8_t* nb_bytes_read_payload_in,
-                                         receive_win_t rx_window, uint8_t* payload_out, uint8_t* payload_out_length,
+static bool mpa_package_parser_internal( uint8_t stack_id, uint8_t* payload_in, uint8_t payload_in_length,
+                                         uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window,
+                                         uint8_t* payload_out, uint8_t* payload_out_length,
                                          const uint8_t max_payload_out_length, uint32_t rx_timestamp_ms )
 {
     uint8_t mpa_package_rx_buffer_index = 0;
@@ -685,10 +689,19 @@ static bool mpa_package_parser_internal( uint8_t stack_id, uint8_t* payload_in, 
         return false;
     }
 
+    if( payload_in_length < 1 )
+    {
+        return false;
+    }
+
     SMTC_MODEM_HAL_TRACE_WARNING( "MPA CiD 0x%02x\n", payload_in[mpa_package_rx_buffer_index] );
 
     uint8_t cmd_id = payload_in[mpa_package_rx_buffer_index];
     if( cmd_id >= sizeof( mpa_req_cmd_size ) )
+    {
+        return false;
+    }
+    if( payload_in_length < mpa_req_cmd_size[cmd_id] )
     {
         return false;
     }
@@ -724,6 +737,9 @@ static bool mpa_package_parser_internal( uint8_t stack_id, uint8_t* payload_in, 
     }
     case MPA_MULTI_PACK_BUFFER_REQ:
     {
+        // payload_in_length >= MPA_MULTI_PACK_BUFFER_REQ_SIZE is guaranteed by the per-cmd-id length
+        // pre-check above, so reading payload_in[+1] / [+2] is safe.
+
         ctx->start_byte_pending = payload_in[mpa_package_rx_buffer_index + 1];
         ctx->stop_byte_pending  = payload_in[mpa_package_rx_buffer_index + 2];
 

@@ -55,6 +55,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <poll.h>
+#include <pthread.h>
 #include <signal.h>
 #include <termios.h>
 #include <sys/stat.h>
@@ -104,11 +105,42 @@ static bool pty_initialized = false;
 static char pty_slave_name[256];
 static char pty_symlink_path[256];
 
+/* Kept open for the process lifetime so the master side never sees a
+ * spurious POLLHUP just because no client is currently connected to the
+ * slave (e.g. between test runs). Without this, pty_watch_thread_func()'s
+ * poll() would report HUP and return immediately forever whenever no
+ * client is attached, forcing a busy-spin.
+ */
+static int pty_slave_keepalive_fd = -1;
+
 static uint8_t modem_response_buff[HW_MODEM_RX_BUFF_MAX_LENGTH];
 static uint8_t modem_received_buff[HW_MODEM_RX_BUFF_MAX_LENGTH];
 static size_t  response_length;
 
 static volatile bool hw_cmd_available = false;
+
+/**
+ * @brief PTY byte stream assembly buffer.
+ *
+ * A single read() on the PTY has no relation to command-frame boundaries: it may
+ * return only part of a frame, or several queued frames at once. Bytes are
+ * accumulated here across calls until a complete frame (cmd_id + length byte +
+ * length payload bytes) is available; any bytes beyond that frame are kept for
+ * the next call instead of being discarded. File-scope statics so they survive
+ * the longjmp-based soft reset (see hw_modem_process_cmd()).
+ */
+static uint8_t rx_assembly[HW_MODEM_RX_BUFF_MAX_LENGTH];
+static size_t  rx_assembled_len = 0;
+
+/* Dedicated thread that wakes the main loop as soon as a host command arrives
+ * on the PTY - mirrors the GPIO IRQ thread / lp_timer thread pattern in
+ * smtc_hal_linux (see hal_mcu_wake_main_thread()). Without this, a command
+ * arriving while the main loop is asleep in hal_mcu_set_sleep_for_ms() would
+ * only be noticed once that sleep (up to WATCHDOG_RELOAD_PERIOD_MS) elapses
+ * on its own, since PTY input has no hardware-interrupt equivalent on Linux.
+ */
+static pthread_t     pty_watch_thread;
+static volatile bool pty_watch_thread_running = false;
 
 /*
  * -----------------------------------------------------------------------------
@@ -130,6 +162,11 @@ static void hw_modem_pty_cleanup( void );
  * @brief Signal handler for clean shutdown (SIGTERM, SIGINT)
  */
 static void hw_modem_signal_handler( int signum );
+
+/**
+ * @brief Wakes the main loop as soon as the PTY has data to read
+ */
+static void* pty_watch_thread_func( void* arg );
 
 /*
  * -----------------------------------------------------------------------------
@@ -180,15 +217,17 @@ int hw_modem_init( void )
         strncpy( pty_slave_name, slave_name, sizeof( pty_slave_name ) - 1 );
         pty_slave_name[sizeof( pty_slave_name ) - 1] = '\0';
 
-        /* Raw mode: disable echo and canonical processing on the slave side */
-        int slave_fd = open( pty_slave_name, O_RDWR | O_NOCTTY );
-        if( slave_fd >= 0 )
+        /* Raw mode: disable echo and canonical processing on the slave side.
+         * This fd is intentionally kept open (not closed) for the process
+         * lifetime - see pty_slave_keepalive_fd's declaration.
+         */
+        pty_slave_keepalive_fd = open( pty_slave_name, O_RDWR | O_NOCTTY );
+        if( pty_slave_keepalive_fd >= 0 )
         {
             struct termios tty;
-            tcgetattr( slave_fd, &tty );
+            tcgetattr( pty_slave_keepalive_fd, &tty );
             cfmakeraw( &tty );
-            tcsetattr( slave_fd, TCSANOW, &tty );
-            close( slave_fd );
+            tcsetattr( pty_slave_keepalive_fd, TCSANOW, &tty );
         }
 
         /* Symlink at a well-known path (override via HW_MODEM_PTY_PATH env var) */
@@ -205,6 +244,17 @@ int hw_modem_init( void )
         atexit( hw_modem_pty_cleanup );
         signal( SIGTERM, hw_modem_signal_handler );
         signal( SIGINT, hw_modem_signal_handler );
+
+        pty_watch_thread_running = true;
+        if( pthread_create( &pty_watch_thread, NULL, pty_watch_thread_func, NULL ) != 0 )
+        {
+            SMTC_HAL_TRACE_WARNING( "PTY: failed to start watch thread, host commands may be delayed\n" );
+            pty_watch_thread_running = false;
+        }
+        else
+        {
+            pthread_detach( pty_watch_thread );
+        }
 
         pty_initialized = true;
     }
@@ -337,24 +387,61 @@ bool hw_modem_is_a_cmd_available( void )
     pfd.fd     = pty_master_fd;
     pfd.events = POLLIN;
 
+    /* Pull in whatever new bytes are ready, appending to whatever is already
+     * assembled from a previous call (a prior read() may have returned more
+     * than one frame's worth of bytes - see below).
+     */
     int ret = poll( &pfd, 1, 0 );
     if( ret > 0 && ( pfd.revents & POLLIN ) )
     {
-        /* Pre-fill with 0xFF to emulate the DMA-based reception on embedded */
-        memset( modem_received_buff, 0xFF, HW_MODEM_RX_BUFF_MAX_LENGTH );
-
-        ssize_t n = read( pty_master_fd, modem_received_buff, HW_MODEM_RX_BUFF_MAX_LENGTH - 1 );
-        if( n > 0 )
+        size_t space = HW_MODEM_RX_BUFF_MAX_LENGTH - rx_assembled_len;
+        if( space > 0 )
         {
+            ssize_t n = read( pty_master_fd, &rx_assembly[rx_assembled_len], space );
+            if( n > 0 )
+            {
+                rx_assembled_len += ( size_t ) n;
+            }
+        }
+    }
+
+    /* A read() on a PTY has no relation to frame boundaries: it may return
+     * only part of a frame, or several queued frames at once. Only declare a
+     * command available once a complete frame (cmd_id + length byte + length
+     * payload bytes) has actually been assembled - regardless of whether that
+     * completes just now or was already sitting here from a previous, bigger
+     * read().
+     */
+    if( rx_assembled_len >= 2 )
+    {
+        uint8_t cmd_length = rx_assembly[1];
+        size_t  frame_len  = ( size_t ) cmd_length + 2;
+
+        if( rx_assembled_len >= frame_len )
+        {
+            /* Pre-fill with 0xFF to emulate the DMA-based reception on embedded */
+            memset( modem_received_buff, 0xFF, HW_MODEM_RX_BUFF_MAX_LENGTH );
+            memcpy( modem_received_buff, rx_assembly, frame_len );
+
             /* Bridge emulation: Python sends frames without CRC; the HW bridge
              * normally computes and appends it, so we replicate that here.
              */
             uint8_t crc = 0;
-            for( ssize_t i = 0; i < n; i++ )
+            for( size_t i = 0; i < frame_len; i++ )
             {
                 crc ^= modem_received_buff[i];
             }
-            modem_received_buff[n] = crc;
+            modem_received_buff[frame_len] = crc;
+
+            /* Keep any bytes beyond this frame (a second, already-queued
+             * command) for the next call instead of discarding them.
+             */
+            size_t leftover = rx_assembled_len - frame_len;
+            if( leftover > 0 )
+            {
+                memmove( rx_assembly, &rx_assembly[frame_len], leftover );
+            }
+            rx_assembled_len = leftover;
 
             hw_cmd_available = true;
             return true;
@@ -407,6 +494,11 @@ static void hw_modem_pty_cleanup( void )
         close( pty_master_fd );
         pty_master_fd = -1;
     }
+    if( pty_slave_keepalive_fd >= 0 )
+    {
+        close( pty_slave_keepalive_fd );
+        pty_slave_keepalive_fd = -1;
+    }
     unlink( pty_symlink_path );
 }
 
@@ -414,6 +506,51 @@ static void hw_modem_signal_handler( int signum )
 {
     ( void ) signum;
     exit( 0 );
+}
+
+static void* pty_watch_thread_func( void* arg )
+{
+    ( void ) arg;
+
+    /* Block SIGUSR2 in this thread: the wake is sent thread-directed via
+     * pthread_kill(main_tid, SIGUSR2) by hal_mcu_wake_main_thread(), so it
+     * always reaches the main thread on its own. This guarantees a
+     * process-directed SIGUSR2 can never interrupt this thread's poll().
+     */
+    sigset_t block_mask;
+    sigemptyset( &block_mask );
+    sigaddset( &block_mask, SIGUSR2 );
+    pthread_sigmask( SIG_BLOCK, &block_mask, NULL );
+
+    while( pty_watch_thread_running )
+    {
+        struct pollfd pfd;
+        pfd.fd     = pty_master_fd;
+        pfd.events = POLLIN;
+
+        /* Blocks indefinitely until the PTY has data. pty_slave_keepalive_fd
+         * keeps the slave side permanently open, so this never sees a
+         * spurious POLLHUP (which would otherwise make poll() return
+         * immediately forever, regardless of timeout, and busy-spin this
+         * thread) just because no client is currently connected.
+         */
+        int ret = poll( &pfd, 1, -1 );
+        if( ret > 0 && ( pfd.revents & POLLIN ) )
+        {
+            /* Just wake the main loop - hw_modem_is_a_cmd_available() (running
+             * on the main thread) does the actual read()/parsing, so all PTY
+             * buffer manipulation stays single-threaded.
+             */
+            hal_mcu_wake_main_thread( );
+
+            /* Avoid spinning: wait for the main loop to actually drain the
+             * PTY before polling again.
+             */
+            usleep( 1000 );
+        }
+    }
+
+    return NULL;
 }
 
 /* --- EOF ------------------------------------------------------------------ */

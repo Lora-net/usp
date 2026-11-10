@@ -46,7 +46,7 @@
 #include "lorawan_send_management.h"
 #include "modem_supervisor_light.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_core.h"
 #include "lorawan_api.h"
 #include "lr1mac_defs.h"
@@ -125,6 +125,9 @@
 #define REMOTE_MULTICAST_SETUP_ID ( 2 )
 #define REMOTE_MULTICAST_SETUP_VERSION ( 1 )
 #define REMOTE_MULTICAST_SETUP_SIZE_ANS_MAX ( 15 )
+
+// Margin in seconds to start a class B session before its session time (covers the rtc to gps time conversion error)
+#define CLASS_B_SESSION_START_MARGIN_S ( 2 )
 
 #define REMOTE_MULTICAST_SETUP_PKG_VERSION_ANS 0x00
 #define REMOTE_MULTICAST_SETUP_MC_GROUP_STATUS_ANS 0x01
@@ -373,7 +376,7 @@ void lorawan_remote_multicast_setup_package_service_on_launch( void* ctx_service
     {
         SMTC_MODEM_HAL_TRACE_PRINTF( " lorawan_remote_multicast_setup_package launch ANS_CMD_TASK \n" );
         SMTC_MODEM_HAL_TRACE_ARRAY( "ans = ", ctx->remote_multicast_tx_payload_ans,
-                                    ctx->remote_multicast_tx_payload_ans_size )
+                                    ctx->remote_multicast_tx_payload_ans_size );
         tx_protocol_manager_request(
             TX_PROTOCOL_TRANSMIT_LORA, REMOTE_MULTICAST_SETUP_PORT, true, ctx->remote_multicast_tx_payload_ans,
             ctx->remote_multicast_tx_payload_ans_size, UNCONF_DATA_UP,
@@ -569,7 +572,7 @@ void lorawan_remote_multicast_setup_package_service_on_update( void* ctx_service
                             gps_time_s ) < time_to_stop_s ) )
         {
             time_to_stop_s   = ( int32_t ) ( multicast_group_params[i].params.session_time +
-                                           multicast_group_params[i].params.time_out - gps_time_s );
+                                             multicast_group_params[i].params.time_out - gps_time_s );
             find_mc_group_id = i;
         }
     }
@@ -614,16 +617,18 @@ void lorawan_remote_multicast_setup_package_service_on_update( void* ctx_service
         }
 
         uint32_t delay_s = 0;
-        if( ( lorawan_api_get_class_b_status( stack_id ) == false ) && ( ( time_to_start_s - 135 ) < 0 ) )
+        if( ( lorawan_api_get_class_b_status( stack_id ) == false ) &&
+            ( ( time_to_start_s - CLASS_B_SESSION_START_MARGIN_S ) < 0 ) )
         {
             // If the class B is not ready and the session start is in past
             delay_s = 30;
         }
         else
         {
-            delay_s = ( ( time_to_start_s - 135 ) < 0 )
+            // the class B session starts immediately in the current beacon period, only keep a small margin
+            delay_s = ( ( time_to_start_s - CLASS_B_SESSION_START_MARGIN_S ) < 0 )
                           ? 0
-                          : time_to_start_s - 135;  // remove 128s+7s to start the session before the beacon
+                          : time_to_start_s - CLASS_B_SESSION_START_MARGIN_S;
         }
 
         SMTC_MODEM_HAL_TRACE_PRINTF( " lorawan_remote_multicast_setup_package start in %us\n", delay_s );
@@ -646,7 +651,7 @@ void lorawan_remote_multicast_setup_package_service_on_update( void* ctx_service
                             gps_time_s ) < time_to_stop_s ) )
         {
             time_to_stop_s   = ( int32_t ) ( multicast_group_params[i].params.session_time +
-                                           multicast_group_params[i].params.time_out - gps_time_s );
+                                             multicast_group_params[i].params.time_out - gps_time_s );
             find_mc_group_id = i;
         }
     }
@@ -713,7 +718,7 @@ void lorawan_remote_multicast_setup_package_service_get_id( uint8_t* pkt_id, uin
     *pkt_port    = REMOTE_MULTICAST_SETUP_PORT;
 }
 
-bool lorawan_remote_multicast_setup_mpa_injector( uint8_t stack_id, uint8_t* payload_in,
+bool lorawan_remote_multicast_setup_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_t payload_in_length,
                                                   uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window,
                                                   uint8_t* payload_out, uint8_t* payload_out_length,
                                                   const uint8_t max_payload_out_length, uint32_t rx_timestamp_ms )
@@ -738,9 +743,17 @@ bool lorawan_remote_multicast_setup_mpa_injector( uint8_t stack_id, uint8_t* pay
     {
         return false;
     }
+    if( payload_in_length < 1 )
+    {
+        return false;
+    }
     // check cmd id to find cmd_id length special case for data_fragment
     uint8_t cmd_id = payload_in[0];
     if( cmd_id >= sizeof( multicast_setup_req_cmd_size ) )
+    {
+        return false;
+    }
+    if( payload_in_length < multicast_setup_req_cmd_size[cmd_id] )
     {
         return false;
     }
@@ -871,6 +884,14 @@ static remote_multicast_setup_status_t remote_multicast_setup_package_parser(
         case REMOTE_MULTICAST_SETUP_MC_GROUP_STATUS_REQ:
         {
             IS_VALID_PKG_CMD( REMOTE_MULTICAST_SETUP_MC_GROUP_STATUS_REQ_SIZE );
+
+            // Variable-size answer: 1 byte ANS cmd-id + 1 byte group-mask + 5 bytes per matched group.
+            // Reserve the 2-byte header upfront; per-group writes are individually guarded in the loop below.
+            if( ( ans_index + 2U ) > max_payload_size )
+            {
+                rx_buffer_index += REMOTE_MULTICAST_SETUP_MC_GROUP_STATUS_REQ_SIZE;
+                break;
+            }
             uint8_t mc_grp_mask                               = rx_buffer[rx_buffer_index + 1] & 0x0F;
             uint8_t ans_group_mask                            = 0;
             uint8_t total_groups                              = 0;
@@ -1026,11 +1047,22 @@ static remote_multicast_setup_status_t remote_multicast_setup_package_parser(
                 mc_grp_id_status |=
                     ( seconds_since_epoch >= multicast_group_params[mc_grp_id].params.session_time ) ? ( 1 << 5 ) : 0;
                 mc_grp_id_status |= ( multicast_group_params[mc_grp_id].active == false ) ? ( 1 << 4 ) : 0;
-                mc_grp_id_status |=
-                    ( lorawan_api_is_frequency_valid( stack_id, multicast_group_params[mc_grp_id].params.frequency ) ==
-                      ERRORLORAWAN )
-                        ? ( 1 << 3 )
-                        : 0;
+
+                // Check if freq = 0 is acceptable in region in which beacon is freq hopping
+                if( ( multicast_group_params[mc_grp_id].params.frequency == 0 ) &&
+                    ( lorawan_api_is_beacon_hopping( stack_id ) == true ) )
+                {
+                    mc_grp_id_status |= 0;
+                }
+                else
+                {
+                    mc_grp_id_status |=
+                        ( lorawan_api_is_frequency_valid(
+                              stack_id, multicast_group_params[mc_grp_id].params.frequency ) == ERRORLORAWAN )
+                            ? ( 1 << 3 )
+                            : 0;
+                }
+
                 mc_grp_id_status |= ( lorawan_api_is_datarate_valid(
                                           stack_id, multicast_group_params[mc_grp_id].params.dr ) == ERRORLORAWAN )
                                         ? ( 1 << 2 )
@@ -1116,11 +1148,22 @@ static remote_multicast_setup_status_t remote_multicast_setup_package_parser(
                 mc_grp_id_status |=
                     ( seconds_since_epoch >= multicast_group_params[mc_grp_id].params.session_time ) ? ( 1 << 5 ) : 0;
                 mc_grp_id_status |= ( multicast_group_params[mc_grp_id].active == false ) ? ( 1 << 4 ) : 0;
-                mc_grp_id_status |=
-                    ( lorawan_api_is_frequency_valid( stack_id, multicast_group_params[mc_grp_id].params.frequency ) ==
-                      ERRORLORAWAN )
-                        ? ( 1 << 3 )
-                        : 0;
+
+                // Check if freq = 0 is acceptable in region in which beacon is freq hopping
+                if( ( multicast_group_params[mc_grp_id].params.frequency == 0 ) &&
+                    ( lorawan_api_is_beacon_hopping( stack_id ) == true ) )
+                {
+                    mc_grp_id_status |= 0;
+                }
+                else
+                {
+                    mc_grp_id_status |=
+                        ( lorawan_api_is_frequency_valid(
+                              stack_id, multicast_group_params[mc_grp_id].params.frequency ) == ERRORLORAWAN )
+                            ? ( 1 << 3 )
+                            : 0;
+                }
+
                 mc_grp_id_status |= ( lorawan_api_is_datarate_valid(
                                           stack_id, multicast_group_params[mc_grp_id].params.dr ) == ERRORLORAWAN )
                                         ? ( 1 << 2 )

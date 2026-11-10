@@ -44,7 +44,7 @@
 #include "smtc_rac_api.h"
 #include "smtc_sw_platform_helper.h"
 #include "smtc_hal_led.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "RANGING"
@@ -216,11 +216,36 @@ const uint32_t ranging_hopping_channels_array[RANGING_HOPPING_CHANNELS_MAX] = {
 #else
 const char*    region                                                       = "2G4";
 const uint32_t ranging_hopping_channels_array[RANGING_HOPPING_CHANNELS_MAX] = {
-    2450000000, 2402000000, 2476000000, 2436000000, 2430000000, 2468000000, 2458000000, 2416000000,
+    2450000000,
+    2402000000,
+    2476000000,
+    2436000000,
+    2430000000,
+    2468000000,
+    2458000000,
+    2416000000,
     // 2424000000, 2478000000, 2456000000, 2448000000, 2462000000, 2472000000, 2432000000, 2446000000,
-    2422000000, 2442000000, 2460000000, 2474000000, 2414000000, 2464000000, 2454000000, 2444000000, 2404000000,
-    2434000000, 2410000000, 2408000000, 2440000000, 2452000000, 2480000000, 2426000000, 2428000000, 2466000000,
-    2418000000, 2412000000, 2406000000,  // 2470000000, 2438000000,
+    2422000000,
+    2442000000,
+    2460000000,
+    2474000000,
+    2414000000,
+    2464000000,
+    2454000000,
+    2444000000,
+    2404000000,
+    2434000000,
+    2410000000,
+    2408000000,
+    2440000000,
+    2452000000,
+    2480000000,
+    2426000000,
+    2428000000,
+    2466000000,
+    2418000000,
+    2412000000,
+    2406000000,  // 2470000000, 2438000000,
 };
 #endif
 
@@ -297,7 +322,7 @@ static uint8_t       multiple_data_rate_config;
 #if defined( CONTINUOUS_RANGING ) && ( CONTINUOUS_RANGING == true )
 static bool continuous_ranging = true;
 #else
-static bool continuous_ranging = false;
+static bool     continuous_ranging                    = false;
 #endif
 
 /*
@@ -488,6 +513,7 @@ static void ranging_state_machine_subordinate( rp_status_t status )
             break;
 
         case RP_STATUS_RX_PACKET:
+        {
             // Received a ranging config packet from the manager
             RANGING_LOG_RX( "Subordinate Ranging config rx done -> go to ack this config\n" );
             RANGING_LOG_RX( "Subordinate Ranging config rx done, payload size: %d\n",
@@ -497,15 +523,13 @@ static void ranging_state_machine_subordinate( rp_status_t status )
             ranging_results.snr_value  = rac_config->smtc_rac_data_result.snr_result;
 
             // Check if the received address matches the expected address
+            const uint32_t received_address =
+                ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[0] << 24 ) |
+                ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[1] << 16 ) |
+                ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[2] << 8 ) |
+                ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[3] );
             if( ( rac_config->smtc_rac_data_result.rx_size == sizeof( radio_pl_buffer ) ) &&
-                ( rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[0] ==
-                  ( ( ranging_settings.rng_address >> 24 ) & 0xFF ) ) &&
-                ( rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[1] ==
-                  ( ( ranging_settings.rng_address >> 16 ) & 0xFF ) ) &&
-                ( rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[2] ==
-                  ( ( ranging_settings.rng_address >> 8 ) & 0xFF ) ) &&
-                ( rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[3] ==
-                  ( ranging_settings.rng_address & 0xFF ) ) )
+                ( received_address == ranging_settings.rng_address ) )
             {
                 // If address matches, update channel and request count, prepare for TX
                 current_channel                = rac_config->smtc_rac_data_buffer_setup.tx_payload_buffer[4];
@@ -519,11 +543,6 @@ static void ranging_state_machine_subordinate( rp_status_t status )
             else
             {
                 // If address does not match, restart RX to wait for the correct config
-                uint32_t received_address =
-                    ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[0] << 24 ) |
-                    ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[1] << 16 ) |
-                    ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[2] << 8 ) |
-                    ( ( uint32_t ) rac_config->smtc_rac_data_buffer_setup.rx_payload_buffer[3] );
                 RANGING_LOG_WARN(
                     "Subordinate Ranging config rx done -> received address 0x%08X does not match expected 0x%08X\n",
                     received_address, ranging_settings.rng_address );
@@ -536,6 +555,7 @@ static void ranging_state_machine_subordinate( rp_status_t status )
             SMTC_SW_PLATFORM( smtc_rac_submit_radio_transaction( ranging_radio_access_id ) );
 
             break;
+        }
         case RP_STATUS_TASK_ABORTED:
         case RP_STATUS_RX_TIMEOUT:
         default:

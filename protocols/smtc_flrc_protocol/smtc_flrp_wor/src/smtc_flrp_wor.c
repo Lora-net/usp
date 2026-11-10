@@ -43,7 +43,7 @@
 
 #include "smtc_flrp_wor.h"
 #include "smtc_flrp_utils.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 /*
  * -----------------------------------------------------------------------------

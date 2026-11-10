@@ -161,7 +161,7 @@ Configuration for a FLRC burst radio operation (multiple packet transmission):
 - `burst_rx_size`: Size of the bursted RX payloads in bytes
 - `max_rx_size`: Maximum size of one payload received by the radio
 - `tx_fifo_payload_buffer[N]`: Pointers to generated fragments of the bursted TX payload
-- `tx_fifo_payload_length[N]`: Lengths of the generated fragments in bytes
+- `tx_fifo_payload_length[N]`: Pointers to the lengths (`uint16_t*`) of the generated fragments in bytes
 - `size_of_tx_fifo_payload_buffer[N]`: Sizes of the TX payload buffers in bytes
 - `frequency_in_hz`: Frequency in Hz
 - `rx_frequency_offset_in_hz`: Frequency offset for reception in Hz
@@ -269,6 +269,7 @@ The `callback_post_radio_transaction` receives an `rp_status_t` parameter indica
 - `RP_STATUS_RTTOF_TIMEOUT`: RTToF operation timed out
 - `RP_STATUS_RADIO_LOCKED`: Radio access has been locked successfully
 - `RP_STATUS_RADIO_UNLOCKED`: Radio access has been unlocked
+- `RP_STATUS_REQUEST_NEXT_TX_PAYLOAD`: FLRC burst TX only: the next fragment of the bursted TX payload must be provided (in `tx_fifo_payload_buffer` / `tx_fifo_payload_length`)
 
 ### Constants
 - `RAC_INVALID_RADIO_ID` (0xFF): Returned by `smtc_rac_open_radio()` when the request fails
@@ -283,6 +284,8 @@ Gets the USP RAC API version.
 #### `void smtc_rac_init(void);`
 Initializes the RAC. Must be called before any other API function. `smtc_rac_set_radio_context()` must be called before this function.
 
+When LoRa Basics Modem is used (`USE_LBM`), `smtc_rac_init()` also gives the radio planner & RALF contexts to LBM (`smtc_modem_set_rp_ralf_contextes()`): it must therefore be called **before** `smtc_modem_init()`.
+
 #### `void smtc_rac_run_engine(void);`
 Runs the RAC engine. Should be called regularly to process scheduled operations.
 
@@ -292,7 +295,9 @@ Checks if a radio IRQ is pending.
 ### Radio Access Management
 
 #### `uint8_t smtc_rac_open_radio(smtc_rac_priority_t priority);`
-Requests radio access with a given priority. Returns a radio access ID, or `RAC_INVALID_RADIO_ID` if the request fails.
+Requests radio access with a given priority. Returns a radio access ID (equal to the priority level), or `RAC_INVALID_RADIO_ID` if the request fails.
+
+Each priority can be opened only once: calling `smtc_rac_open_radio()` with a priority that is already opened (and not closed with `smtc_rac_close_radio()`) triggers a modem panic (`rp_hook_init`), it does not return `RAC_INVALID_RADIO_ID`. The context associated to the priority is reset to 0 by this function.
 
 #### `smtc_rac_return_code_t smtc_rac_close_radio(uint8_t radio_access_id);`
 Closes the radio access and releases resources associated with the given radio access ID.
@@ -430,38 +435,49 @@ graph TD
 ## Example Usage
 
 ```c
+#include "smtc_rac_api.h"
+#include "smtc_core_hal.h"        // smtc_modem_hal_get_time_in_ms()
+#include "smtc_core_hal_trace.h"  // SMTC_MODEM_HAL_TRACE_PRINTF()
+
+static uint8_t payload_buffer[] = { 0x01, 0x02, 0x03, 0x04 };
+
 void my_pre_callback(void) {
-    LOG("Radio transaction starting...\n");
+    SMTC_MODEM_HAL_TRACE_PRINTF("Radio transaction starting...\n");
 }
 
 void my_post_callback(rp_status_t status) {
-    LOG("Radio transaction completed with status: %d\n", status);
+    SMTC_MODEM_HAL_TRACE_PRINTF("Radio transaction completed with status: %d\n", status);
     if (status == RP_STATUS_TX_DONE) {
-        LOG("Transmission successful!\n");
+        SMTC_MODEM_HAL_TRACE_PRINTF("Transmission successful!\n");
     } else if (status == RP_STATUS_RX_PACKET) {
-        LOG("Packet received!\n");
+        SMTC_MODEM_HAL_TRACE_PRINTF("Packet received!\n");
     }
 }
 
 // Set radio context (must be called before init)
 smtc_rac_set_radio_context(my_radio_context);
 
-// Initialize RAC
+// Initialize RAC (before smtc_modem_init() if LoRa Basics Modem is also used)
 smtc_rac_init();
 
-// Request radio access
+// Request radio access (each priority can be opened only once)
 uint8_t radio_id = smtc_rac_open_radio(RAC_HIGH_PRIORITY);
 
-// Get context and configure parameters
+// Get context and configure parameters (all the fields are reset to 0 by smtc_rac_open_radio())
 smtc_rac_context_t *ctx = smtc_rac_get_context(radio_id);
 ctx->modulation_type = SMTC_RAC_MODULATION_LORA;
 ctx->radio_params.lora.is_tx = true;
 ctx->radio_params.lora.frequency_in_hz = 868100000;
 ctx->radio_params.lora.tx_power_in_dbm = 14;
-ctx->radio_params.lora.tx_size = payload_size;
+ctx->radio_params.lora.tx_size = sizeof(payload_buffer);
 ctx->radio_params.lora.sf = RAL_LORA_SF7;
 ctx->radio_params.lora.bw = RAL_LORA_BW_125_KHZ;
 ctx->radio_params.lora.cr = RAL_LORA_CR_4_5;
+ctx->radio_params.lora.preamble_len_in_symb = 8;
+ctx->radio_params.lora.header_type = RAL_LORA_PKT_EXPLICIT;
+ctx->radio_params.lora.crc_is_on = true;
+ctx->radio_params.lora.invert_iq_is_on = false;
+ctx->radio_params.lora.sync_word = LORA_PRIVATE_NETWORK_SYNCWORD;
 ctx->smtc_rac_data_buffer_setup.tx_payload_buffer = payload_buffer;
 ctx->smtc_rac_data_buffer_setup.size_of_tx_payload_buffer = sizeof(payload_buffer);
 ctx->scheduler_config.start_time_ms = smtc_modem_hal_get_time_in_ms();
@@ -475,7 +491,15 @@ smtc_rac_return_code_t result = smtc_rac_submit_radio_transaction(radio_id);
 // In main loop
 while (1) {
     smtc_rac_run_engine();
+
+    // Do not sleep if a radio IRQ is pending: run the engine again
+    if (smtc_rac_is_irq_flag_pending()) {
+        continue;
+    }
+    // Platform specific: wait for the next interrupt (radio IRQ, timer, ...)
 }
 ```
+
+See `examples/main_examples/ping_pong_example` or `examples/main_examples/periodical_uplink_example` for complete applications (including the sleep management of the main loop).
 
 For more details, see the header files [`smtc_rac_api.h`](smtc_rac_api/smtc_rac_api.h) & [`smtc_rac.h`](smtc_rac/smtc_rac.h).

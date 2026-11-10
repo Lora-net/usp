@@ -43,8 +43,8 @@
 #include "radio_planner.h"
 #include "ral.h"
 #include "ralf.h"
-#include "smtc_modem_hal_dbg_trace.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal_trace.h"
+#include "smtc_core_hal.h"
 #include "smtc_rac_api.h"
 #include "smtc_rac_lbt.h"
 #include "smtc_rac_local_func.h"
@@ -54,7 +54,7 @@
 #endif
 
 // Conditional logging for LoRa module
-#if RAC_LOG_ENABLE
+#if RAC_LORA_LOG_ENABLE
 #define RAC_LOG_APP_PREFIX "RAC-LORA"
 #include "smtc_rac_log.h"
 #else
@@ -203,7 +203,7 @@ smtc_rac_return_code_t smtc_rac_lora( uint8_t radio_access_id )
     rp_radio_params_t rp_radio_params = prepare_radio_params_for_lora( rac_config );
     if( ( rp_radio_params.pkt_type != RAL_PKT_TYPE_LORA ) && ( rp_radio_params.pkt_type != RAL_PKT_TYPE_RTTOF ) )
     {
-        RAC_LOG_ERROR("Failed to prepare radio parameters");
+        RAC_LOG_ERROR( "Failed to prepare radio parameters" );
         smtc_modem_hal_unprotect_api_call( );
         return SMTC_RAC_ERROR;
     }

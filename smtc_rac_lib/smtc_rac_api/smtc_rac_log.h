@@ -47,8 +47,8 @@ extern "C" {
 
 #include <stdio.h>
 
-#include "smtc_modem_hal_dbg_trace.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal_trace.h"
+#include "smtc_core_hal.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -107,6 +107,7 @@ extern "C" {
 #define RAC_LOG_TIMESTAMP( ) smtc_modem_hal_get_time_in_ms( )
 
 // Internal formatting helper: %.218s + \n + \0 = 220 bytes max (fits SMTC_PRINT_BUFFER_SIZE)
+#if ( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
 #define RAC_LOG_FORMAT( level, ... )                                                                 \
     do                                                                                               \
     {                                                                                                \
@@ -116,6 +117,17 @@ extern "C" {
         snprintf( _rac_log_buf + _offset, sizeof( _rac_log_buf ) - _offset, __VA_ARGS__ );           \
         SMTC_MODEM_HAL_TRACE_PRINTF( "%.218s\n", _rac_log_buf );                                     \
     } while( 0 )
+#else
+// Arguments stay referenced in dead code (removed by the compiler) to avoid unused variable warnings
+#define RAC_LOG_FORMAT( level, ... )                   \
+    do                                                 \
+    {                                                  \
+        if( 0 )                                        \
+        {                                              \
+            ( void ) snprintf( NULL, 0, __VA_ARGS__ ); \
+        }                                              \
+    } while( 0 )
+#endif
 
 /*
  * -----------------------------------------------------------------------------

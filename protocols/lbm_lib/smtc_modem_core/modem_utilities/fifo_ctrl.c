@@ -42,7 +42,7 @@
 
 #include "fifo_ctrl.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -157,10 +157,10 @@ static fifo_return_status_t ctrl_set( fifo_ctrl_t* ctrl, const uint8_t* buffer, 
     }
 
     // Write data length - 2 bytes MSB first
-    ctrl->buffer[ctrl->write_offset] = ( uint8_t )( buffer_len >> 8 );
+    ctrl->buffer[ctrl->write_offset] = ( uint8_t ) ( buffer_len >> 8 );
     ctrl->write_offset += 1;
     ctrl->write_offset %= ctrl->buffer_size;
-    ctrl->buffer[ctrl->write_offset] = ( uint8_t )( buffer_len );
+    ctrl->buffer[ctrl->write_offset] = ( uint8_t ) ( buffer_len );
     ctrl->write_offset += 1;
     ctrl->write_offset %= ctrl->buffer_size;
 

@@ -46,8 +46,6 @@ extern "C" {
 #include <stdint.h>   // C99 types
 #include <stdbool.h>  // bool type
 
-#include "smtc_modem_api.h"
-
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC CONSTANTS --------------------------------------------------------

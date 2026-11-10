@@ -60,7 +60,6 @@ extern "C" {
 #define LORAWAN_VERSION_PATCH           (4)
 #define LORAWAN_VERSION_REVISION        (1)
 
-// never use #define LINK_CHECK_REQ_SIZE
 #define LINK_CHECK_REQ_SIZE             (1)
 #define LINK_CHECK_ANS_SIZE             (3)
 #define LINK_ADR_REQ_SIZE               (5)
@@ -164,7 +163,6 @@ typedef enum lr1mac_states_e
     LWPSTATE_TX_WAIT,
     LWPSTATE_INVALID,
     LWPSTATE_ERROR,
-    LWPSTATE_DUTY_CYCLE_FULL,
     LWPSTATE_BUSY,
 } lr1mac_states_t;
 
@@ -255,11 +253,13 @@ typedef enum cid_from_device_e
 } cid_from_device_t;
 
 static const uint8_t lr1mac_cmd_mac_ans_size[NB_MAC_CMD_ANS] = {
-    [LINK_CHECK_ANS] = LINK_CHECK_ANS_SIZE,         [LINK_ADR_ANS] = LINK_ADR_ANS_SIZE,
+    [LINK_CHECK_REQ] = LINK_CHECK_REQ_SIZE,         [LINK_ADR_ANS] = LINK_ADR_ANS_SIZE,
     [DUTY_CYCLE_ANS] = DUTY_CYCLE_ANS_SIZE,         [RXPARRAM_SETUP_ANS] = RXPARRAM_SETUP_ANS_SIZE,
     [DEV_STATUS_ANS] = DEV_STATUS_ANS_SIZE,         [NEW_CHANNEL_ANS] = NEW_CHANNEL_ANS_SIZE,
     [RXTIMING_SETUP_ANS] = RXTIMING_SETUP_ANS_SIZE, [TXPARAM_SETUP_ANS] = TXPARAM_SETUP_ANS_SIZE,
-    [DL_CHANNEL_ANS] = DL_CHANNEL_ANS_SIZE,
+    [DL_CHANNEL_ANS] = DL_CHANNEL_ANS_SIZE,         [DEVICE_TIME_REQ] = DEVICE_TIME_REQ_SIZE,
+    [PING_SLOT_INFO_REQ] = PING_SLOT_INFO_REQ_SIZE, [PING_SLOT_CHANNEL_ANS] = PING_SLOT_CHANNEL_ANS_SIZE,
+    [BEACON_FREQ_ANS] = BEACON_FREQ_ANS_SIZE,
 };
 
 typedef enum lr1mac_bandwidth_e
@@ -500,8 +500,9 @@ typedef struct lr1_mac_nvm_context_s
 
 typedef enum cf_list_type
 {
-    CF_LIST_FREQ = 0,
-    CF_LIST_CH_MASK,
+    CF_LIST_FREQ = 0,  // CFList is a list of up to 5 freqs to enable
+    CF_LIST_CH_MASK,   // CFList is a bitfield representing [40/96] distinct, already-defined frequencies around
+                       // [800-900]MHz to enable (See RP2-1.0.4)
 } cf_list_type_t;
 
 /********************************************************************************/

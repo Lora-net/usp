@@ -5,6 +5,7 @@ set(SMTC_FLRP_CRYPTO_DIR ${CMAKE_CURRENT_LIST_DIR}/smtc_flrp_crypto)
 add_library(smtc_flrp_crypto OBJECT)
 
 target_include_directories(smtc_flrp_crypto PUBLIC
+    ${SMTC_FLRP_CRYPTO_DIR}
     ${SMTC_FLRP_CRYPTO_DIR}/soft_secure_element
 )
 
@@ -23,4 +24,7 @@ set_source_files_properties(
     ${SMTC_FLRP_CRYPTO_DIR}/soft_secure_element/aes.c
     PROPERTIES COMPILE_FLAGS "-O2 -fno-strict-aliasing"
 )
+
+# Link to basics_hal cause logs are used
+target_link_libraries(smtc_flrp_crypto PRIVATE smtc_core_hal_interface)
 

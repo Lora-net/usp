@@ -45,7 +45,7 @@
 #include "smtc_rac_api.h"
 #include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "PING-PONG"

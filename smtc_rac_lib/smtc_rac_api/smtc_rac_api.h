@@ -79,7 +79,7 @@ extern "C" {
  */
 typedef struct smtc_rac_context_s
 {
-    smtc_rac_modulation_type_t modulation_type; /*!< Type of modulation (LoRa, FSK, or LR-FHSS). */
+    smtc_rac_modulation_type_t modulation_type; /*!< Type of modulation (LoRa, FSK, LR-FHSS, FLRC or FLRC burst). */
     union
     {
         smtc_rac_radio_lora_params_t       lora;             /*!< LoRa radio parameters. */

@@ -55,8 +55,36 @@ extern "C" {
  */
 
 /* clang-format off */
-#define NUMBER_OF_TX_CHANNEL_AU_915         (72)            // TX 64 125KHz + 8 500KHz channels
-#define NUMBER_OF_RX_CHANNEL_AU_915         (8)             // RX 8 500KHz channels
+#define NUMBER_OF_TX_CHANNEL_125KHZ_FIX_AU_915   (64)
+#define NUMBER_OF_TX_CHANNEL_500KHZ_FIX_AU_915   (8)
+#define NUMBER_OF_RX1_CHANNEL_500KHZ_FIX_AU_915  (8)
+
+#if ( defined( RP2_104 ) || defined( RP2_105 ) )
+    #ifndef USER_ADDED_TX_CHANNELS_AU_915 //If not defined from makefile/env
+        #define USER_ADDED_TX_CHANNELS_AU_915 0 // <-- The number of ADDED channels (up to 8)
+    #endif
+    #ifndef USER_ADDED_RX_CHANNELS_AU_915 
+        #define USER_ADDED_RX_CHANNELS_AU_915 0
+    #endif
+#else //Before RP2_1.0.4, no user RX/TX channels def were possible
+    #define USER_ADDED_TX_CHANNELS_AU_915 0
+    #define USER_ADDED_RX_CHANNELS_AU_915 0
+#endif
+
+#define NUMBER_OF_TX_CHANNEL_AU_915                                                     \
+    ( NUMBER_OF_TX_CHANNEL_125KHZ_FIX_AU_915 + NUMBER_OF_TX_CHANNEL_500KHZ_FIX_AU_915 + \
+        USER_ADDED_TX_CHANNELS_AU_915 )  // TX: 64* 125KHz + 8* 500KHz channels + 8* flexibly-defined
+#if (NUMBER_OF_TX_CHANNEL_AU_915 > 80)
+#error "For AU915, TX channel number cannot be >80. Please reduce USER_ADDED_TX_CHANNELS_AU_915."
+#endif
+
+#define NUMBER_OF_RX_CHANNEL_AU_915            \
+    ( NUMBER_OF_RX1_CHANNEL_500KHZ_FIX_AU_915 + \
+        USER_ADDED_RX_CHANNELS_AU_915 )  // RX: 8* 500KHz channels + 72* flexibly-defined
+#if (NUMBER_OF_RX_CHANNEL_AU_915 > 80)
+#error "For AU915, RX channel number cannot be >80. Please reduce USER_ADDED_RX_CHANNELS_AU_915."
+#endif
+
 #define JOIN_ACCEPT_DELAY1_AU_915           (5)             // define in seconds
 #define JOIN_ACCEPT_DELAY2_AU_915           (6)             // define in seconds
 #define RECEIVE_DELAY1_AU_915               (1)             // define in seconds
@@ -79,29 +107,54 @@ extern "C" {
 #define SYNC_WORD_PRIVATE_AU_915            (0x12)
 #define SYNC_WORD_PUBLIC_AU_915             (0x34)
 #define MIN_TX_DR_AU_915                    (0)
-#define MAX_TX_DR_LORA_AU_915               (6)
+#define MIN_TX_DR_LIMIT_AU_915              (2)             // When uplink_dwell_time == 1
+// #define MAX_TX_DR_LORA_AU_915               (6)
+#if defined( RP2_105 )
+#define MAX_TX_DR_AU_915                    (10)            // DR8 is invalid in this region
+#define MAX_RX_DR_AU_915                    (14)
+#else
 #define MAX_TX_DR_AU_915                    (7)
-#define MIN_TX_DR_LIMIT_AU_915              (2)
-#define NUMBER_OF_TX_DR_AU_915              (8)
-#define MIN_RX_DR_AU_915                    (8)
 #define MAX_RX_DR_AU_915                    (13)
+#endif
+#define NUMBER_OF_TX_DR_AU_915              (MAX_TX_DR_AU_915 - MIN_TX_DR_AU_915 + 1)            // DR8 is invalid but still needs to be counted
 
 #if defined( RP2_101 )
-#define DR_BITFIELD_SUPPORTED_AU_915        (uint16_t)( ( 1 << DR13 ) | ( 1 << DR12 ) | \
-                                                        ( 1 << DR11 ) | ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR8 ) | ( 1 << DR6 ) | \
-                                                        ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
-#elif defined( RP2_103 )
-#define DR_BITFIELD_SUPPORTED_AU_915        (uint16_t)( ( 1 << DR13 ) | ( 1 << DR12 ) | \
-                                                        ( 1 << DR11 ) | ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR8 ) | ( 1 << DR7 ) | ( 1 << DR6 ) | \
-                                                        ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#define TX_DR_BITFIELD_SUPPORTED_AU_915        (uint16_t)( ( 1 << DR6 ) | ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | \
+                                                           ( 1 << DR0 ) )
+#define RX_DR_BITFIELD_SUPPORTED_AU_915        (uint16_t)( ( 1 << DR13 ) | ( 1 << DR12 ) | ( 1 << DR11 ) | ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR8 ) )
+#elif (defined( RP2_103 ) || defined( RP2_104 ))
+#define TX_DR_BITFIELD_SUPPORTED_AU_915        (uint16_t)( ( 1 << DR7 ) | ( 1 << DR6 ) | ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | \
+                                                           ( 1 << DR1 ) | ( 1 << DR0 ) )
+#define RX_DR_BITFIELD_SUPPORTED_AU_915        (uint16_t)( ( 1 << DR13 ) | ( 1 << DR12 ) | ( 1 << DR11 ) | ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR8 ) )
+#elif defined ( RP2_105 )
+#define TX_DR_BITFIELD_SUPPORTED_AU_915        (uint16_t)( ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR7 ) | ( 1 << DR6 ) | ( 1 << DR5 ) | ( 1 << DR4 ) | \
+                                                           ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#define RX_DR_BITFIELD_SUPPORTED_AU_915        (uint16_t)( ( 1 << DR14 ) |( 1 << DR13 ) | ( 1 << DR12 ) | ( 1 << DR11 ) | ( 1 << DR10 ) | ( 1 << DR9 ) | \
+                                                           ( 1 << DR8 ) | ( 1 << DR0 ) )
 #endif
 
+// DR bitfield for LoRa TX 125KHz channels
+#if defined ( RP2_105 )
+#define DEFAULT_TX_DR_125_BIT_FIELD_AU_915  (uint16_t)( ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | \
+                                                        ( 1 << DR1 ) | ( 1 << DR0 ) )
+#else
 #define DEFAULT_TX_DR_125_BIT_FIELD_AU_915  (uint16_t)( ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#endif
+
+// DR bitfield for TX 500KHz channels + LR-FHSS channels
 #if defined( RP2_101 )
 #define DEFAULT_TX_DR_500_BIT_FIELD_AU_915  (uint16_t)( ( 1 << DR6 ) )
-#elif defined( RP2_103 )
+#elif (defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ))
 #define DEFAULT_TX_DR_500_BIT_FIELD_AU_915  (uint16_t)( ( 1 << DR7 ) | ( 1 << DR6 ) )
 #endif
+
+
+// #define DEFAULT_TX_DR_125_BIT_FIELD_AU_915  (uint16_t)( ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+// #if defined( RP2_101 )
+// #define DEFAULT_TX_DR_500_BIT_FIELD_AU_915  (uint16_t)( ( 1 << DR6 ) )
+// #elif (defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ))
+// #define DEFAULT_TX_DR_500_BIT_FIELD_AU_915  (uint16_t)( ( 1 << DR7 ) | ( 1 << DR6 ) )
+// #endif
 
 #define TX_PARAM_SETUP_REQ_SUPPORTED_AU_915 (true)
 #define NEW_CHANNEL_REQ_SUPPORTED_AU_923    (false)         // This mac command is NOT required for AU915
@@ -110,7 +163,7 @@ extern "C" {
 
 #define UPLINK_DWELL_TIME_AU_915            (true)
 
-#define CF_LIST_SUPPORTED_AU_915            (CF_LIST_CH_MASK)
+#define CF_LIST_SUPPORTED_AU_915            (uint8_t)( 1 << CF_LIST_CH_MASK )
 
 #define DEFAULT_TX_FREQ_125_START_AU_915    (915200000) // Hz
 #define DEFAULT_TX_STEP_125_AU_915          (200000)    // Hz
@@ -147,13 +200,18 @@ typedef enum au_915_channels_bank_e
     BANK_6_125_AU915 = 6,  // 125KHZ 48 - 55
     BANK_7_125_AU915 = 7,  // 125KHZ 56 - 63
     BANK_8_500_AU915 = 8,  // 500KHz 64 - 72
+#if ( ( defined( RP2_104 ) || defined( RP2_105 ) ) && ( USER_ADDED_TX_CHANNELS_AU_915 > 0 ) )
+    BANK_9_AU915 = 9,  // 125KHz 72 - 79
+#endif
     BANK_MAX_AU915
 } au_915_channels_bank_t;
 
 typedef struct region_au915_context_s
 {
+    uint32_t tx_frequency_channel[NUMBER_OF_TX_CHANNEL_AU_915];
+    uint32_t rx1_frequency_channel[NUMBER_OF_RX_CHANNEL_AU_915];
     uint16_t dr_bitfield_tx_channel[NUMBER_OF_TX_CHANNEL_AU_915];
-    uint8_t  channel_index_enabled[BANK_MAX_AU915];     // 8ch-125KHz + 1ch-500KHZ // Enable by Network
+    uint8_t  tx_channel_index_enabled[BANK_MAX_AU915];  // 8ch-125KHz + 1ch-500KHZ // Enable by Network
     uint8_t  unwrapped_channel_mask[BANK_MAX_AU915];    // 8ch-125KHz + 1ch-500KHZ // Temp conf send by Network
     uint8_t  snapshot_channel_tx_mask[BANK_MAX_AU915];  // 8ch-125KHz + 1ch-500KHZ // snapshot of used channels
     uint8_t  dr_distribution_init[NUMBER_OF_TX_DR_AU_915];
@@ -177,7 +235,7 @@ static const uint8_t SYNC_WORD_LR_FHSS_AU_915[] = { 0x2C, 0x0F, 0x79, 0x95 };
 /**
  * Up/Down link data rates offset definition
  */
-static const uint8_t datarate_offsets_au_915[8][6] = {
+static const uint8_t datarate_offsets_au_915[NUMBER_OF_TX_DR_AU_915][6] = {
     { 8, 8, 8, 8, 8, 8 },       // DR 0
     { 9, 8, 8, 8, 8, 8 },       // DR 1
     { 10, 9, 8, 8, 8, 8 },      // DR 2
@@ -186,56 +244,119 @@ static const uint8_t datarate_offsets_au_915[8][6] = {
     { 13, 12, 11, 10, 9, 8 },   // DR 5
     { 13, 13, 12, 11, 10, 9 },  // DR 6
     { 9, 8, 8, 8, 8, 8 },       // DR 7
+#if defined( RP2_105 )
+    { 8, 8, 8, 8, 8, 8 },       // DR 8 (INVALID - should never be reached)
+    { 14, 13, 12, 11, 10, 9 },  // DR 9
+    { 0, 14, 13, 12, 11, 10 },  // DR 10
+#endif
 };
 
 /**
  * @brief uplink datarate backoff
  *
  */
-static const uint8_t datarate_backoff_au_915[2][8] = { {
-                                                           // [0][dr_backoff] dwell time Off
-                                                           0,  // DR0 -> DR0
-                                                           0,  // DR1 -> DR0
-                                                           1,  // DR2 -> DR1
-                                                           2,  // DR3 -> DR2
-                                                           3,  // DR4 -> DR3
-                                                           4,  // DR5 -> DR4
-                                                           5,  // DR6 -> DR5
-                                                           0   // DR7 -> DR0
-                                                       },
-                                                       {
-                                                           // [1][dr_backoff] dwell time On
-                                                           2,  // NA
-                                                           2,  // NA
-                                                           2,  // DR2 -> DR2
-                                                           2,  // DR3 -> DR2
-                                                           3,  // DR4 -> DR3
-                                                           4,  // DR5 -> DR4
-                                                           5,  // DR6 -> DR5
-                                                           2   // DR7 -> DR2
-                                                       } };
+static const uint8_t datarate_backoff_au_915[2][NUMBER_OF_TX_DR_AU_915] = {
+    {
+        // [0][dr_backoff] dwell time Off
+        0,  // DR0 -> DR0
+        0,  // DR1 -> DR0
+        1,  // DR2 -> DR1
+        2,  // DR3 -> DR2
+        3,  // DR4 -> DR3
+        4,  // DR5 -> DR4
+        5,  // DR6 -> DR5
+        0,  // DR7 -> DR0
+#if defined( RP2_105 )
+        0,  // DR8 -> DR0 (DR8 is INVALID, should not happen)
+        5,  // DR9 -> DR5
+        9,  // DR10 -> DR9
+#endif
+    },
+    {
+        // [1][dr_backoff] dwell time On
+        2,  // NA
+        2,  // NA
+        2,  // DR2 -> DR2
+        2,  // DR3 -> DR2
+        3,  // DR4 -> DR3
+        4,  // DR5 -> DR4
+        5,  // DR6 -> DR5
+        2,  // DR7 -> DR2
+#if defined( RP2_105 )
+        2,  // DR8 -> DR2 (DR8 is INVALID, should not happen)
+        5,  // DR9 -> DR5
+        9,  // DR10 -> DR9
+#endif
+    }
+};
 
 static const uint8_t NUMBER_RX1_DR_OFFSET_AU_915 =
     sizeof( datarate_offsets_au_915[0] ) / sizeof( datarate_offsets_au_915[0][0] );
 
 /**
- * Data rates table definition
+ * LoRa TX data rates table definition
  */
-static const uint8_t datarates_to_sf_au_915[] = { 12, 11, 10, 9, 8, 7, 8, 0, 12, 11, 10, 9, 8, 7, 0, 0 };
+#if defined( RP2_105 )
+static const uint8_t tx_datarates_to_sf_au_915[NUMBER_OF_TX_DR_AU_915] = { 12, 11, 10, 9, 8, 7, 8, 0, 0, 6, 5 };
+#else
+static const uint8_t tx_datarates_to_sf_au_915[NUMBER_OF_TX_DR_AU_915] = { 12, 11, 10, 9, 8, 7, 8, 0 };
+#endif
 
 /**
- * Bandwidths table definition in KHz
+ * LoRa RX data rates table definition
  */
-static const uint32_t datarates_to_bandwidths_au_915[] = { BW125, BW125, BW125, BW125, BW125, BW125, BW500,  BW_RFU,
-                                                           BW500, BW500, BW500, BW500, BW500, BW500, BW_RFU, BW_RFU };
+#if defined( RP2_105 )
+static const uint8_t rx_datarates_to_sf_au_915[MAX_RX_DR_AU_915 + 1] = {
+    5, 0, 0, 0, 0, 0, 0, 0, 12, 11, 10, 9, 8, 7, 6
+};
+#else
+static const uint8_t rx_datarates_to_sf_au_915[MAX_RX_DR_AU_915 + 1] = { 0, 0, 0, 0, 0, 0, 0, 0, 12, 11, 10, 9, 8, 7 };
+#endif
+
+/**
+ * LoRa TX bandwidths table definition in KHz
+ */
+#if defined( RP2_105 )
+static const uint32_t tx_datarates_to_bandwidths_au_915[] = { BW125,  BW125,  BW125,  BW125, BW125, BW125,
+                                                              BW500,  BW_RFU, BW_RFU, BW125, BW125, BW_RFU,
+                                                              BW_RFU, BW_RFU, BW_RFU, BW_RFU };
+#else
+static const uint32_t tx_datarates_to_bandwidths_au_915[] = { BW125,  BW125,  BW125,  BW125,  BW125,  BW125,
+                                                              BW500,  BW_RFU, BW_RFU, BW_RFU, BW_RFU, BW_RFU,
+                                                              BW_RFU, BW_RFU, BW_RFU, BW_RFU };
+#endif
+
+/**
+ * LoRa RX bandwidths table definition in KHz
+ */
+#if defined( RP2_105 )
+static const uint32_t rx_datarates_to_bandwidths_au_915[] = { BW500,  BW_RFU, BW_RFU, BW_RFU, BW_RFU, BW_RFU,
+                                                              BW_RFU, BW_RFU, BW500,  BW500,  BW500,  BW500,
+                                                              BW500,  BW500,  BW500,  BW_RFU };
+#else
+static const uint32_t rx_datarates_to_bandwidths_au_915[] = { BW_RFU, BW_RFU, BW_RFU, BW_RFU, BW_RFU, BW_RFU,
+                                                              BW_RFU, BW_RFU, BW500,  BW500,  BW500,  BW500,
+                                                              BW500,  BW500,  BW_RFU, BW_RFU };
+#endif
 
 /**
  * Payload max size table definition in bytes
  */
-static const uint8_t M_au_915[2][16] = {
-    { 59, 59, 59, 123, 250, 250, 250, 58, 61, 137, 250, 250, 250, 250, 0, 0 },  // [0][dr] dwell time Off
-    { 0, 0, 19, 61, 133, 250, 250, 58, 61, 137, 250, 250, 250, 250, 0, 0 }      // [1][dr] dwell time On
+#if defined( RP2_105 )
+static const uint8_t M_tx_au_915_dwell_time_off[NUMBER_OF_TX_DR_AU_915] = { 59,  59, 59, 123, 250, 250,
+                                                                            250, 58, 0,  250, 250 };
+static const uint8_t M_tx_au_915_dwell_time_on[NUMBER_OF_TX_DR_AU_915]  = {
+    0, 0, 19, 61, 133, 250, 250, 58, 0, 250, 250
 };
+
+static const uint8_t M_rx_au_915[MAX_RX_DR_AU_915 + 1] = { 250, 0, 0, 0, 0, 0, 0, 0, 61, 137, 250, 250, 250, 250, 250 };
+#else
+static const uint8_t M_tx_au_915_dwell_time_off[NUMBER_OF_TX_DR_AU_915] = { 59, 59, 59, 123, 250, 250, 250, 58 };
+static const uint8_t M_tx_au_915_dwell_time_on[NUMBER_OF_TX_DR_AU_915]  = { 0, 0, 19, 61, 133, 250, 250, 58 };
+
+// No downlink dwell time in AU915 , so only 1 table
+static const uint8_t M_rx_au_915[MAX_RX_DR_AU_915 + 1] = { 0, 0, 0, 0, 0, 0, 0, 0, 61, 137, 250, 250, 250, 250 };
+#endif
 
 /**
  * Mobile long range datarate distribution
@@ -247,7 +368,13 @@ static const uint8_t M_au_915[2][16] = {
  * DR5:  0%,
  * DR6:  0%
  */
-static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_AU_915[] = { 2, 2, 3, 3, 0, 0, 0, 0 };
+static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_AU_915[] = {
+#if defined( RP2_105 )
+    2, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0
+#else
+    2, 2, 3, 3, 0, 0, 0, 0
+#endif
+};
 
 /**
  * Mobile low power datarate distribution
@@ -259,7 +386,13 @@ static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_AU_915[] = { 2, 2, 3, 3, 0
  * DR5: 30%,
  * DR6:  0%
  */
-static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_AU_915[] = { 0, 0, 1, 3, 3, 3, 0, 0 };
+static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_AU_915[] = {
+#if defined( RP2_105 )
+    0, 0, 1, 3, 3, 3, 0, 0, 0, 0, 0
+#else
+    0, 0, 1, 3, 3, 3, 0, 0
+#endif
+};
 
 /**
  * !! NOT USED IN AU915 !!
@@ -273,7 +406,13 @@ static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_AU_915[] = { 0, 0, 1, 3, 3, 3
  * DR5:  0%,
  * DR6: 50%
  */
-static const uint8_t JOIN_DR_DISTRIBUTION_AU_915[] = { 0, 0, 5, 0, 0, 0, 5, 0 };
+static const uint8_t JOIN_DR_DISTRIBUTION_AU_915[] = {
+#if defined( RP2_105 )
+    0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 0
+#else
+    0, 0, 5, 0, 0, 0, 5, 0
+#endif
+};
 
 /**
  * Default datarate distribution
@@ -285,7 +424,13 @@ static const uint8_t JOIN_DR_DISTRIBUTION_AU_915[] = { 0, 0, 5, 0, 0, 0, 5, 0 };
  * DR5:   0%,
  * DR6:   0%
  */
-static const uint8_t DEFAULT_DR_DISTRIBUTION_AU_915[] = { 0, 0, 1, 0, 0, 0, 0, 0 };
+static const uint8_t DEFAULT_DR_DISTRIBUTION_AU_915[] = {
+#if defined( RP2_105 )
+    0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0
+#else
+    0, 0, 1, 0, 0, 0, 0, 0
+#endif
+};
 
 /*
  * -----------------------------------------------------------------------------

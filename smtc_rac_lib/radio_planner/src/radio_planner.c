@@ -42,17 +42,19 @@
 #include "radio_planner.h"
 #include "duty_cycle.h"
 #include "radio_planner_types.h"
-#include "smtc_modem_hal_dbg_trace.h"
+
+#include "radio_planner_trace.h"
+#include "smtc_core_hal.h"  //For modem_panic, SMTC_LBM_IS_VALID_FN_PTR, etc
+
 // #define DEBUG_GPIO 1
 #if DEBUG_GPIO
-#include "../../../examples/smtc_hal_l4/smtc_hal_gpio.h"
+#include "../../../lbm_examples/smtc_hal_l4/smtc_hal_gpio.h"
 #define DEBUG_GPIO_ON hal_gpio_init_out( PA_4, 1 );
 #define DEBUG_GPIO_OFF hal_gpio_init_out( PA_4, 0 );
 #else
 #define DEBUG_GPIO_ON
 #define DEBUG_GPIO_OFF
 #endif
-#include "smtc_modem_hal.h"
 
 #if defined( ADD_LBM_GEOLOCATION )
 #include "lr11xx_system.h"  // For blocking command abort
@@ -336,29 +338,27 @@ rp_hook_status_t rp_task_enqueue( radio_planner_t* rp, const rp_task_t* task, ui
 
     if( ( task->state == RP_TASK_STATE_SCHEDULE ) && ( ( ( int32_t ) ( task->start_time_ms - now ) <= 0 ) ) )
     {
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF(
-            " RP: Task #%u enqueue impossible. Task is in past start_time_ms:%d - now:%d = %d\n", hook_id,
-            task->start_time_ms, now, task->start_time_ms - now );
+        SMTC_RP_TRACE_PRINTF( "Task #%u enqueue impossible. Task is in past start_time_ms:%d - now:%d = %d\n", hook_id,
+                              task->start_time_ms, now, task->start_time_ms - now );
         return RP_TASK_STATUS_SCHEDULE_TASK_IN_PAST;
     }
 
     if( ( ( task->start_time_ms - now ) > 36000000 ) &&
         ( task->start_time_ms > now ) )  // this task is too far in the future, improve robustness to wrapping issue
     {
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF(
-            " RP: Task enqueue impossible. Task is too far in future start_time_ms:%d - now:%d = %d\n",
-            task->start_time_ms, now, task->start_time_ms - now );
+        SMTC_RP_TRACE_PRINTF( "Task enqueue impossible. Task is too far in future start_time_ms:%d - now:%d = %d\n",
+                              task->start_time_ms, now, task->start_time_ms - now );
         return RP_TASK_STATUS_TASK_TOO_FAR_IN_FUTURE;
     }
 
     if( rp->tasks[hook_id].state == RP_TASK_STATE_RUNNING )
     {
-        SMTC_MODEM_HAL_TRACE_PRINTF( " RP: Task enqueue impossible. Task is already running\n" );
+        SMTC_RP_TRACE_PRINTF( "Task enqueue impossible. Task is already running\n" );
         return RP_TASK_STATUS_ALREADY_RUNNING;
     }
     if( rp->tasks[hook_id].state != RP_TASK_STATE_FINISHED )
     {
-        SMTC_MODEM_HAL_TRACE_PRINTF( " RP: WARNING Task is already running\n" );
+        SMTC_RP_TRACE_PRINTF( "WARNING Task is already running\n" );
     }
     rp->status[hook_id]              = RP_STATUS_TASK_INIT;
     rp->tasks[hook_id]               = *task;
@@ -375,7 +375,7 @@ rp_hook_status_t rp_task_enqueue( radio_planner_t* rp, const rp_task_t* task, ui
         rp->tasks[hook_id].priority = ( rp->tasks[hook_id].state * RP_NB_HOOKS ) + hook_id;
     }
     rp->tasks[hook_id].start_time_init_ms = rp->tasks[hook_id].start_time_ms;
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "RP: Task #%u enqueue with #%u priority\n", hook_id, rp->tasks[hook_id].priority );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "Task #%u enqueue with #%u priority\n", hook_id, rp->tasks[hook_id].priority );
     rp_task_compute_ranking( rp );
     if( ( rp->radio_irq_flag == false ) && ( rp->arbiter_flag == false ) )
     {
@@ -387,7 +387,7 @@ rp_hook_status_t rp_task_enqueue( radio_planner_t* rp, const rp_task_t* task, ui
 
 rp_hook_status_t rp_task_abort( radio_planner_t* rp, const uint8_t hook_id )
 {
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "RP: rp_task_abort #%d\n", hook_id );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "rp_task_abort #%d\n", hook_id );
     if( hook_id >= RP_NB_HOOKS )
     {
         SMTC_MODEM_HAL_PANIC( );
@@ -461,7 +461,7 @@ void rp_callback( radio_planner_t* rp )
 {
     if( rp->radio_immediate_access_in_progress == true )
     {
-        if( ( rp->immediate_irq_callback != NULL ) && ( rp->radio_irq_flag == true ) )
+        if( ( SMTC_LBM_IS_VALID_FN_PTR( rp->immediate_irq_callback ) ) && ( rp->radio_irq_flag == true ) )
         {
             rp->radio_irq_flag = false;
             rp->immediate_irq_callback( );
@@ -523,7 +523,7 @@ void rp_callback( radio_planner_t* rp )
                 }
                 return;
             }
-            SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: INFO - Radio IRQ received for hook #%u\n", rp->radio_task_id );
+            SMTC_RP_TRACE_PRINTF_DEBUG( " RP: INFO - Radio IRQ received for hook #%u\n", rp->radio_task_id );
 
             rp_irq_get_status( rp, rp->radio_task_id );
 
@@ -554,6 +554,8 @@ void rp_callback( radio_planner_t* rp )
             // the arbiter
             rp->radio_is_free = false;  // this is a kind of critical section
             rp_task_free( rp, &rp->tasks[rp->radio_task_id] );
+            SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_set_standby( TARGET_RAL, RAL_STANDBY_CFG_RC ) == RAL_STATUS_OK );
+            SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_clear_irq_status( TARGET_RAL, RAL_IRQ_ALL ) == RAL_STATUS_OK );
             SMTC_MODEM_HAL_PANIC_ON_FAILURE( ral_set_sleep( TARGET_RAL, true ) == RAL_STATUS_OK );
             rp->radio = TARGET_RADIO;
 
@@ -588,7 +590,7 @@ void rp_callback( radio_planner_t* rp )
                     }
                 }
             }
-            SMTC_MODEM_HAL_TRACE_PRINTF( " radio planner it but no more task activated\n" );
+            SMTC_RP_TRACE_PRINTF( "Radio Planner IT but no more task activated\n" );
         }
 
         smtc_modem_hal_set_ant_switch( false );
@@ -601,7 +603,8 @@ bool rp_get_irq_flag( void* obj )
 {
     radio_planner_t* rp = ( ( radio_planner_t* ) obj );
     if( ( rp->timer_irq_flag == true ) || ( rp->radio_irq_flag == true ) ||
-        ( rp->tasks[rp->radio_task_id].type == RP_TASK_TYPE_LOCK_RADIO_ACCESS ) )
+        ( ( rp->tasks[rp->radio_task_id].type == RP_TASK_TYPE_LOCK_RADIO_ACCESS ) &&
+          ( rp_radio_is_free( rp ) == false ) ) )
     {
         return true;
     }
@@ -681,7 +684,7 @@ static void rp_task_update_time( radio_planner_t* rp, uint32_t now )
                 // Schedule the task at (now + RP_TASK_RE_SCHEDULE_OFFSET_TIME) seconds
                 rp->tasks[i].start_time_ms = now + RP_TASK_RE_SCHEDULE_OFFSET_TIME;
                 rp->tasks[i].priority      = ( rp->tasks[i].state * RP_NB_HOOKS ) + i;
-                SMTC_MODEM_HAL_TRACE_WARNING(
+                SMTC_RP_TRACE_WARNING(
                     "RP: SWITCH TASK #%d FROM ASAP TO SCHEDULED (start_time_init_ms:%u, now:%u, diff:%d)\n", i,
                     rp->tasks[i].start_time_init_ms, now, ( int32_t ) ( now - rp->tasks[i].start_time_init_ms ) );
                 rp_task_compute_ranking( rp );
@@ -704,8 +707,7 @@ static void rp_task_update_time( radio_planner_t* rp, uint32_t now )
             rp->tasks[rp->radio_task_id].priority = ( RP_TASK_STATE_SCHEDULE * RP_NB_HOOKS ) + rp->radio_task_id;
             rp_task_compute_ranking( rp );
         }
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: Extended duration of radio task #%u time to %u ms\n", rp->radio_task_id,
-                                        now );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "Extended duration of radio task #%u time to %u ms\n", rp->radio_task_id, now );
     }
 }
 
@@ -713,7 +715,12 @@ bool rp_get_immediate_radio_access( radio_planner_t* rp, uint8_t priority, void 
 {
     if( priority > RP_HOOK_ID_MAX )
     {
-        SMTC_MODEM_HAL_TRACE_ERROR( "RP: Invalid priority #%u\n", priority );
+        SMTC_RP_TRACE_ERROR( "Invalid priority #%u\n", priority );
+        return false;
+    }
+    if( irq_callback == NULL )
+    {
+        SMTC_RP_TRACE_ERROR( "invalid irq callback\n" );
         return false;
     }
     rp->priority_task.hook_id = RP_HOOK_ID_SUSPEND;
@@ -725,8 +732,8 @@ bool rp_get_immediate_radio_access( radio_planner_t* rp, uint8_t priority, void 
         }
         // priority task not equal to radio task => abort radio task if the priority task is SCHEDULED
         rp->tasks[rp->radio_task_id].state = RP_TASK_STATE_ABORTED;
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( "RP: Abort running #%u for priority #%u\n", rp->radio_task_id,
-                                        rp->priority_task.hook_id );
+        SMTC_RP_TRACE_PRINTF_DEBUG( "RP: Abort running #%u for priority #%u\n", rp->radio_task_id,
+                                    rp->priority_task.hook_id );
 #if defined( ADD_LBM_GEOLOCATION )
         if( ( rp->radio_task_id == RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS ) ||
             ( rp->radio_task_id == RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS_ALMANAC ) ||
@@ -753,8 +760,8 @@ bool rp_release_immediate_radio_access( radio_planner_t* rp )
 {
     if( ( rp->radio_task_id != RP_HOOK_ID_SUSPEND ) || ( rp->radio_immediate_access_in_progress == false ) )
     {
-        SMTC_MODEM_HAL_TRACE_ERROR( "RP: Invalid radio task id #%u or radio immediate access in progress is false\n",
-                                    rp->radio_task_id );
+        SMTC_RP_TRACE_ERROR( "Invalid radio task id #%u or radio immediate access in progress is false\n",
+                             rp->radio_task_id );
         return false;
     }
     rp->tasks[rp->radio_task_id].state     = RP_TASK_STATE_ABORTED;
@@ -778,7 +785,7 @@ static void rp_task_arbiter( radio_planner_t* rp, const char* caller_func_name )
     {  // Next task exists
 
         int32_t delay = ( int32_t ) ( rp->priority_task.start_time_ms - now );
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF(
+        SMTC_RP_TRACE_PRINTF_DEBUG(
             " RP: Arbiter has been called by %s and priority-task #%d, timer hook #%d, delay %d, now %d, start_time_ms "
             "%u\n",
             caller_func_name, rp->priority_task.hook_id, rp->timer_hook_id, delay, now,
@@ -790,8 +797,7 @@ static void rp_task_arbiter( radio_planner_t* rp, const char* caller_func_name )
             if( rp->priority_task.state != RP_TASK_STATE_RUNNING )
             {
                 rp->stats.rp_error++;
-                SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: ERROR - delay #%d - hook #%d\n", delay,
-                                                rp->priority_task.hook_id );
+                SMTC_RP_TRACE_ERROR( " RP: ERROR - delay #%d - hook #%d\n", delay, rp->priority_task.hook_id );
 
                 rp->tasks[rp->priority_task.hook_id].state = RP_TASK_STATE_ABORTED;
             }
@@ -799,7 +805,7 @@ static void rp_task_arbiter( radio_planner_t* rp, const char* caller_func_name )
         // Case where the high priority task is in the future
         else if( ( uint32_t ) delay > rp->margin_delay )
         {  // The high priority task is in the future
-            SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: High priority task is in the future delay %d\n", delay );
+            SMTC_RP_TRACE_PRINTF_DEBUG( " RP: High priority task is in the future\n" );
         }
         // Case where the high priority task is now
         else
@@ -809,8 +815,8 @@ static void rp_task_arbiter( radio_planner_t* rp, const char* caller_func_name )
                 if( rp->tasks[rp->radio_task_id].hook_id != rp->priority_task.hook_id )
                 {  // priority task not equal to radio task => abort radio task if the priority task is SCHEDULED
                     rp->tasks[rp->radio_task_id].state = RP_TASK_STATE_ABORTED;
-                    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "RP: Abort running #%u for priority #%u\n", rp->radio_task_id,
-                                                    rp->priority_task.hook_id );
+                    SMTC_RP_TRACE_PRINTF( "Abort running #%u for priority #%u\n", rp->radio_task_id,
+                                          rp->priority_task.hook_id );
 #if defined( ADD_LBM_GEOLOCATION )
                     if( ( rp->radio_task_id == RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS ) ||
                         ( rp->radio_task_id == RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS_ALMANAC ) ||
@@ -868,8 +874,7 @@ static void rp_task_arbiter( radio_planner_t* rp, const char* caller_func_name )
                 ( rp->timer_hook_id != rp->priority_task.hook_id ) &&
                 ( rp->tasks[rp->timer_hook_id].state == RP_TASK_STATE_SCHEDULE ) )
             {
-                SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: Aborted task with hook #%u - not a priority task\n",
-                                                rp->timer_hook_id );
+                SMTC_RP_TRACE_WARNING( " RP: Aborted task with hook #%u - not a priority task\n", rp->timer_hook_id );
                 rp->tasks[rp->timer_hook_id].state = RP_TASK_STATE_ABORTED;
             }
         }
@@ -890,19 +895,19 @@ static void rp_task_arbiter( radio_planner_t* rp, const char* caller_func_name )
             if( rp->timer_value > rp->margin_delay )
             {
                 rp_set_alarm( rp, rp->timer_value - rp->margin_delay );
-                SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: Timer set to %u\n", rp->timer_value - rp->margin_delay );
+                SMTC_RP_TRACE_PRINTF_DEBUG( " RP: Timer set to %u\n", rp->timer_value - rp->margin_delay );
             }
             else
             {
-                SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: fake Timer set to %u, margin_delay %u\n", rp->timer_value,
-                                                rp->margin_delay );
+                SMTC_RP_TRACE_PRINTF_DEBUG( " RP: fake Timer set to %u, margin_delay %u\n", rp->timer_value,
+                                            rp->margin_delay );
                 rp->timer_irq_flag = true;
                 rp->timer_armed    = false;  // timer is not armed
             }
             DEBUG_GPIO_OFF;
         }
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: radio_task_id %u, state %u, running %u\n", rp->radio_task_id,
-                                        rp->tasks[rp->radio_task_id].state, rp->radio_task_running[rp->radio_task_id] );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " RP: radio_task_id %u, state %u, running %u\n", rp->radio_task_id,
+                                    rp->tasks[rp->radio_task_id].state, rp->radio_task_running[rp->radio_task_id] );
         if( ( rp->tasks[rp->radio_task_id].state == RP_TASK_STATE_RUNNING ) &&
             ( rp->radio_task_running[rp->radio_task_id] == false ) )
         {
@@ -914,7 +919,7 @@ static void rp_task_arbiter( radio_planner_t* rp, const char* caller_func_name )
     {  // No more tasks in the radio planner
 
         rp_task_call_aborted( rp );
-        // SMTC_MODEM_HAL_TRACE_PRINTF( " RP: No more active tasks\n" );
+        // SMTC_RP_TRACE_PRINTF_DEBUG( " RP: No more active tasks\n" );
     }
 }
 
@@ -958,7 +963,7 @@ static void rp_irq_get_status( radio_planner_t* rp, const uint8_t hook_id )
         }
         else
         {
-            SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: ERROR SCAN - IRQ source 0x%04X unknown\n", radio_irq );
+            SMTC_RP_TRACE_PRINTF_DEBUG( " RP: ERROR SCAN - IRQ source 0x%04X unknown\n", radio_irq );
             rp->status[hook_id] = RP_STATUS_TASK_ABORTED;
         }
     }
@@ -1063,7 +1068,7 @@ static void rp_irq_get_status( radio_planner_t* rp, const uint8_t hook_id )
         }
         else
         {
-            SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: ERROR - IRQ source 0x%04X unknown\n", radio_irq );
+            SMTC_RP_TRACE_PRINTF_DEBUG( " RP: ERROR - IRQ source 0x%04X unknown\n", radio_irq );
             rp->status[hook_id] = RP_STATUS_TASK_ABORTED;
         }
     }
@@ -1089,10 +1094,11 @@ static void rp_task_compute_ranking( radio_planner_t* rp )
 static void rp_task_launch_current( radio_planner_t* rp )
 {
     uint8_t id = rp->radio_task_id;
-
-    if( rp->tasks[id].launch_task_callbacks == NULL )
+    SMTC_RP_TRACE_PRINTF_DEBUG( " RP: Launch task #%u and start radio state %u, type %u\n", id, rp->tasks[id].state,
+                                rp->tasks[id].type );
+    if( !SMTC_LBM_IS_VALID_FN_PTR( rp->tasks[id].launch_task_callbacks ) )
     {
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: ERROR - launch_task_callbacks == NULL \n" );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " RP: ERROR - launch_task_callbacks == NULL \n" );
     }
     else
     {
@@ -1188,8 +1194,8 @@ static rp_next_state_status_t rp_task_get_next( radio_planner_t* rp, uint32_t* d
             ( ( ( int32_t ) ( rp->tasks[hook_id].start_time_ms - time_tmp ) < 0 ) ) )
         {
             rp->tasks[hook_id].state = RP_TASK_STATE_ABORTED;
-            SMTC_MODEM_HAL_TRACE_PRINTF( "task schedule aborted because in the past %d\n",
-                                         ( int32_t ) ( rp->tasks[hook_id].start_time_ms - now ) );
+            SMTC_RP_TRACE_PRINTF( "Task schedule aborted because in the past %d\n",
+                                  ( int32_t ) ( rp->tasks[hook_id].start_time_ms - now ) );
         }
     }
 
@@ -1225,16 +1231,16 @@ static rp_next_state_status_t rp_task_get_next( radio_planner_t* rp, uint32_t* d
         {
             time_tmp = rp->tasks[rp->radio_task_id].start_time_ms + rp->active_time_out_time_ms[rp->radio_task_id] +
                        RP_MARGIN_DELAY;
-            index = rp->radio_task_id;
+            index    = rp->radio_task_id;
         }
     }
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF(
+    SMTC_RP_TRACE_PRINTF_DEBUG(
         "RP: time_tmp: %u, index: %u\n,active_time_out: %d, radio_task_id: %u duration: %u radio_task_running: %d\n",
         time_tmp, index, rp->active_time_out[rp->radio_task_id], rp->radio_task_id, time_tmp - now,
         rp->radio_task_running[rp->radio_task_id] );
     if( ( index == 0xFF ) || ( ( rp->timer_armed == true ) && ( rp->timer_absolute_time_ms == time_tmp ) ) )
     {
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: No more task to schedule\n" );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " RP: No more task to schedule\n" );
         return RP_STATUS_NO_MORE_TASK_SCHEDULE;
     }
     else
@@ -1338,7 +1344,7 @@ static void rp_task_call_aborted( radio_planner_t* rp )
     {
         if( rp->tasks[i].state == RP_TASK_STATE_ABORTED )
         {
-            SMTC_MODEM_HAL_RP_TRACE_PRINTF( " RP: INFO - Aborted hook # %d callback\n", i );
+            SMTC_RP_TRACE_PRINTF_DEBUG( " RP: INFO - Aborted hook # %d callback\n", i );
             rp->stats.task_hook_aborted_nb[i]++;
             rp_task_free( rp, &rp->tasks[i] );
             rp->status[i] = RP_STATUS_TASK_ABORTED;
@@ -1350,136 +1356,145 @@ static void rp_task_call_aborted( radio_planner_t* rp )
 
 static void rp_task_print( const radio_planner_t* rp, const rp_task_t* task )
 {
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "\n" );
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( "RP- INFO - Radio task #%u  running - Timer task #%u running  - Hook ID #%u -",
-                                    rp->radio_task_id, rp->timer_hook_id, task->hook_id );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "\n" );
+    SMTC_RP_TRACE_PRINTF_DEBUG( "RP- INFO - Radio task #%u  running - Timer task #%u running  - Hook ID #%u -",
+                                rp->radio_task_id, rp->timer_hook_id, task->hook_id );
     switch( task->type )
     {
     case RP_TASK_TYPE_RX_LORA:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_RX_LORA " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_RX_LORA " );
         break;
     case RP_TASK_TYPE_RX_FSK:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_RX_FSK " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_RX_FSK " );
         break;
     case RP_TASK_TYPE_TX_LORA:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_TX_LORA " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_TX_LORA " );
         break;
     case RP_TASK_TYPE_TX_FSK:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_TX_FSK " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_TX_FSK " );
         break;
     case RP_TASK_TYPE_TX_LR_FHSS:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_TX_LR_FHSS " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_TX_LR_FHSS " );
         break;
     case RP_TASK_TYPE_CAD:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_CAD " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_CAD " );
         break;
     case RP_TASK_TYPE_CAD_TO_TX:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_CAD_TO_TX " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_CAD_TO_TX " );
         break;
     case RP_TASK_TYPE_CAD_TO_RX:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_CAD_TO_RX " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_CAD_TO_RX " );
         break;
     case RP_TASK_TYPE_TX_BLE:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_TX_BLE " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_TX_BLE " );
         break;
     case RP_TASK_TYPE_RX_BLE:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_RX_BLE " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_RX_BLE " );
         break;
     case RP_TASK_TYPE_RX_BLE_SCAN:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_RX_BLE_SCAN " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_RX_BLE_SCAN " );
         break;
     case RP_TASK_TYPE_NONE:
     case RP_TASK_TYPE_GNSS_SNIFF:
     case RP_TASK_TYPE_WIFI_SNIFF:
     case RP_TASK_TYPE_GNSS_RSSI:
     case RP_TASK_TYPE_WIFI_RSSI:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_EMPTY " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_EMPTY " );
         break;
     default:
-        SMTC_MODEM_HAL_RP_TRACE_PRINTF( " TASK_ERROR " );
+        SMTC_RP_TRACE_PRINTF_DEBUG( " TASK_ERROR " );
         break;
     };
-    SMTC_MODEM_HAL_RP_TRACE_PRINTF( " - start time @%u - priority #%u\n", task->start_time_ms, task->priority );
+    SMTC_RP_TRACE_PRINTF_DEBUG( " - start time @%u - priority #%u\n", task->start_time_ms, task->priority );
 }
 
 void print_hook_ids( void )
 {
-    SMTC_MODEM_HAL_TRACE_PRINTF( "Defined Hook IDs:\n" );
+    SMTC_RP_TRACE_PRINTF( "Defined Hook IDs:\n" );
 
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_SUSPEND: %d\n", RP_HOOK_ID_SUSPEND );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_RAC_VERY_HIGH_PRIORITY: %d\n", RP_HOOK_RAC_VERY_HIGH_PRIORITY );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_RAC_HIGH_PRIORITY: %d\n", RP_HOOK_RAC_HIGH_PRIORITY );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_RAC_MEDIUM_PRIORITY: %d\n", RP_HOOK_RAC_MEDIUM_PRIORITY );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_RAC_LOW_PRIORITY: %d\n", RP_HOOK_RAC_LOW_PRIORITY );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_RAC_VERY_LOW_PRIORITY: %d\n", RP_HOOK_RAC_VERY_LOW_PRIORITY );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_SUSPEND: %d\n", RP_HOOK_ID_SUSPEND );
+#if defined( USE_SMTC_RAC )
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_VERY_HIGH_PRIORITY: %d\n", RP_HOOK_RAC_VERY_HIGH_PRIORITY );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_HIGH_PRIORITY: %d\n", RP_HOOK_RAC_HIGH_PRIORITY );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_MEDIUM_PRIORITY: %d\n", RP_HOOK_RAC_MEDIUM_PRIORITY );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_LOW_PRIORITY: %d\n", RP_HOOK_RAC_LOW_PRIORITY );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_VERY_LOW_PRIORITY: %d\n", RP_HOOK_RAC_VERY_LOW_PRIORITY );
 
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_RAC_FLRP_MAC: %d\n", RP_HOOK_RAC_FLRP_MAC );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_RAC_FLRP_WOR_TX: %d\n", RP_HOOK_RAC_FLRP_WOR_TX );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_RAC_FLRP_WOR_RX: %d\n", RP_HOOK_RAC_FLRP_WOR_RX );
+#if defined( USE_FLRP )
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_FLRS_SYNC: %d\n", RP_HOOK_RAC_FLRS_SYNC );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_FLRP_MAC: %d\n", RP_HOOK_RAC_FLRP_MAC );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_FLRP_WOR_TX: %d\n", RP_HOOK_RAC_FLRP_WOR_TX );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_RAC_FLRP_WOR_RX: %d\n", RP_HOOK_RAC_FLRP_WOR_RX );
+#endif  // USE_FLRP
 
+#endif
+
+#if defined( USE_LBM )
 #if defined( ADD_LBM_GEOLOCATION )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS_ALMANAC: %d\n",
-                                 RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS_ALMANAC );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS_WIFI: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS_WIFI );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS_ALMANAC: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS_ALMANAC );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS_WIFI: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS_WIFI );
 #endif
 
 #if defined( ADD_RELAY_RX )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_RELAY_FORWARD_RXR: %d\n", RP_HOOK_ID_RELAY_FORWARD_RXR );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_RELAY_FORWARD_RXR: %d\n", RP_HOOK_ID_RELAY_FORWARD_RXR );
 #endif
 
 #if defined( ADD_CLASS_B )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_CLASS_B_BEACON: %d\n", RP_HOOK_ID_CLASS_B_BEACON );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_LR1MAC_STACK: %d\n", RP_HOOK_ID_LR1MAC_STACK );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_CLASS_B_BEACON: %d\n", RP_HOOK_ID_CLASS_B_BEACON );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_LR1MAC_STACK: %d\n", RP_HOOK_ID_LR1MAC_STACK );
 #else
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_LR1MAC_STACK: %d\n", RP_HOOK_ID_LR1MAC_STACK );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_LR1MAC_STACK: %d\n", RP_HOOK_ID_LR1MAC_STACK );
 #endif
 
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_LBT: %d\n", RP_HOOK_ID_LBT );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_LBT: %d\n", RP_HOOK_ID_LBT );
 
 #if defined( ADD_CSMA )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_CAD: %d\n", RP_HOOK_ID_CAD );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_CAD: %d\n", RP_HOOK_ID_CAD );
 #endif
 
 #if defined( ADD_CLASS_B )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_CLASS_B_PING_SLOT: %d\n", RP_HOOK_ID_CLASS_B_PING_SLOT );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_TEST_MODE: %d\n", RP_HOOK_ID_TEST_MODE );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_CLASS_B_PING_SLOT: %d\n", RP_HOOK_ID_CLASS_B_PING_SLOT );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_TEST_MODE: %d\n", RP_HOOK_ID_TEST_MODE );
 #else
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_TEST_MODE: %d\n", RP_HOOK_ID_TEST_MODE );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_TEST_MODE: %d\n", RP_HOOK_ID_TEST_MODE );
 #endif
 
 #if defined( ADD_ALMANAC )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS_4_ALMANAC: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS_4_ALMANAC );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS_4_ALMANAC: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS_4_ALMANAC );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS );
 #else
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_DIRECT_RP_ACCESS: %d\n", RP_HOOK_ID_DIRECT_RP_ACCESS );
 #endif
 
 #if defined( ADD_BLE )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_BLE_RX_BEACON: %d\n", RP_HOOK_ID_BLE_RX_BEACON );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_BLE_TX_BEACON: %d\n", RP_HOOK_ID_BLE_TX_BEACON );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_BLE_RX_BEACON: %d\n", RP_HOOK_ID_BLE_RX_BEACON );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_BLE_TX_BEACON: %d\n", RP_HOOK_ID_BLE_TX_BEACON );
 #endif
 
 #if defined( ADD_RELAY_RX )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_RELAY_RX_CAD: %d\n", RP_HOOK_ID_RELAY_RX_CAD );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_RELAY_RX_CAD: %d\n", RP_HOOK_ID_RELAY_RX_CAD );
 #endif
 
 #if defined( ADD_RELAY_TX )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_RELAY_TX: %d\n", RP_HOOK_ID_RELAY_TX );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_RELAY_TX: %d\n", RP_HOOK_ID_RELAY_TX );
 #if defined( ADD_CLASS_C )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_CLASS_C: %d\n", RP_HOOK_ID_CLASS_C );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_CLASS_C: %d\n", RP_HOOK_ID_CLASS_C );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
 #else
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
 #endif
 #else
 #if defined( ADD_CLASS_C )
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_CLASS_C: %d\n", RP_HOOK_ID_CLASS_C );
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_CLASS_C: %d\n", RP_HOOK_ID_CLASS_C );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
 #else
-    SMTC_MODEM_HAL_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
 #endif
 #endif
+#else
+    SMTC_RP_TRACE_PRINTF( "RP_HOOK_ID_MAX: %d\n", RP_HOOK_ID_MAX );
+#endif  // USE_LBM
 }
 static void rp_consumption_statistics_updated( radio_planner_t* rp, const uint8_t hook_id, const uint32_t time )
 {
@@ -1585,11 +1600,8 @@ static void rp_hook_callback( radio_planner_t* rp, uint8_t id )
         SMTC_MODEM_HAL_PANIC( );
         return;
     }
-    if( rp->hook_callbacks[id] == NULL )
-    {
-        SMTC_MODEM_HAL_PANIC( );
-        return;
-    }
+    SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( rp->hook_callbacks[id] ) );
+
     rp->radio_is_free = false;  // this is a kind of critical section
     rp->hook_callbacks[id]( rp->hooks[id] );
     rp->radio_is_free = true;

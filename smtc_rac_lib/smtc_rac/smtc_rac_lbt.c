@@ -46,12 +46,12 @@
 #include <string.h>
 
 #include "smtc_rac_api.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 #include "smtc_rac_lbt.h"
 #include "radio_planner.h"
 #include "ral.h"
 #include "ralf.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_rac_local_func.h"
 
 /*

@@ -42,7 +42,7 @@
 #include "modem_core.h"
 #include "smtc_modem_api.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_supervisor_light.h"
 #include "smtc_real.h"
 #include "lorawan_api.h"
@@ -742,8 +742,8 @@ static void cloud_dm_service_on_launch( void* service_id )
                                info_bitfield_periodic_join, &cloud_dm_obj[idx].next_dm_opcode_periodic );
 
         status_lorawan_t send_status =
-            tx_protocol_manager_request (TX_PROTOCOL_TRANSMIT_LORA, cloud_dm_obj[idx].dm_port, true, payload, payload_length, UNCONF_DATA_UP,
-                                      smtc_modem_hal_get_time_in_ms( )  , stack_id );
+            tx_protocol_manager_request( TX_PROTOCOL_TRANSMIT_LORA, cloud_dm_obj[idx].dm_port, true, payload,
+                                         payload_length, UNCONF_DATA_UP, smtc_modem_hal_get_time_in_ms( ), stack_id );
 
         if( send_status == OKLORAWAN )
         {
@@ -808,16 +808,16 @@ static void cloud_dm_service_on_launch( void* service_id )
         else if( cloud_dm_obj[idx].up_count != 0 )
         {
             SMTC_MODEM_HAL_TRACE_PRINTF( "UL for DL opportunities\n" );
-            tx_protocol_manager_request (TX_PROTOCOL_TRANSMIT_LORA, cloud_dm_obj[idx].dm_port, false, NULL, 0, UNCONF_DATA_UP,
-                                      smtc_modem_hal_get_time_in_ms( )  , stack_id );
+            tx_protocol_manager_request( TX_PROTOCOL_TRANSMIT_LORA, cloud_dm_obj[idx].dm_port, false, NULL, 0,
+                                         UNCONF_DATA_UP, smtc_modem_hal_get_time_in_ms( ), stack_id );
         }
         // else nothing to do
 
         if( payload_length > 0 )
         {
-            status_lorawan_t send_status =
-                tx_protocol_manager_request (TX_PROTOCOL_TRANSMIT_LORA, cloud_dm_obj[idx].dm_port, true, payload, payload_length, UNCONF_DATA_UP,
-                                          smtc_modem_hal_get_time_in_ms( )  , stack_id );
+            status_lorawan_t send_status = tx_protocol_manager_request(
+                TX_PROTOCOL_TRANSMIT_LORA, cloud_dm_obj[idx].dm_port, true, payload, payload_length, UNCONF_DATA_UP,
+                smtc_modem_hal_get_time_in_ms( ), stack_id );
             if( send_status == OKLORAWAN )
             {
                 SMTC_MODEM_HAL_TRACE_ARRAY( "payload DM ", payload, payload_length );
@@ -1158,7 +1158,8 @@ static void dm_parse_cmd( cloud_dm_t* ctx, dm_cmd_msg_t* cmd_input )
             ctx->dm_event_requested_bitfield |= REQ_EVENT_DM_SET_CONF_BIT;
         }
         break;
-    case DM_REJOIN: {
+    case DM_REJOIN:
+    {
         uint16_t dev_nonce       = ( cmd_input->buffer[1] << 8 ) | cmd_input->buffer[0];
         uint16_t lr1mac_devnonce = lorawan_api_devnonce_get( ctx->stack_id );
         if( lr1mac_devnonce != dev_nonce )
@@ -1254,24 +1255,28 @@ static dm_rc_t dm_set_conf( cloud_dm_t* ctx, dm_info_field_t tag, uint8_t* data,
     {
         switch( tag )
         {
-        case DM_INFO_ADRMODE: {
+        case DM_INFO_ADRMODE:
+        {
             if( lorawan_api_dr_strategy_set( ( dr_strategy_t ) data[0], ctx->stack_id ) == ERRORLORAWAN )
             {
                 ret = DM_ERROR;
             }
             break;
         }
-        case DM_INFO_JOINEUI: {
+        case DM_INFO_JOINEUI:
+        {
             uint8_t p_tmp[8];
             memcpy1_r( p_tmp, data, 8 );
             lorawan_api_set_joineui( &p_tmp[0], ctx->stack_id );
             break;
         }
-        case DM_INFO_INTERVAL: {
+        case DM_INFO_INTERVAL:
+        {
             ctx->dm_interval = data[0];
             break;
         }
-        case DM_INFO_REGION: {
+        case DM_INFO_REGION:
+        {
             smtc_real_region_types_t region_type = data[0];
             if( smtc_real_is_supported_region( region_type ) == SMTC_REAL_STATUS_OK )
             {
@@ -1404,7 +1409,8 @@ static bool dm_status_payload( cloud_dm_t* ctx, uint8_t stack_id, uint8_t* dm_up
             case DM_INFO_STATUS:
                 *p_tmp = modem_get_status( stack_id );
                 break;
-            case DM_INFO_CHARGE: {
+            case DM_INFO_CHARGE:
+            {
                 uint32_t charge;
                 smtc_modem_get_charge( &charge );
                 *p_tmp         = charge & 0xFF;
@@ -1417,7 +1423,8 @@ static bool dm_status_payload( cloud_dm_t* ctx, uint8_t stack_id, uint8_t* dm_up
             case DM_INFO_TEMP:
                 *p_tmp = smtc_modem_hal_get_temperature( );
                 break;
-            case DM_INFO_SIGNAL: {
+            case DM_INFO_SIGNAL:
+            {
                 int16_t rssi = ctx->lorawan_last_rssi_get;
                 if( rssi >= -128 && rssi <= 63 )
                 {
@@ -1436,14 +1443,16 @@ static bool dm_status_payload( cloud_dm_t* ctx, uint8_t stack_id, uint8_t* dm_up
                 *( p_tmp + 1 ) = ctx->lorawan_last_snr_get << 2;
                 break;
             }
-            case DM_INFO_UPTIME: {
+            case DM_INFO_UPTIME:
+            {
                 // The uptime is the RTC start
                 uint32_t time  = smtc_modem_hal_get_time_in_s( ) / 3600;
                 *p_tmp         = time & 0xFF;
                 *( p_tmp + 1 ) = time >> 8;
             }
             break;
-            case DM_INFO_RXTIME: {
+            case DM_INFO_RXTIME:
+            {
                 uint32_t time_h = 0;
                 uint32_t rtc_s  = smtc_modem_hal_get_time_in_s( );
 
@@ -1460,14 +1469,16 @@ static bool dm_status_payload( cloud_dm_t* ctx, uint8_t stack_id, uint8_t* dm_up
                 *( p_tmp + 1 ) = time_h >> 8;
             }
             break;
-            case DM_INFO_FIRMWARE: {
+            case DM_INFO_FIRMWARE:
+            {
                 memset( p_tmp, 0, 8 );  // fill with 0 as firmware info is only useful in embedded modem
             }
             break;
             case DM_INFO_ADRMODE:
                 *p_tmp = lorawan_api_dr_strategy_get( stack_id );
                 break;
-            case DM_INFO_JOINEUI: {
+            case DM_INFO_JOINEUI:
+            {
                 uint8_t p_tmp_app_eui[8];
                 lorawan_api_get_joineui( p_tmp_app_eui, stack_id );
                 memcpy1_r( p_tmp, p_tmp_app_eui, 8 );
@@ -1485,13 +1496,15 @@ static bool dm_status_payload( cloud_dm_t* ctx, uint8_t stack_id, uint8_t* dm_up
             case DM_INFO_CRASHLOG:
 
                 break;
-            case DM_INFO_RSTCOUNT: {
+            case DM_INFO_RSTCOUNT:
+            {
                 uint32_t nb_reset = modem_get_reset_counter( );
                 *p_tmp            = nb_reset & 0xFF;
                 *( p_tmp + 1 )    = nb_reset >> 8;
                 break;
             }
-            case DM_INFO_DEVEUI: {
+            case DM_INFO_DEVEUI:
+            {
                 uint8_t p_tmp_dev_eui[8];
                 lorawan_api_get_deveui( p_tmp_dev_eui, stack_id );
                 memcpy1_r( p_tmp, p_tmp_dev_eui, 8 );
@@ -1500,13 +1513,15 @@ static bool dm_status_payload( cloud_dm_t* ctx, uint8_t stack_id, uint8_t* dm_up
             case DM_INFO_RFU_1:
                 // Nothing to do
                 break;
-            case DM_INFO_SESSION: {
+            case DM_INFO_SESSION:
+            {
                 uint16_t dev_nonce = lorawan_api_devnonce_get( stack_id );
                 *p_tmp             = dev_nonce & 0xFF;
                 *( p_tmp + 1 )     = dev_nonce >> 8;
                 break;
             }
-            case DM_INFO_CHIPEUI: {
+            case DM_INFO_CHIPEUI:
+            {
                 uint8_t p_tmp_chip_eui[8] = { 0 };
 #if defined( USE_LR11XX_CE )
                 lr11xx_system_read_uid( modem_get_radio_ctx( ), ( uint8_t* ) &p_tmp_chip_eui );

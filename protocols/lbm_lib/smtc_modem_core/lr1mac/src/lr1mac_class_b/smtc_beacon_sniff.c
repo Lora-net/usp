@@ -32,7 +32,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_beacon_sniff.h"
 #include "smtc_ping_slot.h"
 #include "radio_planner.h"
@@ -176,7 +176,7 @@ static bool is_valid_beacon( smtc_lr1_beacon_t* lr1_beacon_obj, uint32_t timesta
  * @brief Compute the beacon duration in us
  */
 #define BEACON_SYMB_DURATION_US( ) \
-    smtc_real_get_symbol_duration_us( lr1_beacon_obj->lr1_mac->real, BEACON_DATA_RATE( ) )
+    smtc_real_get_symbol_duration_us( lr1_beacon_obj->lr1_mac->real, BEACON_DATA_RATE( ), DOWN_LINK )
 /**
  * @brief Compute the beacon duration in ms
  */
@@ -352,14 +352,14 @@ void beacon_rp_request( smtc_lr1_beacon_t* lr1_beacon_obj )
     rp_radio_params_t rp_radio_params      = { 0 };
     rp_radio_params.pkt_type               = RAL_PKT_TYPE_LORA;
     lora_param.symb_nb_timeout             = lr1_beacon_obj->beacon_open_rx_nb_symb;
-    lora_param.sync_word                   = smtc_real_get_sync_word( lr1_beacon_obj->lr1_mac->real );
     lora_param.mod_params.cr               = smtc_real_get_coding_rate( lr1_beacon_obj->lr1_mac->real );
     lora_param.pkt_params.header_type      = RAL_LORA_PKT_IMPLICIT;
     lora_param.pkt_params.pld_len_in_bytes = GET_BEACON_LENGTH_BYTES( );
     lora_param.pkt_params.crc_is_on        = false;
     lora_param.pkt_params.invert_iq_is_on  = false;
     lora_param.mod_params.sf               = GET_BEACON_SF( );
-    lora_param.mod_params.bw               = GET_BEACON_BW( );
+    lora_param.sync_word       = smtc_real_get_sync_word( lr1_beacon_obj->lr1_mac->real, lora_param.mod_params.sf );
+    lora_param.mod_params.bw   = GET_BEACON_BW( );
     lora_param.mod_params.ldro = ral_compute_lora_ldro( lora_param.mod_params.sf, lora_param.mod_params.bw );
     lora_param.pkt_params.preamble_len_in_symb = BEACON_PREAMBLE_LENGTH_SYMB;
     rp_radio_params.rx.lora                    = lora_param;
@@ -462,6 +462,7 @@ void smtc_beacon_sniff_rp_callback( smtc_lr1_beacon_t* lr1_beacon_obj )
     else
     {
         beacon_rp_request( lr1_beacon_obj );
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( lr1_beacon_obj->push_callback ) );
         lr1_beacon_obj->push_callback( lr1_beacon_obj->push_context );
     }
 }
@@ -543,14 +544,14 @@ static uint8_t get_beacon_sf( lr1_stack_mac_t* lr1_mac, uint8_t beacon_datarate 
 {
     uint8_t            sf;
     lr1mac_bandwidth_t bw;
-    smtc_real_lora_dr_to_sf_bw( lr1_mac->real, beacon_datarate, &sf, &bw );
+    smtc_real_lora_rx_dr_to_sf_bw( lr1_mac->real, beacon_datarate, &sf, &bw );
     return sf;
 }
 static lr1mac_bandwidth_t get_beacon_bw( lr1_stack_mac_t* lr1_mac, uint8_t beacon_datarate )
 {
     uint8_t            sf;
     lr1mac_bandwidth_t bw;
-    smtc_real_lora_dr_to_sf_bw( lr1_mac->real, beacon_datarate, &sf, &bw );
+    smtc_real_lora_rx_dr_to_sf_bw( lr1_mac->real, beacon_datarate, &sf, &bw );
     return bw;
 }
 
@@ -726,17 +727,20 @@ static void beacon_debug_print( smtc_lr1_beacon_t* lr1_beacon_obj )
                                     lr1_beacon_obj->beacon_buffer_length );
     }
 
-    SMTC_MODEM_HAL_TRACE_PRINTF( "--> PLL INFO ppl_phase =%u, pll_error= %u  pll_frequency = %u \n",
-                                 lr1_beacon_obj->dpll_phase, lr1_beacon_obj->dpll_error,
-                                 lr1_beacon_obj->dpll_frequency );
+    SMTC_MODEM_HAL_TRACE_PRINTF( "--> PLL INFO ppl_phase= %u, pll_error= %d,  pll_frequency= %u, dpll_error_sum= %d\n",
+                                 lr1_beacon_obj->dpll_phase, lr1_beacon_obj->dpll_error, lr1_beacon_obj->dpll_frequency,
+                                 lr1_beacon_obj->dpll_error_sum );
     SMTC_MODEM_HAL_TRACE_PRINTF( "\n" );
     SMTC_MODEM_HAL_TRACE_PRINTF( "********************\n" );
     SMTC_MODEM_HAL_TRACE_PRINTF( "-->BEACON STATUS\n" );
     SMTC_MODEM_HAL_TRACE_PRINTF( " received = %u\n", lr1_beacon_obj->beacon_statistics.nb_beacon_received );
     SMTC_MODEM_HAL_TRACE_PRINTF( " missed = %u\n", lr1_beacon_obj->beacon_statistics.nb_beacon_missed );
-    SMTC_MODEM_HAL_TRACE_PRINTF( " received_consecutively = %u\n", lr1_beacon_obj->beacon_statistics.last_beacon_received_consecutively );
-    SMTC_MODEM_HAL_TRACE_PRINTF( " lost_consecutively = %u\n", lr1_beacon_obj->beacon_statistics.last_beacon_lost_consecutively );
-    SMTC_MODEM_HAL_TRACE_PRINTF( " four_last_beacon_rx_statistic = %u\n", lr1_beacon_obj->beacon_statistics.four_last_beacon_rx_statistic );
+    SMTC_MODEM_HAL_TRACE_PRINTF( " received_consecutively = %u\n",
+                                 lr1_beacon_obj->beacon_statistics.last_beacon_received_consecutively );
+    SMTC_MODEM_HAL_TRACE_PRINTF( " lost_consecutively = %u\n",
+                                 lr1_beacon_obj->beacon_statistics.last_beacon_lost_consecutively );
+    SMTC_MODEM_HAL_TRACE_PRINTF( " four_last_beacon_rx_statistic = %u\n",
+                                 lr1_beacon_obj->beacon_statistics.four_last_beacon_rx_statistic );
     SMTC_MODEM_HAL_TRACE_PRINTF( " next beacon rx_nb_symb = %u\n", lr1_beacon_obj->beacon_open_rx_nb_symb );
     SMTC_MODEM_HAL_TRACE_PRINTF( "********************\n" );
 }
@@ -799,7 +803,7 @@ static bool is_valid_beacon( smtc_lr1_beacon_t* lr1_beacon_obj, uint32_t timesta
     }
     else
     {
-        SMTC_MODEM_HAL_TRACE_ERROR( "device no more synchronized\n" )
+        SMTC_MODEM_HAL_TRACE_ERROR( "device no more synchronized\n" );
     }
     return true;  // case receive a beacon but device no more synchronized
 }

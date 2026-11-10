@@ -49,3 +49,11 @@ target_include_directories(smtc_hal PUBLIC
 target_link_libraries(smtc_hal PRIVATE st_hal)
 
 set(HAL_FLASH_UNAVAILABLE ON PARENT_SCOPE)
+
+# Optional: Disable HAL debug trace
+# Disable with -DHAL_DBG_TRACE=OFF
+option(HAL_DBG_TRACE "Enable HAL debug trace output" ON)
+if(NOT HAL_DBG_TRACE)
+    target_compile_definitions(smtc_hal PUBLIC HAL_DBG_TRACE=0)
+    message(STATUS "HAL_DBG_TRACE: OFF")
+endif()

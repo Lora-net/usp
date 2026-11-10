@@ -36,6 +36,8 @@ PB_BIND( rac_results_pb_t, rac_results_pb_t, 2 )
 
 PB_BIND( flrp_rx_payload_stats_pb_t, flrp_rx_payload_stats_pb_t, AUTO )
 
+PB_BIND( flrp_tx_payload_stats_pb_t, flrp_tx_payload_stats_pb_t, AUTO )
+
 PB_BIND( flrp_stats_tx_pb_t, flrp_stats_tx_pb_t, AUTO )
 
 PB_BIND( flrp_stats_rx_pb_t, flrp_stats_rx_pb_t, AUTO )
@@ -43,8 +45,6 @@ PB_BIND( flrp_stats_rx_pb_t, flrp_stats_rx_pb_t, AUTO )
 PB_BIND( flrp_stats_pb_t, flrp_stats_pb_t, AUTO )
 
 PB_BIND( flrp_api_config_pb_t, flrp_api_config_pb_t, AUTO )
-
-PB_BIND( flrc_protocol_radio_config_pb_t, flrc_protocol_radio_config_pb_t, AUTO )
 
 PB_BIND( flrp_flrc_advanced_radio_config_pb_t, flrp_flrc_advanced_radio_config_pb_t, AUTO )
 
@@ -58,4 +58,4 @@ PB_BIND( flrp_com_config_pb_t, flrp_com_config_pb_t, AUTO )
 
 PB_BIND( flrp_initiate_transmission_pb_t, flrp_initiate_transmission_pb_t, AUTO )
 
-PB_BIND( flrc_burst_stats_pb_t, flrc_burst_stats_pb_t, AUTO )
+PB_BIND( flrp_initiate_reception_pb_t, flrp_initiate_reception_pb_t, AUTO )

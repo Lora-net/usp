@@ -46,7 +46,7 @@
 #include "lorawan_send_management.h"
 #include "modem_supervisor_light.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_core.h"
 #include "lorawan_api.h"
 #include "lr1mac_defs.h"
@@ -164,7 +164,8 @@ typedef enum fragmented_package_req_e
 } fragmented_package_req_t;
 
 static const uint8_t frag_req_cmd_size[4] = { FRAGMENTATION_PKG_VERSION_REQ_SIZE, FRAGMENTATION_SESSION_STATUS_REQ_SIZE,
-                                              FRAGMENTATION_SESSION_SETUP_REQ_SIZE, FRAGMENTATION_SESSION_DELETE_REQ };
+                                              FRAGMENTATION_SESSION_SETUP_REQ_SIZE,
+                                              FRAGMENTATION_SESSION_DELETE_REQ_SIZE };
 typedef struct lorawan_fragmentation_package_s
 {
     uint8_t stack_id;
@@ -403,8 +404,9 @@ uint8_t lorawan_fragmentation_package_get_frag_session_count( uint8_t frag_index
 }
 
 bool lorawan_fragmentation_package_service_mpa_injector( uint8_t stack_id, uint8_t* payload_in,
-                                                         uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window,
-                                                         uint8_t* payload_out, uint8_t* payload_out_length,
+                                                         uint8_t payload_in_length, uint8_t* nb_bytes_read_payload_in,
+                                                         receive_win_t rx_window, uint8_t* payload_out,
+                                                         uint8_t*      payload_out_length,
                                                          const uint8_t max_payload_out_length,
                                                          uint32_t      rx_timestamp_ms )
 {
@@ -429,8 +431,16 @@ bool lorawan_fragmentation_package_service_mpa_injector( uint8_t stack_id, uint8
     {
         return false;
     }
+    if( payload_in_length < 1 )
+    {
+        return false;
+    }
     uint8_t cmd_id = payload_in[0];
     if( cmd_id >= sizeof( frag_req_cmd_size ) )
+    {
+        return false;
+    }
+    if( payload_in_length < frag_req_cmd_size[cmd_id] )
     {
         return false;
     }
@@ -569,6 +579,12 @@ static frag_status_t fragmentation_package_parser( lorawan_fragmentation_package
             uint8_t frag_index =
                 ( fragmentation_package_rx_buffer[fragmentation_package_rx_buffer_index + 1] & 0x06 ) >> 1;
 
+            if( frag_index >= FRAGMENTATION_MAX_NB_SESSIONS )
+            {
+                /* answer with status 0x04 frag_session index not supported and consume bytes */
+                fragmentation_package_rx_buffer_index += FRAGMENTATION_SESSION_STATUS_REQ_SIZE;
+                break;
+            }
             uint8_t participants = fragmentation_package_rx_buffer[fragmentation_package_rx_buffer_index + 1] & 0x01;
 
             fragmentation_package_rx_buffer_index += FRAGMENTATION_SESSION_STATUS_REQ_SIZE;
@@ -777,12 +793,23 @@ static frag_status_t fragmentation_package_parser( lorawan_fragmentation_package
             uint8_t  frag_index   = 0;
             uint16_t frag_counter = 0;
 
+            IS_VALID_PKG_CMD( 3 );  // At least 3 bytes to read frag_counter and frag_index
+
             frag_counter = ( fragmentation_package_rx_buffer[fragmentation_package_rx_buffer_index + 1] ) & 0x00FF;
             frag_counter |=
                 ( fragmentation_package_rx_buffer[fragmentation_package_rx_buffer_index + 2] << 8 ) & 0xFF00;
 
             frag_index = ( frag_counter >> 14 ) & 0x03;
             frag_counter &= 0x3FFF;
+
+            if( frag_index >= FRAGMENTATION_MAX_NB_SESSIONS )
+            {
+                /* unsupported session — drop fragment, terminate stream */
+                fragmentation_package_rx_buffer_index += fragmentation_package_rx_buffer_length;
+                break;
+            }
+
+            IS_VALID_PKG_CMD( 3 + frag_session_data[frag_index].frag_group_data.frag_size );
 
             bool accept_data = false;
 
@@ -829,7 +856,10 @@ static frag_status_t fragmentation_package_parser( lorawan_fragmentation_package
 
                 if( is_received_on_multicast_window( fragmentation_package_rx_window ) == false )
                 {
-                    accept_data = true;
+                    if( frag_session_data[frag_index].frag_group_data.frag_session.mc_group_bit_mask == 0 )
+                    {
+                        accept_data = true;
+                    }
                 }
             }
 

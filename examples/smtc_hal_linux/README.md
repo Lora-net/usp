@@ -10,7 +10,8 @@ This directory contains the Linux implementation of the USP Hardware Abstraction
 The Linux HAL provides the same interface as the STM32 HAL implementations but uses Linux kernel APIs instead of bare-metal peripherals.
 
 **Key capabilities:**
-- Physical radio support via SPI/GPIO (LR20xx)
+- Physical radio support via SPI/GPIO: LR20xx (validated with LR2021), LR11xx & SX126x (radio HAL `examples/radio_hal/<radio_family>_hal_linux.c`, lower validation level). SX127x & SX128x are not supported on Linux
+- Radio sleep/wake-up management (wake-up through a NSS pulse)
 - Virtual radio support (UDP Packet Forwarder protocol)
 - POSIX-based timers and RTC
 - File-based flash emulation
@@ -37,10 +38,10 @@ The Linux HAL provides the same interface as the STM32 HAL implementations but u
 │                     Linux Kernel APIs                           │
 │   - /dev/gpiochip0 (GPIO character device)                      │
 │   - /dev/spidev0.0 (SPI device)                                 │
-│   - POSIX timers (timer_create, SIGRTMIN + timer_id)            │
+│   - timerfd, dedicated delivery thread per timer                │
 │   - CLOCK_MONOTONIC (monotonic time)                            │
 │   - File I/O (flash emulation)                                  │
-│   - Signals (SIGUSR1 for button)                                │
+│   - Signals (SIGUSR1 for button, SIGUSR2 to wake the main loop) │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -60,7 +61,8 @@ The Linux HAL provides the same interface as the STM32 HAL implementations but u
 
 **Key details:**
 - Uses `libgpiod` style API (direct ioctl calls to `/dev/gpiochip0`)
-- IRQ handling: A background thread (`hal_gpio_irq_thread`) polls GPIO event file descriptors for rising edge detection
+- IRQ handling: A background thread polls GPIO event file descriptors for edge detection, then invokes the attached callback
+- After the callback returns, the thread sends `SIGUSR2` to the main thread (via `hal_mcu_wake_main_thread()`) so a main loop blocked in `hal_mcu_set_sleep_for_ms()` wakes immediately instead of waiting out its sleep
 - Multiple GPIO interrupts supported (radio IRQ, button, etc.)
 - Pin definitions in `smtc_hal_gpio_pin_names.h` (Raspberry Pi BCM numbering)
 
@@ -111,17 +113,15 @@ GPIO_3 = 3,         // BCM GPIO 3
 
 #### Low-Power Timer (`smtc_hal_lp_timer.c`, `smtc_hal_lp_timer.h`)
 
-**Implementation:** POSIX `timer_create()` with real-time signals
+**Implementation:** `timerfd_create()` read by a dedicated, persistent per-timer thread
 
 **Features:**
 - One-shot timer for modem operations
-- 100μs resolution or better
-- Signal-based callback mechanism
+- Callback runs in normal thread context (not a signal handler)
 
 **Key details:**
 - Uses `CLOCK_MONOTONIC` as time base
-- Timer signal: `SIGRTMIN + timer_id` (typically `SIGRTMIN` for HAL_LP_TIMER_ID_1)
-- Callback executed in signal handler context (keep it short!)
+- Each timer has its own long-lived thread blocked in `read()` on its `timerfd`; on expiry it runs the registered callback, then sends `SIGUSR2` to the main thread (via `hal_mcu_wake_main_thread()`) so `hal_mcu_set_sleep_for_ms()` returns immediately
 - Time acceleration supported (see RTC section)
 
 **Important functions:**
@@ -249,7 +249,8 @@ kill -SIGUSR1 12345
 
 **Key details:**
 - Critical sections (`hal_mcu_disable_irq()` / `hal_mcu_enable_irq()`) are no-ops (placeholder for embedded compatibility)
-- Sleep uses `nanosleep()` with maximum 1ms chunks to maintain interrupt responsiveness
+- Sleep blocks for the full requested duration in one `nanosleep()` call, but returns early (EINTR) as soon as `SIGUSR2` is delivered, so a pending IRQ flag set by a HAL delivery thread is serviced without delay
+- `hal_mcu_init()` captures the main thread's ID and installs the (no-op, non-restarting) `SIGUSR2` handler that makes this early-return possible
 - Reset triggers `exit(1)` - relies on external supervisor for restart
 - Wait functions use `nanosleep()` for precise timing
 
@@ -257,7 +258,8 @@ kill -SIGUSR1 12345
 - `hal_mcu_init()` - Initialize all HAL subsystems (RTC, RNG, GPIO, SPI, timers)
 - `hal_mcu_reset()` - Exit process with code 1
 - `hal_mcu_wait_us()` - Busy-wait delay in microseconds
-- `hal_mcu_set_sleep_for_ms()` - Sleep in 1ms chunks (allows frequent IRQ checking)
+- `hal_mcu_set_sleep_for_ms()` - Sleep for the requested duration, interruptible via `SIGUSR2`
+- `hal_mcu_wake_main_thread()` - Send `SIGUSR2` to interrupt a sleeping main thread; called by HAL delivery threads (GPIO IRQ, timer expiry) and by `smtc_modem_hal_user_lbm_irq()` for radio backends that fire IRQs from their own thread
 - `hal_mcu_disable_irq()` / `hal_mcu_enable_irq()` - No-op (compatibility stubs)
 - `hal_mcu_critical_section_begin()` / `hal_mcu_critical_section_end()` - No-op (compatibility stubs)
 
@@ -305,9 +307,9 @@ kill -SIGUSR1 12345
 
 ### CMake Integration
 
-The Linux HAL is automatically selected when building with `BOARD=LINUX` or `BOARD=LINUX_ARM`.
+The Linux HAL is automatically selected when building with `BOARD=LINUX`, `BOARD=LINUX_ARM` or `BOARD=LINUX_ARM64`.
 
-For more details regarding the integration, refer to the [examples/toolchain.cmake](examples/toolchain.cmake] file.
+For more details regarding the integration, refer to the [examples/toolchain.cmake](../toolchain.cmake) file.
 
 ### Toolchain Files
 
@@ -315,16 +317,23 @@ For more details regarding the integration, refer to the [examples/toolchain.cma
 - Uses system default compiler (gcc/clang)
 - No toolchain file needed
 
-**ARM Cross-Compilation:**
+**ARM Cross-Compilation (`BOARD=LINUX_ARM`):**
 - Toolchain: `cmake_linux_arm_toolchain.cmake`
 - Requires ARM cross-compiler: `arm-linux-gnueabihf-gcc`
 
+**AArch64 Cross-Compilation (`BOARD=LINUX_ARM64`, e.g. Raspberry Pi 64-bit):**
+- Toolchain: `cmake_linux_aarch64_toolchain.cmake`
+- Requires AArch64 cross-compiler: `aarch64-linux-gnu-gcc`
+
+The cross-compiler prefix can be changed with `-DTOOLCHAIN_CROSS_PREFIX=<prefix>` (e.g. `-DTOOLCHAIN_CROSS_PREFIX=aarch64-none-linux-gnu-` for the ARM provided toolchain), and a user-defined toolchain file can be given with `-DCMAKE_TOOLCHAIN_FILE=<toolchain_file>`, see [Configuring toolchain files](../main_examples/README.md#configuring-toolchain-files).
+
 ```cmake
-# cmake_linux_arm_toolchain.cmake
+# cmake_linux_arm_toolchain.cmake (excerpt)
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
-set(CMAKE_C_COMPILER arm-linux-gnueabihf-gcc)
-set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
+set(TOOLCHAIN_CROSS_PREFIX "arm-linux-gnueabihf-" CACHE STRING "Cross compiler toolchain prefix")
+set(CMAKE_C_COMPILER   ${TOOLCHAIN_CROSS_PREFIX}gcc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_CROSS_PREFIX}g++)
 ```
 
 ### Compile Definitions
@@ -342,7 +351,7 @@ set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
 
 To use different GPIO pins:
 
-1. Edit `examples/modem_pinout_linux.h`
+1. Edit `examples/modem_pinout_linux.h` (pinouts for LR20xx, LR11xx & SX126x)
 2. Use Raspberry Pi BCM GPIO numbering (not physical pin numbers)
 
 ---

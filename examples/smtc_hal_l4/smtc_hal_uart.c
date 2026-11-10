@@ -72,6 +72,16 @@ static DMA_HandleTypeDef hdma_usart4_rx;
 static UART_HandleTypeDef huart2;
 static UART_HandleTypeDef huart4;
 
+#if defined( HAL_UART_RX_ENABLED )
+/*
+ * Circular DMA reception on USART2 into a caller-owned ring buffer (see hal_uart_rx_start()).
+ * The HAL owns no data buffer: it only keeps the DMA handle and the buffer size needed to turn
+ * the DMA counter into a producer write index. The caller owns the buffer and the read cursor.
+ */
+static DMA_HandleTypeDef hdma_usart2_rx;
+static uint16_t          rx_buffer_size = 0;
+#endif  // HAL_UART_RX_ENABLED
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
@@ -111,12 +121,21 @@ void hw_modem_uart_deinit( void )
 
 void trace_uart_init( void )
 {
+#if defined( HAL_UART_RX_ENABLED )
+    // Enable DMA1 clock for USART2 RX
+    __HAL_RCC_DMA1_CLK_ENABLE( );
+#endif
+
     huart2.Instance                    = USART2;
     huart2.Init.BaudRate               = 115200;
     huart2.Init.WordLength             = UART_WORDLENGTH_8B;
     huart2.Init.StopBits               = UART_STOPBITS_1;
     huart2.Init.Parity                 = UART_PARITY_NONE;
+#if defined( HAL_UART_RX_ENABLED )
+    huart2.Init.Mode                   = UART_MODE_TX_RX;  // Enable RX for hal_uart_rx_start() users
+#else
     huart2.Init.Mode                   = UART_MODE_TX;
+#endif
     huart2.Init.HwFlowCtl              = UART_HWCONTROL_NONE;
     huart2.Init.OverSampling           = UART_OVERSAMPLING_16;
     huart2.Init.OneBitSampling         = UART_ONE_BIT_SAMPLE_DISABLE;
@@ -149,7 +168,7 @@ void hw_modem_uart_tx( uint8_t* buff, uint8_t len )
     HAL_UART_Transmit( &huart4, ( uint8_t* ) buff, len, 0xffffff );
 }
 
-void trace_uart_tx( uint8_t* buff, uint8_t len )
+void trace_uart_tx( uint8_t* buff, uint16_t len )
 {
     HAL_UART_Transmit( &huart2, ( uint8_t* ) buff, len, 0xffffff );
 }
@@ -209,6 +228,25 @@ void HAL_UART_MspInit( UART_HandleTypeDef* huart )
         gpio_port           = ( GPIO_TypeDef* ) ( AHB2PERIPH_BASE + ( ( DEBUG_UART_RX & 0xF0 ) << 6 ) );
         GPIO_InitStruct.Pin = ( 1 << ( DEBUG_UART_RX & 0x0F ) );
         HAL_GPIO_Init( gpio_port, &GPIO_InitStruct );
+
+#if defined( HAL_UART_RX_ENABLED )
+        // Configure DMA1 Channel6 for USART2 RX in circular mode
+        hdma_usart2_rx.Instance                 = DMA1_Channel6;
+        hdma_usart2_rx.Init.Request             = DMA_REQUEST_2;  // USART2_RX
+        hdma_usart2_rx.Init.Direction           = DMA_PERIPH_TO_MEMORY;
+        hdma_usart2_rx.Init.PeriphInc           = DMA_PINC_DISABLE;
+        hdma_usart2_rx.Init.MemInc              = DMA_MINC_ENABLE;
+        hdma_usart2_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+        hdma_usart2_rx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+        hdma_usart2_rx.Init.Mode                = DMA_CIRCULAR;  // Circular mode for continuous reception
+        hdma_usart2_rx.Init.Priority            = DMA_PRIORITY_LOW;
+
+        if( HAL_DMA_Init( &hdma_usart2_rx ) != HAL_OK )
+        {
+            mcu_panic( );
+        }
+        __HAL_LINKDMA( huart, hdmarx, hdma_usart2_rx );
+#endif  // HAL_UART_RX_ENABLED
     }
     else
     {
@@ -246,6 +284,44 @@ void DMA2_Channel5_IRQHandler( void )
 {
     HAL_DMA_IRQHandler( &hdma_usart4_rx );
 }
+
+#if defined( HAL_UART_RX_ENABLED )
+/*
+ * -----------------------------------------------------------------------------
+ * --- UART RX (circular DMA into caller-owned buffer) -------------------------
+ */
+
+/**
+ * @brief USART2 IRQ handler
+ * IDLE line interrupt only wakes the MCU from sleep; the DMA has already captured the bytes
+ * and the consumer polls hal_uart_rx_write_index() to pick them up.
+ */
+void USART2_IRQHandler( void )
+{
+    if( __HAL_UART_GET_FLAG( &huart2, UART_FLAG_IDLE ) )
+    {
+        __HAL_UART_CLEAR_IDLEFLAG( &huart2 );
+    }
+}
+
+void hal_uart_rx_start( uint8_t* buff, uint16_t size )
+{
+    rx_buffer_size = size;
+
+    HAL_UART_Receive_DMA( &huart2, buff, size );
+
+    // Enable UART IDLE interrupt to wake MCU when data is received
+    __HAL_UART_ENABLE_IT( &huart2, UART_IT_IDLE );
+    HAL_NVIC_SetPriority( USART2_IRQn, 0, 0 );
+    HAL_NVIC_EnableIRQ( USART2_IRQn );
+}
+
+uint16_t hal_uart_rx_write_index( void )
+{
+    // DMA counter decrements from buffer size to 0, so write index = size - counter
+    return rx_buffer_size - ( uint16_t ) __HAL_DMA_GET_COUNTER( &hdma_usart2_rx );
+}
+#endif  // HAL_UART_RX_ENABLED
 
 /*
  * -----------------------------------------------------------------------------

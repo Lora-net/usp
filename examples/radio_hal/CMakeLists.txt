@@ -41,3 +41,10 @@ endif()
 target_include_directories(radio_hal PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}
 )
+
+# PA tables for lr20xx
+if(RADIO_FAMILY STREQUAL "lr20xx")
+    target_sources(radio_hal PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/pa_tables_lr20xx_common.c
+    )
+endif()

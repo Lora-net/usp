@@ -18,6 +18,9 @@ project(hw_modem LANGUAGES C ASM DESCRIPTION "${DESCRIPTION}")
 set(ENABLE_FULL_LBM_FEATURES ON CACHE BOOL "")
 set(LBM_ALMANAC OFF CACHE BOOL "")
 
+# LBM is used in this sample
+set(INCLUDE_LBM ON CACHE BOOL "")
+
 # HW Modem uses the FLRC protocol (disabled by default & include a 20KB buffer for the payload)
 set(USE_FLRC_PROTOCOL OFF CACHE BOOL "")
 
@@ -26,11 +29,23 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../../common.cmake)
 ################################################################################
 # Create target
 
-# Select hw_modem transport layer: PTY-based on Linux, GPIO+UART+DMA on embedded
+option(HW_MODEM_USE_BRIDGE "Use GPIO+UART4 physical bridge transport" OFF)
+
+# Select hw_modem transport layer:
+#   Linux           -> PTY (set BOARD to a linux variant) (see hw_modem_linux.c)
+#   Software bridge -> single USART2 (set HW_MODEM_USE_BRIDGE=OFF) (see hw_modem_serial.c)
+#   Physical bridge -> GPIO + UART4 (set HW_MODEM_USE_BRIDGE=ON) (see hw_modem.c)
 if("${BOARD}" STREQUAL "LINUX" OR "${BOARD}" STREQUAL "LINUX_ARM" OR "${BOARD}" STREQUAL "LINUX_ARM64")
     set(HW_MODEM_TRANSPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/hw_modem_linux.c")
-else()
+elseif(HW_MODEM_USE_BRIDGE)
     set(HW_MODEM_TRANSPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/hw_modem.c")
+else()
+    set(HW_MODEM_TRANSPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/hw_modem_serial.c")
+    # Single-UART transport multiplexes hw_modem data with traces on the trace UART: the HAL runs
+    # the circular DMA RX into hw_modem's own ring buffer and only exposes the producer write index
+    # (hal_uart_rx_start/_write_index); hw_modem owns the ring buffer, consume logic and framing.
+    # The physical-bridge transport (hw_modem.c) doesn't need it.
+    target_compile_definitions(smtc_hal PUBLIC HAL_UART_RX_ENABLED)
 endif()
 
 set(HW_MODEM_SOURCES
@@ -62,13 +77,19 @@ register_example(hw_modem "${DESCRIPTION}")
 # HW modem requires this HAL definition
 target_compile_definitions(smtc_hal PUBLIC HW_MODEM_ENABLED)
 
+# WFI only — keep USART2/DMA running during hal_mcu_set_sleep_for_ms()
+set(LOW_POWER_MODE 0 CACHE STRING "HAL low power: 0=WFI, 1=STOP2")
+if(LOW_POWER_MODE EQUAL 1)
+    message(FATAL_ERROR "hw_modem requires LOW_POWER_MODE != 1")
+endif()
+target_compile_definitions(smtc_hal PUBLIC LOW_POWER_MODE=${LOW_POWER_MODE})
+
 if(LBM_CRYPTO MATCHES "^LR11XX")
     target_compile_definitions(hw_modem PRIVATE USE_LR11XX_CE)
 endif()
 
 if(USE_FLRC_PROTOCOL)
     target_compile_definitions(hw_modem PRIVATE USE_FLRC_PROTOCOL)
-    target_link_libraries(hw_modem PUBLIC smtc_flrc_protocol)
 endif()
 
 target_include_directories(hw_modem PRIVATE

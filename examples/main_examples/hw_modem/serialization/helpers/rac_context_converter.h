@@ -154,21 +154,6 @@ void rac_convert_flrc_radio_params_from_pb( const rac_radio_flrc_params_pb_t* pb
                                             uint8_t*                          sync_word_buffers[3] );
 
 /**
- * \brief Convert protobuf CMD_SET_FLRC_PROTOCOL_PARAMS payload to native FLRP radio config
- *
- * \param [in] pb_config flrc_protocol_radio_config_pb_t (flat FLRC + timing fields)
- * \param [out] native_config Native FLRP radio config structure to populate
- */
-void convert_pb_flrc_protocol_radio_config_to_native( const flrc_protocol_radio_config_pb_t* pb_config,
-                                                      smtc_flrp_radio_config_t*              native_config );
-
-/**
- * \brief Map flrc_protocol_radio_config_pb_t to smtc_flrp_flrc_advanced_radio_config_t
- */
-void convert_pb_flrc_protocol_radio_config_to_native_advanced(
-    const flrc_protocol_radio_config_pb_t* pb_config, smtc_flrp_flrc_advanced_radio_config_t* advanced_config );
-
-/**
  * \brief Map flrp_flrc_advanced_radio_config_pb_t (CMD_FLRP_SET_PARAMS_ADVANCED) to
  * smtc_flrp_flrc_advanced_radio_config_t
  */

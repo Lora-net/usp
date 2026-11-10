@@ -8,6 +8,12 @@ RADIO ?= nc
 # MCU - Must be provided by user
 MCU_FLAGS ?= nc
 
+# Location of the components that live next to lbm_lib in the lbm/ folder
+SMTC_RADIO_INTERFACE_DIR ?= ../smtc_radio_interface
+SMTC_RADIO_DRIVERS_DIR   ?= $(SMTC_RADIO_INTERFACE_DIR)/radio_drivers
+RADIO_PLANNER_DIR        ?= ../radio_planner
+SMTC_CORE_HAL_DIR        ?= ../smtc_core_hal_interface
+
 # Prefix for all build directories
 BUILD_ROOT = build
 

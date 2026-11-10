@@ -35,6 +35,7 @@
 #include <stdbool.h>
 #include <string.h>  // for memset
 #include "fragmentation_helper_v1.0.0.h"
+#include "smtc_lbm_code_ptr.h"  // SMTC_LBM_IS_VALID_FN_PTR
 
 #define DBG_TRACE 0
 
@@ -275,6 +276,12 @@ int32_t FragDecoderProcess( uint16_t fragCounter, uint8_t* rawData )
     memset( dataTempVector, 0, ( FRAG_MAX_REDUNDANCY >> 3 ) + 1 );
     memset( dataTempVector2, 0, ( FRAG_MAX_REDUNDANCY >> 3 ) + 1 );
 
+    if( ( fragCounter == 0 ) || ( fragCounter > ( FragDecoder.FragNb + FRAG_MAX_REDUNDANCY ) ) )
+    {
+        FragDecoder.Status.MatrixError = 1;
+        return FRAG_SESSION_FAILED;  // or a dedicated FRAG_SESSION_BAD_INDEX
+    }
+
     FragDecoder.Status.FragNbRx = fragCounter;
 
     if( fragCounter < FragDecoder.Status.FragNbLastRx )
@@ -438,7 +445,7 @@ FragDecoderStatus_t FragDecoderGetStatus( void )
 
 static void SetRow( uint8_t* src, uint16_t row, uint16_t size )
 {
-    if( ( FragDecoder.Callbacks != NULL ) && ( FragDecoder.Callbacks->FragDecoderWrite != NULL ) )
+    if( SMTC_LBM_IS_VALID_FN_PTR( FragDecoder.Callbacks->FragDecoderWrite ) )
     {
         FragDecoder.Callbacks->FragDecoderWrite( row * size, src, size );
     }
@@ -446,7 +453,7 @@ static void SetRow( uint8_t* src, uint16_t row, uint16_t size )
 
 static void GetRow( uint8_t* dst, uint16_t row, uint16_t size )
 {
-    if( ( FragDecoder.Callbacks != NULL ) && ( FragDecoder.Callbacks->FragDecoderRead != NULL ) )
+    if( SMTC_LBM_IS_VALID_FN_PTR( FragDecoder.Callbacks->FragDecoderRead ) )
     {
         FragDecoder.Callbacks->FragDecoderRead( row * size, dst, size );
     }

@@ -6,13 +6,13 @@
 TARGET = sx128x
 
 RADIO_DRIVER_C_SOURCES +=  \
-	smtc_modem_core/radio_drivers/sx128x_driver/src/sx128x.c
+	$(SMTC_RADIO_DRIVERS_DIR)/sx128x_driver/src/sx128x.c
 
 SMTC_RAL_C_SOURCES += \
-	smtc_modem_core/smtc_ral/src/ral_sx128x.c
+	$(SMTC_RADIO_INTERFACE_DIR)/smtc_ral/src/ral_sx128x.c
 
 SMTC_RALF_C_SOURCES += \
-	smtc_modem_core/smtc_ralf/src/ralf_sx128x.c
+	$(SMTC_RADIO_INTERFACE_DIR)/smtc_ralf/src/ralf_sx128x.c
 
 LR1MAC_C_SOURCES += \
 	smtc_modem_core/lr1mac/src/smtc_real/src/region_ww_2g4.c
@@ -26,11 +26,14 @@ SMTC_MODEM_CRYPTO_C_SOURCES += \
 # Includes
 #-----------------------------------------------------------------------------
 LBM_C_INCLUDES =  \
-	-Ismtc_modem_core/radio_drivers/sx128x_driver/src\
+	-I$(SMTC_RADIO_DRIVERS_DIR)/sx128x_driver/src\
 	-Ismtc_modem_core/smtc_modem_crypto/soft_secure_element
 
 #-----------------------------------------------------------------------------
 # Radio specific compilation flags
 #-----------------------------------------------------------------------------
 LBM_C_DEFS += \
-	-DSX128X
+	-DSX128X \
+	-DRAL_DRIVER_DIRECT_DISPATCH \
+	-DRAL_DRIVER_DIRECT_DISPATCH_SX128X \
+	-DSX1280

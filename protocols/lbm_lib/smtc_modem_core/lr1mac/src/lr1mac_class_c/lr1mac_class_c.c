@@ -41,7 +41,7 @@
 
 #include "lr1mac_class_c.h"
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "radio_planner.h"
 #include "lr1mac_defs.h"
 #include "lr1mac_utilities.h"
@@ -211,19 +211,19 @@ void lr1mac_class_c_launch( lr1mac_class_c_t* class_c_obj )
     rp_radio_params_t rp_radio_params = { 0 };
     rp_radio_params.rx.timeout_in_ms  = 120000;
 
-    modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate(
+    modulation_type_t rx_modulation_type = smtc_real_get_modulation_type_from_rx_datarate(
         class_c_obj->lr1_mac->real, RX_SESSION_PARAM_CURRENT->rx_data_rate );
 
-    if( modulation_type == LORA )
+    if( rx_modulation_type == LORA )
     {
         uint8_t            sf;
         lr1mac_bandwidth_t bw;
-        smtc_real_lora_dr_to_sf_bw( class_c_obj->lr1_mac->real, RX_SESSION_PARAM_CURRENT->rx_data_rate, &sf, &bw );
+        smtc_real_lora_rx_dr_to_sf_bw( class_c_obj->lr1_mac->real, RX_SESSION_PARAM_CURRENT->rx_data_rate, &sf, &bw );
 
         ralf_params_lora_t lora_param;
         memset( &lora_param, 0, sizeof( ralf_params_lora_t ) );
 
-        lora_param.sync_word       = smtc_real_get_sync_word( class_c_obj->lr1_mac->real );
+        lora_param.sync_word       = smtc_real_get_sync_word( class_c_obj->lr1_mac->real, sf );
         lora_param.symb_nb_timeout = 0;
         lora_param.rf_freq_in_hz   = RX_SESSION_PARAM_CURRENT->rx_frequency;
 
@@ -246,7 +246,7 @@ void lr1mac_class_c_launch( lr1mac_class_c_t* class_c_obj )
         rp_radio_params.pkt_type = RAL_PKT_TYPE_LORA;
         rp_radio_params.rx.lora  = lora_param;
     }
-    else if( modulation_type == FSK )
+    else if( rx_modulation_type == FSK )
     {
         uint8_t kbitrate;
         smtc_real_fsk_dr_to_bitrate( class_c_obj->lr1_mac->real, RX_SESSION_PARAM_CURRENT->rx_data_rate, &kbitrate );
@@ -316,6 +316,7 @@ static void lr1mac_class_c_rp_callback( lr1mac_class_c_t* class_c_obj )
     if( rp_status == RP_STATUS_RX_PACKET )
     {
         SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( "--> RP_STATUS_RX_PACKET\n" );
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( class_c_obj->rx_callback ) );
         class_c_obj->rx_callback( class_c_obj->rx_context );
     }
     else
@@ -396,6 +397,7 @@ void lr1mac_class_c_mac_rp_callback( lr1mac_class_c_t* class_c_obj )
                 class_c_obj->lr1_mac->rx_down_data.rx_metadata.rx_window =
                     RECEIVE_ON_RXC + ( uint8_t ) class_c_obj->rx_session_index;
 
+                SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( class_c_obj->push_callback ) );
                 class_c_obj->push_callback( class_c_obj->push_context );
             }
         }

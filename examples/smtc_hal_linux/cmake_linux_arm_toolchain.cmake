@@ -7,17 +7,20 @@ set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 set(CMAKE_CROSSCOMPILING 1)
 
+# Toolchain prefix for ARM Linux GNU Toolchain 32-bit
+set(TOOLCHAIN_CROSS_PREFIX "arm-linux-gnueabihf-" CACHE STRING "Cross compiler toolchain prefix")
+
 # Specify the cross-compiler
-set(CMAKE_C_COMPILER   arm-linux-gnueabihf-gcc)
-set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
-set(CMAKE_ASM_COMPILER arm-linux-gnueabihf-gcc)
-set(CMAKE_AR           arm-linux-gnueabihf-ar)
-set(CMAKE_LINKER       arm-linux-gnueabihf-ld)
-set(CMAKE_NM           arm-linux-gnueabihf-nm)
-set(CMAKE_OBJCOPY      arm-linux-gnueabihf-objcopy)
-set(CMAKE_OBJDUMP      arm-linux-gnueabihf-objdump)
-set(CMAKE_STRIP        arm-linux-gnueabihf-strip)
-set(CMAKE_RANLIB       arm-linux-gnueabihf-ranlib)
+set(CMAKE_C_COMPILER   ${TOOLCHAIN_CROSS_PREFIX}gcc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_CROSS_PREFIX}g++)
+set(CMAKE_ASM_COMPILER ${TOOLCHAIN_CROSS_PREFIX}gcc)
+set(CMAKE_AR           ${TOOLCHAIN_CROSS_PREFIX}ar)
+set(CMAKE_LINKER       ${TOOLCHAIN_CROSS_PREFIX}ld)
+set(CMAKE_NM           ${TOOLCHAIN_CROSS_PREFIX}nm)
+set(CMAKE_OBJCOPY      ${TOOLCHAIN_CROSS_PREFIX}objcopy)
+set(CMAKE_OBJDUMP      ${TOOLCHAIN_CROSS_PREFIX}objdump)
+set(CMAKE_STRIP        ${TOOLCHAIN_CROSS_PREFIX}strip)
+set(CMAKE_RANLIB       ${TOOLCHAIN_CROSS_PREFIX}ranlib)
 
 # Where to look for the target environment
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)

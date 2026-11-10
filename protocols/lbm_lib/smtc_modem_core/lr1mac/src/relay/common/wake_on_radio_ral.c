@@ -41,7 +41,7 @@
 #include "ral.h"
 #include "ralf_defs.h"
 #include "ralf.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_modem_hal.h"
 #include "smtc_real.h"
 #include "wake_on_radio_ral.h"
@@ -77,17 +77,18 @@ void wor_ral_init_tx_wor( smtc_real_t* real, uint8_t dr, uint32_t freq_hz, uint1
 {
     // assert_param( param != NULL );
 
-    modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate( real, dr );
+    // Relay channel datarate is defined in the RX datarate table (ex: DR10 SF10/BW500 for US915/AU915)
+    modulation_type_t tx_modulation_type = smtc_real_get_modulation_type_from_rx_datarate( real, dr );
 
-    if( modulation_type == LORA )
+    if( tx_modulation_type == LORA )
     {
         uint8_t             sf;
         lr1mac_bandwidth_t  bw;
         ralf_params_lora_t* lora = &param->tx.lora;
 
-        smtc_real_lora_dr_to_sf_bw( real, dr, &sf, &bw );
+        smtc_real_lora_rx_dr_to_sf_bw( real, dr, &sf, &bw );
 
-        lora->sync_word         = smtc_real_get_sync_word( real );
+        lora->sync_word         = smtc_real_get_sync_word( real, sf );
         lora->symb_nb_timeout   = 8;
         lora->rf_freq_in_hz     = freq_hz;
         lora->output_pwr_in_dbm = smtc_real_clamp_output_power_eirp_vs_freq_and_dr(
@@ -157,20 +158,21 @@ bool wor_schedule_tx_wor( uint8_t hook_id, radio_planner_t* rp, wor_tx_param_t* 
 void wor_ral_init_tx_ack( smtc_real_t* real, uint8_t dr, uint32_t freq_hz, uint8_t payload_len,
                           rp_radio_params_t* param )
 {
-    const modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate( real, dr );
-    if( modulation_type == LORA )
+    // Relay channel datarate is defined in the RX datarate table (ex: DR10 SF10/BW500 for US915/AU915)
+    const modulation_type_t tx_modulation_type = smtc_real_get_modulation_type_from_rx_datarate( real, dr );
+    if( tx_modulation_type == LORA )
     {
         uint8_t             sf;
         lr1mac_bandwidth_t  bw;
         ralf_params_lora_t* lora = &param->tx.lora;
 
-        smtc_real_lora_dr_to_sf_bw( real, dr, &sf, &bw );
+        smtc_real_lora_rx_dr_to_sf_bw( real, dr, &sf, &bw );
 
         lora->rf_freq_in_hz = freq_hz;
 
         lora->output_pwr_in_dbm = smtc_real_clamp_output_power_eirp_vs_freq_and_dr(
             real, smtc_real_get_default_max_eirp( real ), freq_hz, dr );
-        lora->sync_word                       = smtc_real_get_sync_word( real );
+        lora->sync_word                       = smtc_real_get_sync_word( real, sf );
         lora->mod_params.sf                   = ( ral_lora_sf_t ) sf;
         lora->mod_params.bw                   = ( ral_lora_bw_t ) bw;
         lora->mod_params.cr                   = smtc_real_get_coding_rate( real );
@@ -287,14 +289,14 @@ void wor_ral_callback_start_rx( void* rp_void )
 void wor_ral_init_rx_wor( smtc_real_t* real, uint8_t dr, uint32_t freq_hz, wor_cad_periodicity_t cad_period,
                           uint8_t max_payload, rp_radio_params_t* param )
 {
-    const modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate( real, dr );
-    if( modulation_type == LORA )
+    const modulation_type_t rx_modulation_type = smtc_real_get_modulation_type_from_rx_datarate( real, dr );
+    if( rx_modulation_type == LORA )
     {
         uint8_t             sf;
         lr1mac_bandwidth_t  bw;
         ralf_params_lora_t* lora = &param->rx.lora;
 
-        smtc_real_lora_dr_to_sf_bw( real, dr, &sf, &bw );
+        smtc_real_lora_rx_dr_to_sf_bw( real, dr, &sf, &bw );
 
         const uint32_t symb_time_us =
             lr1mac_utilities_get_symb_time_us( 1, ( ral_lora_sf_t ) sf, ( ral_lora_bw_t ) bw );
@@ -306,7 +308,7 @@ void wor_ral_init_rx_wor( smtc_real_t* real, uint8_t dr, uint32_t freq_hz, wor_c
         else
         {
             lora->symb_nb_timeout = 10;
-            lora->sync_word       = smtc_real_get_sync_word( real );
+            lora->sync_word       = smtc_real_get_sync_word( real, sf );
             lora->rf_freq_in_hz   = freq_hz;
 
             lora->mod_params.cr   = smtc_real_get_coding_rate( real );
@@ -336,7 +338,7 @@ void wor_ral_init_cad( const ralf_t* radio, smtc_real_t* real, uint8_t dr, wor_c
     uint8_t            sf;
     lr1mac_bandwidth_t bw;
 
-    smtc_real_lora_dr_to_sf_bw( real, dr, &sf, &bw );
+    smtc_real_lora_rx_dr_to_sf_bw( real, dr, &sf, &bw );
 
     param->cad_det_min_in_symb = 10;
     param->cad_timeout_in_ms   = wor_convert_cad_period_in_ms( cad_period ) + wor_toa_ms;
@@ -383,14 +385,15 @@ void wor_ral_init_cad( const ralf_t* radio, smtc_real_t* real, uint8_t dr, wor_c
 void wor_ral_init_rx_msg( smtc_real_t* real, uint8_t max_payload, uint8_t dr, uint32_t freq_hz,
                           rp_radio_params_t* param )
 {
-    modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate( real, dr );
-    if( modulation_type == LORA )
+    // ED uplink datarate is defined in the TX datarate table (ex: DR0..DR4 for US915)
+    modulation_type_t rx_modulation_type = smtc_real_get_modulation_type_from_tx_datarate( real, dr );
+    if( rx_modulation_type == LORA )
     {
         uint8_t             sf;
         lr1mac_bandwidth_t  bw;
         ralf_params_lora_t* lora = &param->rx.lora;
 
-        smtc_real_lora_dr_to_sf_bw( real, dr, &sf, &bw );
+        smtc_real_lora_tx_dr_to_sf_bw( real, dr, &sf, &bw );
 
         const uint32_t symb_time_us =
             lr1mac_utilities_get_symb_time_us( 1, ( ral_lora_sf_t ) sf, ( ral_lora_bw_t ) bw );
@@ -401,7 +404,7 @@ void wor_ral_init_rx_msg( smtc_real_t* real, uint8_t max_payload, uint8_t dr, ui
         }
         else
         {
-            lora->sync_word       = smtc_real_get_sync_word( real );
+            lora->sync_word       = smtc_real_get_sync_word( real, sf );
             lora->symb_nb_timeout = 10 + 1000 * smtc_modem_hal_get_radio_tcxo_startup_delay_ms( ) / symb_time_us;
             lora->rf_freq_in_hz   = freq_hz;
 
@@ -419,7 +422,7 @@ void wor_ral_init_rx_msg( smtc_real_t* real, uint8_t max_payload, uint8_t dr, ui
             param->pkt_type = RAL_PKT_TYPE_LORA;
         }
     }
-    else if( modulation_type == FSK )
+    else if( rx_modulation_type == FSK )
     {
         ralf_params_gfsk_t* gfsk = &param->rx.gfsk;
         uint8_t             tx_bitrate;

@@ -42,7 +42,7 @@
 #include "modem_supervisor_light.h"
 #include "smtc_modem_api.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lorawan_api.h"
 #include "modem_event_utilities.h"
 #include "device_management_defs.h"
@@ -244,9 +244,9 @@ void stream_service_on_launch( void* service_id )
     // TODO Is this enough to ensure we send everything?
     if( ( stream_rc == STREAM_OK ) && ( fragment_size > 0 ) )
     {
-        stream_ctx[idx].send_status = tx_protocol_manager_request (TX_PROTOCOL_TRANSMIT_LORA,
-            stream_ctx[idx].port, true, stream_payload, fragment_size + tx_buff_offset, UNCONF_DATA_UP,
-            smtc_modem_hal_get_time_in_ms( )  , stream_ctx[idx].stack_id );
+        stream_ctx[idx].send_status = tx_protocol_manager_request(
+            TX_PROTOCOL_TRANSMIT_LORA, stream_ctx[idx].port, true, stream_payload, fragment_size + tx_buff_offset,
+            UNCONF_DATA_UP, smtc_modem_hal_get_time_in_ms( ), stream_ctx[idx].stack_id );
     }
     else
     {

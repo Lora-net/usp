@@ -31,7 +31,6 @@ setup_example_target(flrp_api_initiator)
 register_example(flrp_api_initiator "${DESCRIPTION} (initiator)")
 target_compile_definitions(flrp_api_initiator PRIVATE FLRP_API_ROLE=1)
 target_include_directories(flrp_api_initiator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(flrp_api_initiator PUBLIC smtc_flrc_protocol)
 
 # Slave
 add_executable(flrp_api_slave ${FLRP_API_SOURCES})
@@ -39,7 +38,6 @@ setup_example_target(flrp_api_slave)
 register_example(flrp_api_slave "${DESCRIPTION} (slave)")
 target_compile_definitions(flrp_api_slave PRIVATE FLRP_API_ROLE=0)
 target_include_directories(flrp_api_slave PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(flrp_api_slave PUBLIC smtc_flrc_protocol)
 
 # Build all targets
 add_custom_target(flrp_api DEPENDS

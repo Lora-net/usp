@@ -41,7 +41,10 @@
 #include <inttypes.h>  // PRIu32
 #include <stdbool.h>   // bool type
 
+#include "smtc_core_hal.h"
+#if defined( USE_LBM )
 #include "smtc_modem_hal.h"
+#endif
 #include "smtc_hal_dbg_trace.h"
 
 #include "smtc_hal_gpio.h"
@@ -71,9 +74,9 @@
 // for memcpy
 #include <string.h>
 
-#if defined( SX1272 ) || defined( SX1276 )
-#define SX127X
-#include "smtc_modem_utilities.h"
+#if defined( SX127X )
+// #define SX127X
+#include "smtc_rac_api.h"  // To access smtc_rac_get_radio_driver_context()
 #include "sx127x.h"
 #endif
 
@@ -214,7 +217,7 @@ void smtc_modem_hal_disable_modem_irq( void )
 {
     hal_gpio_irq_disable( );
     hal_lp_timer_irq_disable( HAL_LP_TIMER_ID_1 );
-#if ( SX127X )
+#if defined( SX127X )
     hal_lp_timer_irq_disable( HAL_LP_TIMER_ID_2 );
 #endif
 }
@@ -223,7 +226,7 @@ void smtc_modem_hal_enable_modem_irq( void )
 {
     hal_gpio_irq_enable( );
     hal_lp_timer_irq_enable( HAL_LP_TIMER_ID_1 );
-#if ( SX127X )
+#if defined( SX127X )
     hal_lp_timer_irq_enable( HAL_LP_TIMER_ID_2 );
 #endif
 }
@@ -470,8 +473,8 @@ void smtc_modem_hal_irq_config_radio_irq( void ( *callback )( void* context ), v
 #if defined( UDP_PF )
     // UDP virtual radio - call implementation directly (context unused by UDP_PF)
     ral_udp_pf_set_fake_irq_callback( NULL, callback, context );
-#elif defined( SX1272 ) || defined( SX1276 )
-    sx127x_t* radio = ( sx127x_t* ) smtc_modem_get_radio_context( );
+#elif defined( SX127X )
+    sx127x_t* radio = ( sx127x_t* ) smtc_rac_get_radio_driver_context( );
 
     sx127x_irq_attach( radio, callback, context );
 #else
@@ -631,13 +634,30 @@ uint16_t smtc_modem_hal_flash_get_page_size( void )
 
 void smtc_modem_hal_user_lbm_irq( void )
 {
+#if defined( LINUX_PLATFORM )
+    // This hook runs every time a radio IRQ or radio-planner timer fires,
+    // called from whichever thread actually delivered that event:
+    //   - Real radios: that thread is smtc_hal_gpio.c's GPIO IRQ thread, which
+    //     already wakes the main loop itself right after. So the call below
+    //     is a harmless duplicate wake-up in that case.
+    //   - Some radio backends fire this hook from their own thread instead,
+    //     without going through the GPIO IRQ thread at all. For those, this
+    //     call is what wakes a main loop sleeping in
+    //     hal_mcu_set_sleep_for_ms() - without it, the IRQ flag would be set
+    //     but the main loop would not notice until something else woke it up.
+    hal_mcu_wake_main_thread( );
+#else
     // Do nothing in case implementation is bare metal
+#endif
 }
-void smtc_modem_hal_protect_api_call( void )
+/* Weak no-op defaults: correct for the single-threaded examples. An application
+ * that drives the RAC API from several threads (e.g. one_channel_hub) overrides
+ * these with a real lock by providing a strong definition. */
+__attribute__( ( weak ) ) void smtc_modem_hal_protect_api_call( void )
 {
     // Do nothing in case implementation is bare metal
 }
-void smtc_modem_hal_unprotect_api_call( void )
+__attribute__( ( weak ) ) void smtc_modem_hal_unprotect_api_call( void )
 {
     // Do nothing in case implementation is bare metal
 }

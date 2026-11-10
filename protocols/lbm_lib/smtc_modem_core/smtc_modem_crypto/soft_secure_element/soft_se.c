@@ -46,7 +46,7 @@
 #include "cmac.h"
 
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 #include <string.h>  //for memset, memcpy
 
@@ -799,12 +799,12 @@ static smtc_se_return_code_t compute_cmac( const uint8_t* mic_bx_buffer, const u
         return SMTC_SE_RC_ERROR_NPE;
     }
 
-    uint8_t      local_cmac[16];
+    uint8_t      local_cmac[16] = { 0 };
     AES_CMAC_CTX aes_cmac_ctx[1];
 
     AES_CMAC_Init( aes_cmac_ctx );
 
-    soft_se_key_t* key_item;
+    soft_se_key_t* key_item = NULL;
 
     smtc_se_return_code_t rc = get_key_by_id( key_id, &key_item, stack_id );
 

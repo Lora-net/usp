@@ -44,6 +44,7 @@
 #include "smtc_wor.h"
 #include "smtc_rac.h"
 #include "smtc_rac_api.h"
+#include "smtc_core_hal.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -137,6 +138,7 @@ uint32_t smtc_wor_get_single_symbol_time_us( ral_lora_bw_t bw, ral_lora_sf_t sf 
 
     if( sf < RAL_LORA_SF5 || sf > RAL_LORA_SF12 )
     {
+        SMTC_MODEM_HAL_PANIC( "Incorrect SF Parameter" );
         return 0;
     }
 
@@ -164,6 +166,7 @@ uint32_t smtc_wor_get_single_symbol_time_us( ral_lora_bw_t bw, ral_lora_sf_t sf 
         bw_value = 1000;
         break;
     default:
+        SMTC_MODEM_HAL_PANIC( "Incorrect BW Parameter" );
         return 0;
     }
 

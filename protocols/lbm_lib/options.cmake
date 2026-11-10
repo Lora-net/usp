@@ -48,6 +48,8 @@ option(LBM_BEACON_TX "Build Beacon TX service")
 option(LBM_PERF_TEST "Build LBM with perf test")
 option(LBM_TEST_BYPASS_JOIN_DUTY_CYCLE "Allow bypassing the join duty cycle, only for test")
 
+option(LBM_CMAKE_CONFIG_AUTO "Configure defaults options about crypto LR11xx, Region 2.5GHz for SX1280 etc" ON)
+
 ################################################################################
 # Sanitizing and checking
 
@@ -130,7 +132,7 @@ if(LBM_GEOLOCATION AND NOT LBM_RADIO IN_LIST GEOLOCATION_RADIOS)
         set(LBM_GEOLOCATION OFF)
         set(LBM_GEOLOCATION OFF CACHE BOOL "Build Geolocation service" FORCE)
     else()
-        message(SEND_ERROR "Geolocation is only available for LR11xx.")
+        message(SEND_ERROR "Geolocation is only available for LR1110 and LR1120.")
     endif()
 endif()
 

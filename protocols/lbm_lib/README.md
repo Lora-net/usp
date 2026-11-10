@@ -129,7 +129,7 @@ For example, to build LoRa Basics Modem for an STM32L4 MCU the following MCU_FLA
 `MCU_FLAGS="-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard"`
 
 For CMake, you need to use toolchain files, such as the ones provided by the `lbm_examples`.
-See [the relevant CMake documentation](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Cross%20Compiling%20With%20CMake.html)
+See [the relevant CMake documentation](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Cross%20Compiling%20With%20CMake.html).
 
 ### Regions
 
@@ -148,6 +148,26 @@ Support for one or more of the following regions can be selected at compile time
 The supported regions are selected through the REGION build option. If the user does not explicitly select one or more regions, all regions are included at compile time.
 
 Ex: REGION=EU_868,WW_2G4
+
+### Regional Parameters
+LoRa Basics™ Modem (LBM) suppports Regional Parameters versions RP2-1.0.3 through RP2-1.0.5. The Regional Parameters version used by LBM is selected via the RP_VERSION build option. The possible options are : `RP2_103`, `RP2_104` and `RP2_105`.
+If RP_VERSION is not defined, LBM will use RP2-1.0.3 by default.
+
+**IMPORTANT NOTE ON CHANNELS** : 
+- In each end-device, a certain number of TX/RX channels are **implemented**. This number represents the maximum number of channels that the end-device can use. In RP2-1.0.3 and above, the **implemented** number of channel was fixed and region-dependant (e.g 16 for EU868 and 72 for US915). We can think of these as "placeholders" for channel data (frequency + data rates) that will later be filled by the NS. Please note than the greater the **implemented** channel number, the greater the RAM usage on the end-device. The number of implemented channels is defined during compilation and cannot be updated at runtime.
+- During runtime, each one of these **implemented** channels can be **created**, meaning they are assigned a certain frequency and one or many data rates they can work on. Typically, channels are **created** via NewChannelReq MAC command or via Join-Accept CFList for regions using Dynamic-Channel Plan. **Created** channels are typically immediately **enabled**. For regions using Fixed-Channel Plan, all channels are **created** and **enabled** at boot.
+- Each one of the **created** channel can be **enabled** or **disabled**, meaning they can/cannot be used for uplinks/downlinks. Typically, a channel is **enabled** or **disabled** via NewChannelReq or LinkADRReq MAC commands (or via Join-Accept CFList for regions using Fixed Channel Plan).
+- Each region defines a certain number of **default channels** that are **created** and **enabled** at end-device startup and used for join requests.
+
+From RP2-1.0.4 and above, the user can now implement a custom number of *added* channels adding to the mimimal implemented ones, with the total never greater than **80**. In the world, each region is part of one of the 2 groups:
+- Regions using Fixed Channel Plan (US_915, AU_915), where between 72 and 80 channels are implemented, including 72 default channeld (created and enabled at end-device startup).
+- Regions using Dynamic Channel Plan (all the other ones except CN470), where between 24 and 80 channels are implemented.
+For Dynamic Channel Plan regions, the NS creates and enables new channels via the NewChannelReq MAC command. For Fixed Channel Plan regions, the LoRaWAN L2 1.0.4 specifications forbids the use of NewChannelReq MAC command. As a result, for Fixed Channel Plan regions, it is impossible to use the (up-to) 8 user-defined channels in LoRaWAN versions < 1.1.x.
+- CN470 region doesn't provide user-defined channels in RP2-1.0.4 and is similar to RP2-1.0.3 regarding this aspect.
+- The user-defined channel number has to be provided in each *region_xx_000_defs.h* header file [in here](smtc_modem_core/lr1mac/src/smtc_real/src/), in `USER_ADDED_CHANNELS_XX_000` #define field.
+
+#### Relay considerations
+Since RP2-1.0.5, the relay WOR Channel 1 has been updated for regions CN_470, EU_868, IN_865, KR_920, RU_864 and WW_2G4 to use SF7, 125kHz. If building with `RP2_105` and the user relay implements an earlier Regional Parameters version (or vice-versa), it it advised to use Channel 0 for retrocompatibility.
 
 ### Cryptographic Engine Selection
 
@@ -227,11 +247,11 @@ Refer to [smtc_modem_api.h](smtc_modem_api/smtc_modem_api.h) for the Application
 
 For porting LoRa Basics Modem to a new architecture/platform, implement functions defined in [smtc_modem_hal.h](smtc_modem_hal/smtc_modem_hal.h).
 
-### Radio BSP (Board Specific Package) and HAL (Hardware Abstraction Layer)
+### Radio BSP (Board Support Package) and HAL (Hardware Abstraction Layer)
 
 Semtech radio drivers and Radio Abstraction Layer (RAL) architecture requires the user to implement the radio HAL and BSP functions.
 
-Radio BSP functions & Radio HAL functions are defined for each transceiver and can be found in USP smtc_ral & radio_drivers folders.
+Radio BSP functions prototypes & Radio HAL functions prototypes are defined for each transceiver and can be found in USP smtc_ral & radio_drivers folders.
 
 ### Fetch an Event
 

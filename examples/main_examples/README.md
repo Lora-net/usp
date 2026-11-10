@@ -18,6 +18,8 @@ For detailled informations about each sample, please refer to the README.md file
   - [multiprotocol](multiprotocol_example/README.md)
   - [flrp_api](flrp_api_example/README.md)
   - [lrfhss](lrfhss_example/README.md)
+  - [fhss_example](fhss_example/README.md)
+  - [one_channel_hub](one_channel_hub_example/README.md)
   - [packet_error_rate_flrc](packet_error_rate_flrc_example/README.md)
   - [packet_error_rate_fsk](packet_error_rate_fsk_example/README.md)
   - [packet_error_rate_lora](packet_error_rate_example/README.md)
@@ -50,7 +52,7 @@ All examples use the unified logging system, which is controlled with the follow
 
 | Parameter                    | Default   | Description                                         |
 |------------------------------|-----------|-----------------------------------------------------|
-| `RAC_LOGGING_ENABLE`         | `ON`      | Enable logging system                               |
+| `RAC_LOG_ENABLE`             | `ON`      | Enable RAC Core logs (OFF disables all RAC_CORE_*)  |
 | `RAC_LOG_PROFILE`            | `DEFAULT` | logging profile (MINIMAL;DEFAULT;VERBOSE;DEBUG;ALL) |
 |------------------------------|-----------|-----------------------------------------------------|
 | `RAC_CORE_LOG_ERROR_ENABLE`  | `ON`      | Enable RAC Core ERROR logs                          |
@@ -60,14 +62,41 @@ All examples use the unified logging system, which is controlled with the follow
 | `RAC_CORE_LOG_DEBUG_ENABLE`  | `OFF`     | Enable RAC Core DEBUG logs                          |
 | `RAC_CORE_LOG_API_ENABLE`    | `OFF`     | Enable RAC Core API logs                            |
 | `RAC_CORE_LOG_RADIO_ENABLE`  | `OFF`     | Enable RAC Core RADIO logs                          |
-|------------------------------|-----------|-----------------------------------------------------|
-| `RAC_LORA_LOG_TX_ENABLE`     | `ON`      | Enable RAC LoRa TX logs                             |
-| `RAC_LORA_LOG_RX_ENABLE`     | `ON`      | Enable RAC LoRa RX logs                             |
-| `RAC_LORA_LOG_CONFIG_ENABLE` | `ON`      | Enable RAC LoRa CONFIG logs                         |
-| `RAC_LORA_LOG_ERROR_ENABLE`  | `ON`      | Enable RAC LoRa ERROR logs                          |
-| `RAC_LORA_LOG_INFO_ENABLE`   | `OFF`     | Enable RAC LoRa INFO logs                           |
-| `RAC_LORA_LOG_WARN_ENABLE`   | `OFF`     | Enable RAC LoRa WARN logs                           |
-| `RAC_LORA_LOG_DEBUG_ENABLE`  | `OFF`     | Enable RAC LoRa DEBUG logs                          |
+
+### Configuring toolchain files
+
+These examples provide default CMake toolchain files relying on cross-compilers available in Debian or Ubuntu package managers.
+See for instance the file `examples/smtc_hal_linux/cmake_linux_aarch64_toolchain.cmake`.
+
+On Debian/Ubuntu host systems, a cross compiler toolchain can typically be installed with command `apt install <toolchain>`.
+See hereafter for the toolchain to install depending on `BOARD`:
+
+- `NUCLEO_L073`: `gcc-arm-none-eabi`
+- `NUCLEO_L476`: `gcc-arm-none-eabi`
+- `FPB_RA0E2`: `gcc-arm-none-eabi`
+- `LINUX_ARM`: `gcc-arm-linux-gnueabihf`
+- `LINUX_ARM64`: `gcc-aarch64-linux-gnu`
+- `LINUX`: this corresponds to a native build, the compiler of the machine running the build is used
+
+A user-defined toolchain file can be provided when generating an example build system, typically when attempting to use a different compiler than the provided ones.
+The toolchain file path is then to be provided on command line with `-DCMAKE_TOOLCHAIN_FILE=<toolchain_file>`:
+
+```bash
+rm -Rf build/ ; cmake -L -S examples/main_examples/<example> -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DBOARD=<board> -DRAC_RADIO=<shield> -DCMAKE_TOOLCHAIN_FILE=<toolchain_file> <list of additional -D flags> -G Ninja; cmake --build build --target <example>
+```
+
+Note that when writing the toolchain file, care must be taken to ensure the compiler used is capable to generate code for the MCU corresponding the provided `-DBOARD=<BOARD>`.
+
+Refer to [`CMAKE_TOOLCHAIN_FILE` doc](https://cmake.org/cmake/help/latest/variable/CMAKE_TOOLCHAIN_FILE.html) for details.
+
+The toolchain files provided can have their prefixes altered by using `-DTOOLCHAIN_CROSS_PREFIX=<new_prefix>`.
+When used, the compiler, linker and other tools will be: `<new_prefix>gcc`, `<new_prefix>ld`, etc.
+This `TOOLCHAIN_CROSS_PREFIX` alteration comes useful when the build machine has toolchain installed with a different name than default one, but other toolchain file variables does not need to change.
+For instance ARM provides the Aarch64 Linux toolchain with prefix being the quadruplet *aarch64-none-linux-gnu-*, but Debian and Ubuntu provides it with triplet *aarch64-linux-gnu-*.
+The generation build system command line can have `-DTOOLCHAIN_CROSS_PREFIX=aarch64-none-linux-gnu-` when ARM provided toolchain is to be used.
+This avoids to rewrite a complete toolchain file if only the toolchain prefix is different.
+
+Note that the example are built and tested only for the toolchain listed above.
 
 ## Using the Device Tree
 

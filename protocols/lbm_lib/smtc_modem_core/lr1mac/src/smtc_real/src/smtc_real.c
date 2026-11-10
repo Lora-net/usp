@@ -38,7 +38,7 @@
 #include "lr1mac_utilities.h"
 #include "lr1_stack_mac_layer.h"
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_modem_hal.h"
 
 #include "smtc_lbt.h"
@@ -90,7 +90,7 @@
 
 #define tx_frequency_channel_ctx real_ctx.tx_frequency_channel_ctx
 #define rx1_frequency_channel_ctx real_ctx.rx1_frequency_channel_ctx
-#define channel_index_enabled_ctx real_ctx.channel_index_enabled_ctx
+#define tx_channel_index_enabled_ctx real_ctx.tx_channel_index_enabled_ctx
 #define unwrapped_channel_mask_ctx real_ctx.unwrapped_channel_mask_ctx
 #define dr_bitfield_tx_channel_ctx real_ctx.dr_bitfield_tx_channel_ctx
 #define dr_distribution_init_ctx real_ctx.dr_distribution_init_ctx
@@ -157,7 +157,7 @@ void smtc_real_init( smtc_real_t* real, smtc_real_region_types_t region_type )
         region_as_923_init( real, 3 );
         break;
     }
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
     {
         region_as_923_init( real, 4 );
@@ -244,7 +244,7 @@ void smtc_real_config( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
     {
@@ -324,7 +324,7 @@ void smtc_real_config_session( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -493,9 +493,10 @@ status_lorawan_t smtc_real_get_next_tx_dr( smtc_real_t* real, join_status_t join
     return OKLORAWAN;
 }
 
-cf_list_type_t smtc_real_cf_list_type_supported( smtc_real_t* real )
+bool smtc_real_is_cf_list_type_supported( smtc_real_t* real, cf_list_type_t cf_list_type )
 {
-    return ( real_const.const_cf_list_type_supported );
+    return ( ( real_const.const_cf_list_type_supported & ( 1 << cf_list_type ) ) >> cf_list_type );
+    //    return ( ( real_const.const_cf_list_type_supported & cf_list_type ) == cf_list_type ) ? true : false;
 }
 
 status_lorawan_t smtc_real_update_cflist( smtc_real_t* real, uint8_t* cf_list )
@@ -503,9 +504,9 @@ status_lorawan_t smtc_real_update_cflist( smtc_real_t* real, uint8_t* cf_list )
     status_lorawan_t status       = OKLORAWAN;
     cf_list_type_t   cf_list_type = cf_list[15];
 
-    if( smtc_real_cf_list_type_supported( real ) != cf_list_type )
+    if( smtc_real_is_cf_list_type_supported( real, cf_list_type ) != true )
     {
-        SMTC_MODEM_HAL_TRACE_WARNING( "INVALID CFList type for this region (%d)\n", cf_list_type );
+        SMTC_MODEM_HAL_TRACE_WARNING( "Unsupported CFList type for this region (%d)\n", cf_list_type );
         status = ERRORLORAWAN;
     }
 
@@ -515,30 +516,31 @@ status_lorawan_t smtc_real_update_cflist( smtc_real_t* real, uint8_t* cf_list )
         {
         case CF_LIST_FREQ:
         {
-            for( uint8_t i = 0; i < 5; i++ )
+            SMTC_MODEM_HAL_TRACE_PRINTF( "Default channel nb (already enabled) for this region: %d\n",
+                                         real_const.const_number_of_boot_tx_channel );
+            for( uint8_t i = 0; i < 5; i++ )  // CFList contains up to 5 frequencies
             {
+                // We add the received freq to list before checking it ? (decode fun doesnt check if allowed)
                 tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i] =
                     smtc_real_decode_freq_from_buf( real, &cf_list[0 + ( 3 * i )] );
                 rx1_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i] =
                     tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i];
 
-                if( smtc_real_is_nwk_received_tx_frequency_valid(
-                        real, tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i] ) == OKLORAWAN &&
-                    tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i] != 0 )
+                if( smtc_real_is_frequency_valid(
+                        real, tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i] ) == OKLORAWAN )
                 {
                     // Enable default datarate for all added channels
                     dr_bitfield_tx_channel_ctx[real_const.const_number_of_boot_tx_channel + i] =
                         real_const.const_default_tx_dr_bit_field;
 
                     // Enable Channel
-                    SMTC_PUT_BIT8( channel_index_enabled_ctx, ( real_const.const_number_of_boot_tx_channel + i ),
+                    SMTC_PUT_BIT8( tx_channel_index_enabled_ctx, ( real_const.const_number_of_boot_tx_channel + i ),
                                    CHANNEL_ENABLED );
 
-#if ( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
+#if( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
                     SMTC_MODEM_HAL_TRACE_PRINTF(
-                        "MacTxFrequency [%d] = %d \n", i,
+                        "New channel created - CFListTxFrequency[%d] = %dHz \n", i,
                         tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i] );
-
                     char dr_str[16 * 2 + 1];
                     for( uint8_t dr = 0; dr < 16; dr++ )
                     {
@@ -548,57 +550,157 @@ status_lorawan_t smtc_real_update_cflist( smtc_real_t* real, uint8_t* cf_list )
                                       &dr_bitfield_tx_channel_ctx[real_const.const_number_of_boot_tx_channel + i], dr );
                     }
                     dr_str[2 * 16] = '\0';
-                    SMTC_MODEM_HAL_TRACE_PRINTF( "MacDataRateChannel [%d] = %s\n", i, dr_str );
-                    SMTC_MODEM_HAL_TRACE_PRINTF( "MacChannelIndexEnabled [%d] = %d \n", i,
-                                                 SMTC_GET_BIT8( channel_index_enabled_ctx,
-                                                                ( real_const.const_number_of_boot_tx_channel + i ) ) );
+                    SMTC_MODEM_HAL_TRACE_PRINTF( "CFListDataRateChannel[%d] (channel nb %d) = %s\n", i,
+                                                 real_const.const_number_of_boot_tx_channel + i, dr_str );
 #endif
                 }
                 else
                 {
                     tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i]  = 0;
                     rx1_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel + i] = 0;
-                    SMTC_PUT_BIT8( channel_index_enabled_ctx, ( real_const.const_number_of_boot_tx_channel + i ),
+                    SMTC_PUT_BIT8( tx_channel_index_enabled_ctx, ( real_const.const_number_of_boot_tx_channel + i ),
                                    CHANNEL_DISABLED );
 
-                    SMTC_MODEM_HAL_TRACE_WARNING( "INVALID TX FREQUENCY IN CFLIST OR CFLIST EMPTY \n" );
+                    SMTC_MODEM_HAL_TRACE_WARNING(
+                        "INVALID TX FREQUENCY IN CFLIST (CFLIST FREQ INDEX %d) OR CFLIST EMPTY \n", i );
                 }
             }
         }
         break;
         case CF_LIST_CH_MASK:
         {
-            uint8_t          ch_mash_i      = smtc_real_get_number_of_chmask_in_cflist( real );
+            uint8_t          ch_mask_i      = smtc_real_get_number_of_chmask_in_cflist( real );
             status_channel_t channel_status = OKCHANNEL;
             uint16_t         channel_mask;
 
-            smtc_real_init_channel_mask( real );
-
-            for( uint8_t i = 0; i < ch_mash_i; i++ )
+#if( defined( RP2_104 ) || defined( RP2_105 ) )
+            uint8_t nb_added_channel = 0;
+            // Static plan for Dynamic channel plan
+            if( smtc_real_is_cf_list_type_supported( real, CF_LIST_FREQ ) )
             {
-                channel_mask   = cf_list[0 + ( 2 * i )] + ( cf_list[1 + ( 2 * i )] << 8 );
-                channel_status = smtc_real_build_channel_mask( real, i, channel_mask );
+                for( uint8_t i = 0; i < ch_mask_i; i++ )
+                {
+                    channel_mask = cf_list[0 + ( 2 * i )] + ( cf_list[1 + ( 2 * i )] << 8 );
 
-                if( channel_status == ERROR_CHANNEL_CNTL )
-                {  // Test ChannelCNTL not defined
-                    SMTC_MODEM_HAL_TRACE_WARNING( "INVALID CHANNEL CNTL IN JOIN\n" );
-                    break;
-                }
-                // Valid global channel mask
-                if( channel_status == ERROR_CHANNEL_MASK )
-                {  // Test Channelmask enables a not defined channel or Channelmask = 0
-                    SMTC_MODEM_HAL_TRACE_WARNING( "INVALID CHANNEL MASK IN JOIN\n" );
-                    break;
+                    for( uint8_t bit = 0; bit < 16; bit++ )
+                    {
+                        if( SMTC_GET_BIT16( &channel_mask, bit ) == 1 )
+                        {
+                            uint8_t  channel_id = ( i * 16 ) + bit;
+                            uint32_t frequency  = 0;
+
+                            // Check if Tx channel index is smaller than the buffer
+                            if( ( real_const.const_number_of_boot_tx_channel + nb_added_channel ) >=
+                                real_const.const_number_of_tx_channel )
+                            {
+                                break;
+                            }
+
+                            // Dynamic 800 MHz channel list - ch_mask_i should not be greater than 3 as we have 40
+                            // possible channels
+                            if( real_const.const_freq_min < 900000000 )
+                            {
+                                if( channel_id < 35 )
+                                {
+                                    frequency = SMTC_REAL_FREQ_MIN_800MHZ + ( channel_id * SMTC_REAL_STEP_FREQ_800MHZ );
+                                }
+                                else if( channel_id < 40 )
+                                {
+                                    frequency = smtc_real_default_freq_800mhz_cflist[channel_id - 35];
+                                }
+                                else  // invalid bit set in considered ChMaskGrp
+                                {
+                                    SMTC_MODEM_HAL_TRACE_WARNING(
+                                        "INVALID CHANNEL BIT SET IN STATIC CFLIST FOR 800MHZ PLAN (%d)\n", channel_id );
+                                }
+                            }
+                            // Dynamic 900 MHz channel list
+                            else
+                            {
+                                if( channel_id < 96 )
+                                {
+                                    frequency = SMTC_REAL_FREQ_MIN_900MHZ + ( channel_id * SMTC_REAL_STEP_FREQ_900MHZ );
+                                }
+                                // Should never be > 95 as we have only 12 data bytes in CFList
+                            }
+
+                            if( smtc_real_is_frequency_valid( real, frequency ) == OKLORAWAN )
+                            {
+                                // Tx freq
+                                tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel +
+                                                         nb_added_channel] = frequency;
+
+                                // Rx1 Freq
+                                rx1_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel +
+                                                          nb_added_channel] = frequency;
+
+                                // Enable default datarate for all added channels
+                                dr_bitfield_tx_channel_ctx[real_const.const_number_of_boot_tx_channel +
+                                                           nb_added_channel] = real_const.const_default_tx_dr_bit_field;
+
+                                // Enable Channel
+                                SMTC_PUT_BIT8( tx_channel_index_enabled_ctx,
+                                               ( real_const.const_number_of_boot_tx_channel + nb_added_channel ),
+                                               CHANNEL_ENABLED );
+                                SMTC_MODEM_HAL_TRACE_PRINTF(
+                                    "CFList bit %d (corresponding to freq %dHz) present in CFList, "
+                                    "device channel %d is now usable with region default DRs \n",
+                                    bit + 16 * i,
+                                    tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel +
+                                                             nb_added_channel],
+                                    real_const.const_number_of_boot_tx_channel + nb_added_channel );
+                                //                                SMTC_MODEM_HAL_TRACE_PRINTF(
+                                //                                    "CFListTxFrequency [%d] = %d \n",
+                                //                                    real_const.const_number_of_boot_tx_channel +
+                                //                                    nb_added_channel,
+                                //                                    tx_frequency_channel_ctx[real_const.const_number_of_boot_tx_channel
+                                //                                    +
+                                //                                                             nb_added_channel] );
+                                nb_added_channel++;
+                            }
+                            else
+                            {
+                                SMTC_MODEM_HAL_TRACE_WARNING( "INVALID TX FREQUENCY IN CFLIST OR CFLIST EMPTY \n" );
+                            }
+                        }
+                    }
                 }
             }
-            if( channel_status == OKCHANNEL )
+            // Fixed channel list
+            else
+#endif  // RP2_104 || RP2_105
             {
-                smtc_real_set_channel_mask( real );
+                smtc_real_init_channel_mask( real );  // Set unwrapped_channel_mask to 0x00 (as all ch are described in
+                                                      // CFList, this isn't a problem)
+
+                for( uint8_t i = 0; i < ch_mask_i; i++ )
+                {
+                    // We iterate on 16 bit, as each ChMaskGrp in CFList is 16b
+                    channel_mask   = cf_list[0 + ( 2 * i )] + ( cf_list[1 + ( 2 * i )] << 8 );
+                    channel_status = smtc_real_build_channel_mask( real, i, channel_mask );
+
+                    if( channel_status == ERROR_CHANNEL_CNTL )
+                    {  // Test ChannelCNTL not defined
+                        SMTC_MODEM_HAL_TRACE_WARNING( "INVALID CHANNEL CNTL IN JOIN\n" );
+                        break;
+                    }
+                    // Valid global channel mask
+                    if( channel_status == ERROR_CHANNEL_MASK )
+                    {  // Test Channelmask enables a not defined channel or Channelmask = 0
+                        SMTC_MODEM_HAL_TRACE_WARNING( "INVALID CHANNEL MASK IN JOIN\n" );
+                        break;
+                    }
+                }
+                if( channel_status == OKCHANNEL )
+                {
+                    smtc_real_set_channel_mask( real );
+                }
             }
+
             break;
         }
         default:
-            SMTC_MODEM_HAL_TRACE_WARNING( "INVALID CFLIST, MUST CONTAINS FREQ OR CHMASK \n" );
+            SMTC_MODEM_HAL_TRACE_WARNING( "INVALID CFLIST TYPE\n" );
             status = ERRORLORAWAN;
             break;
         }
@@ -616,27 +718,31 @@ uint8_t smtc_real_get_number_of_chmask_in_cflist( smtc_real_t* real )
 #if defined( REGION_EU_868 )
     case SMTC_REAL_REGION_EU_868:
 #endif
-#if defined( REGION_AS_923 )
-    case SMTC_REAL_REGION_AS_923:
-    case SMTC_REAL_REGION_AS_923_GRP2:
-    case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
-    case SMTC_REAL_REGION_AS_923_GRP4:
-#endif
-#endif
 #if defined( REGION_IN_865 )
     case SMTC_REAL_REGION_IN_865:
-#endif
-#if defined( REGION_KR_920 )
-    case SMTC_REAL_REGION_KR_920:
 #endif
 #if defined( REGION_RU_864 )
     case SMTC_REAL_REGION_RU_864:
 #endif
-#if defined( REGION_WW_2G4 ) || defined( REGION_EU_868 ) || defined( REGION_AS_923 ) || defined( REGION_IN_865 ) || \
-    defined( REGION_KR_920 ) || defined( REGION_RU_864 )
+#if defined( REGION_WW_2G4 ) || defined( REGION_EU_868 ) || defined( REGION_IN_865 ) || defined( REGION_RU_864 )
     {
-        return 0;
+        return 3;  // 800MHz fixed-channels for dynamic channel plan in CFList, 40 atomic frequencies
+    }
+#endif
+#if defined( REGION_AS_923 )
+    case SMTC_REAL_REGION_AS_923:
+    case SMTC_REAL_REGION_AS_923_GRP2:
+    case SMTC_REAL_REGION_AS_923_GRP3:
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
+    case SMTC_REAL_REGION_AS_923_GRP4:
+#endif
+#endif
+#if defined( REGION_KR_920 )
+    case SMTC_REAL_REGION_KR_920:
+#endif
+#if defined( REGION_AS_923 ) || defined( REGION_KR_920 )
+    {
+        return 6;  // 900MHz fixed-channels for dynamic channel plan in CFList, 96 atomic frequencies
     }
 #endif
 #if defined( REGION_US_915 )
@@ -647,7 +753,7 @@ uint8_t smtc_real_get_number_of_chmask_in_cflist( smtc_real_t* real )
 #endif
 #if defined( REGION_US_915 ) || defined( REGION_AU_915 )
     {
-        return 5;
+        return 5;  // Fixed Chan  Plan, 80 channels max
     }
 #endif
 #if defined( REGION_CN_470 )
@@ -692,7 +798,7 @@ status_lorawan_t smtc_real_get_next_channel( smtc_real_t* real, uint8_t tx_data_
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
     {
@@ -780,7 +886,7 @@ status_lorawan_t smtc_real_get_join_next_channel( smtc_real_t* real, uint8_t* tx
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
     {
@@ -860,7 +966,7 @@ void smtc_real_mask_channel_used_for_tx( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -936,8 +1042,13 @@ int8_t smtc_real_convert_power_cmd( smtc_real_t* real, uint8_t power_cmd, uint8_
     }
 }
 
+// Copy from unwrapped_tx_channel buffer to tx_channel_enabled buffer (and to snapshot_tx_buffer if US/AU).
 void smtc_real_set_channel_mask( smtc_real_t* real )
 {
+#if( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
+    char channels_str[real_const.const_number_of_tx_channel * 3 + 1];
+#endif
+
     switch( real->region_type )
     {
 #if defined( REGION_WW_2G4 )
@@ -950,7 +1061,7 @@ void smtc_real_set_channel_mask( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -974,18 +1085,15 @@ void smtc_real_set_channel_mask( smtc_real_t* real )
     defined( REGION_CN_470_RP_1_0 ) || defined( REGION_IN_865 ) || defined( REGION_KR_920 ) ||                      \
     defined( REGION_RU_864 )
         // Copy all unwrapped channels in channel enable
-        memcpy( channel_index_enabled_ctx, unwrapped_channel_mask_ctx, real_const.const_number_of_channel_bank );
+        memcpy( tx_channel_index_enabled_ctx, unwrapped_channel_mask_ctx, real_const.const_number_of_channel_banks );
 
-#if ( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
+#if( MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON )
+        for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
         {
-            char channels_str[real_const.const_number_of_tx_channel * 3 + 1];
-            for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
-            {
-                sprintf( channels_str + i * 3, "%d  ", SMTC_GET_BIT8( channel_index_enabled_ctx, i ) );
-            }
-            channels_str[real_const.const_number_of_tx_channel * 3] = '\0';
-            SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( " %s\n", channels_str );
+            sprintf( channels_str + i * 3, "%d  ", SMTC_GET_BIT8( tx_channel_index_enabled_ctx, i ) );
         }
+        channels_str[real_const.const_number_of_tx_channel * 3] = '\0';
+        SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( " %s\n", channels_str );
 #endif  // MODEM_HAL_DBG_TRACE == MODEM_HAL_FEATURE_ON
         break;
 #endif
@@ -1011,9 +1119,20 @@ void smtc_real_set_channel_mask( smtc_real_t* real )
     }
 }
 
+void smtc_real_get_channel_mask( smtc_real_t* real, uint8_t* channel_mask, uint8_t* mask_size )
+{
+    *mask_size = real_const.const_number_of_channel_banks;
+    memcpy( channel_mask, tx_channel_index_enabled_ctx, real_const.const_number_of_channel_banks );
+}
+
 void smtc_real_init_channel_mask( smtc_real_t* real )
 {
-    memset( unwrapped_channel_mask_ctx, 0xFF, real_const.const_number_of_channel_bank );
+    memset( unwrapped_channel_mask_ctx, 0x00, real_const.const_number_of_channel_banks );
+}
+
+void smtc_real_init_channel_mask_before_multiple_linkadrreq( smtc_real_t* real )
+{
+    memcpy( unwrapped_channel_mask_ctx, tx_channel_index_enabled_ctx, real_const.const_number_of_channel_banks );
 }
 
 void smtc_real_init_join_snapshot_channel_mask( smtc_real_t* real )
@@ -1030,7 +1149,7 @@ void smtc_real_init_join_snapshot_channel_mask( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1091,7 +1210,7 @@ void smtc_real_init_after_join_snapshot_channel_mask( smtc_real_t* real, uint8_t
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1138,6 +1257,8 @@ void smtc_real_init_after_join_snapshot_channel_mask( smtc_real_t* real, uint8_t
     }
 }
 
+// Called from LinkAdrReq or when receiving a CFList in JoinAccept
+// Modifies unwrapped_channel_mask[], but does not copy to tx_channel_index_enabled[]
 status_channel_t smtc_real_build_channel_mask( smtc_real_t* real, uint8_t ch_mask_cntl, uint16_t ch_mask )
 {
     switch( real->region_type )
@@ -1158,7 +1279,7 @@ status_channel_t smtc_real_build_channel_mask( smtc_real_t* real, uint8_t ch_mas
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
     {
@@ -1259,6 +1380,7 @@ void smtc_real_decrement_dr( smtc_real_t* real, dr_strategy_t adr_mode_select, u
     if( *tx_power < real_const.const_tx_power_dbm )
     {
         *tx_power = real_const.const_tx_power_dbm;
+        SMTC_MODEM_HAL_TRACE_WARNING( "ADR Back-Off - Setting TX power to maximum\n" );
         return;
     }
 
@@ -1273,6 +1395,7 @@ void smtc_real_decrement_dr( smtc_real_t* real, dr_strategy_t adr_mode_select, u
         if( *tx_data_rate_adr != dr_tmp )
         {
             *tx_data_rate_adr = dr_tmp;
+            SMTC_MODEM_HAL_TRACE_WARNING( "ADR Back-Off - Decrementing DR to DR%d\n", dr_tmp );
             return;
         }
     }
@@ -1286,8 +1409,9 @@ void smtc_real_decrement_dr( smtc_real_t* real, dr_strategy_t adr_mode_select, u
         // nb_trans must set to 1 and all default channels re-enabled
         *nb_trans = 1;
         smtc_real_enable_all_channels_with_valid_freq( real );
-        // When all channels are once again available, a lower datarate could be available (in case where only DR6 and
-        // DR7 were present previously, or if user created channels w/ min DR different than default one)
+        SMTC_MODEM_HAL_TRACE_WARNING( "ADR Back-Off - Setting NbTrans to 1 and re-enabling default channels\n" );
+        // When all channels are once again available, a lower datarate could be available (if the user created channels
+        // w/ min DR different than default one and was only transmitting on this DR)
         *tx_data_rate_adr = smtc_real_decrement_dr_simulation( real, *tx_data_rate_adr );
         return;
     }
@@ -1311,7 +1435,7 @@ bool smtc_real_are_all_default_channels_enabled( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1329,7 +1453,7 @@ bool smtc_real_are_all_default_channels_enabled( smtc_real_t* real )
     {
         for( uint8_t i = 0; i < real_const.const_number_of_boot_tx_channel; i++ )
         {
-            if( SMTC_GET_BIT8( channel_index_enabled_ctx, i ) == 0 )  // If at least 1 default ch is disabled
+            if( SMTC_GET_BIT8( tx_channel_index_enabled_ctx, i ) == 0 )  // If at least 1 default ch is disabled
             {
                 return false;
             }
@@ -1382,7 +1506,7 @@ void smtc_real_enable_all_channels_with_valid_freq( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1400,7 +1524,7 @@ void smtc_real_enable_all_channels_with_valid_freq( smtc_real_t* real )
     {
         for( uint8_t i = 0; i < real_const.const_number_of_boot_tx_channel; i++ )
         {
-            SMTC_PUT_BIT8( channel_index_enabled_ctx, i, CHANNEL_ENABLED );
+            SMTC_PUT_BIT8( tx_channel_index_enabled_ctx, i, CHANNEL_ENABLED );
             dr_bitfield_tx_channel_ctx[i] = real_const.const_default_tx_dr_bit_field;
         }
         break;
@@ -1446,39 +1570,67 @@ status_lorawan_t smtc_real_is_rx1_dr_offset_valid( smtc_real_t* real, uint8_t rx
     if( rx1_dr_offset >= real_const.const_number_rx1_dr_offset )
     {
         status = ERRORLORAWAN;
-        SMTC_MODEM_HAL_TRACE_WARNING( "RECEIVE AN INVALID Rx1 DR OFFSET \n" );
+        SMTC_MODEM_HAL_TRACE_WARNING( "RECEIVED AN INVALID RX1 DR OFFSET \n" );
     }
     return ( status );
 }
 
 status_lorawan_t smtc_real_is_rx_dr_valid( smtc_real_t* real, uint8_t dr )
 {
-    if( ( dr >= real_const.const_min_rx_dr ) && ( dr <= real_const.const_max_rx_dr ) )
+    if( ( dr <= 15 ) )
     {
-        if( SMTC_GET_BIT16( &real_const.const_dr_bitfield, dr ) == 1 )
+        if( SMTC_GET_BIT16( &real_const.const_rx_dr_bitfield, dr ) == 1 )
         {
             return ( OKLORAWAN );
         }
     }
-    SMTC_MODEM_HAL_TRACE_WARNING( "Invalid Rx datarate %d\n", dr );
+    SMTC_MODEM_HAL_TRACE_WARNING( "Invalid RX datarate (%d)\n", dr );
 
     return ( ERRORLORAWAN );
 }
 
 status_lorawan_t smtc_real_is_tx_dr_valid( smtc_real_t* real, uint8_t dr )
 {
-    if( ( dr >= real_const.const_min_tx_dr ) && ( dr <= real_const.const_max_tx_dr ) )
+    if( dr <= 15 )
     {
-        if( SMTC_GET_BIT16( &real_const.const_dr_bitfield, dr ) == 1 )
+        if( SMTC_GET_BIT16( &real_const.const_tx_dr_bitfield, dr ) == 1 )
         {
             return ( OKLORAWAN );
         }
     }
-    SMTC_MODEM_HAL_TRACE_WARNING( "Invalid Tx datarate %d\n", dr );
+    SMTC_MODEM_HAL_TRACE_WARNING( "Invalid TX datarate (%d)\n", dr );
 
     return ( ERRORLORAWAN );
 }
 
+status_lorawan_t smtc_real_is_tx_dr_range_valid( smtc_real_t* real, uint8_t dr_min, uint8_t dr_max )
+{
+#if defined( RP2_105 )
+    if( dr_max == 0 )
+    {
+        if( dr_min > 6 )
+        {
+            return ERRORLORAWAN;
+        }
+    }
+    else
+    {
+        if( dr_max < dr_min )
+        {
+            return ERRORLORAWAN;
+        }
+    }
+#else
+    if( dr_max < dr_min )
+    {
+        return ERRORLORAWAN;
+    }
+#endif
+    return OKLORAWAN;
+}
+// Check if requested DR is valid for at lease one channel.
+// For each enabled channel, we iterate on datarates to determinate the channel that will be used.
+// Called when a LinkAdrReq is received.
 status_lorawan_t smtc_real_is_tx_dr_acceptable( smtc_real_t* real, uint8_t dr, bool is_ch_mask_from_link_adr )
 {
     switch( real->region_type )
@@ -1493,7 +1645,7 @@ status_lorawan_t smtc_real_is_tx_dr_acceptable( smtc_real_t* real, uint8_t dr, b
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1517,7 +1669,7 @@ status_lorawan_t smtc_real_is_tx_dr_acceptable( smtc_real_t* real, uint8_t dr, b
     defined( REGION_RU_864 )
     {
         uint8_t* ch_mask_to_check =
-            ( is_ch_mask_from_link_adr == true ) ? unwrapped_channel_mask_ctx : channel_index_enabled_ctx;
+            ( is_ch_mask_from_link_adr == true ) ? unwrapped_channel_mask_ctx : tx_channel_index_enabled_ctx;
 
         if( uplink_dwell_time_ctx == true )
         {
@@ -1558,6 +1710,7 @@ status_lorawan_t smtc_real_is_tx_dr_acceptable( smtc_real_t* real, uint8_t dr, b
     return ERRORLORAWAN;  // never reach => avoid warning
 }
 
+// Called only after reception of NewChannelReq
 status_lorawan_t smtc_real_is_nwk_received_tx_frequency_valid( smtc_real_t* real, uint32_t frequency )
 {
     switch( real->region_type )
@@ -1572,7 +1725,7 @@ status_lorawan_t smtc_real_is_nwk_received_tx_frequency_valid( smtc_real_t* real
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1635,7 +1788,7 @@ status_lorawan_t smtc_real_is_channel_index_valid( smtc_real_t* real, uint8_t ch
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1656,7 +1809,7 @@ status_lorawan_t smtc_real_is_channel_index_valid( smtc_real_t* real, uint8_t ch
             ( channel_index >= real_const.const_number_of_tx_channel ) )
         {
             status = ERRORLORAWAN;
-            SMTC_MODEM_HAL_TRACE_WARNING( "RECEIVE AN INVALID Channel Index Cmd = %d\n", channel_index );
+            SMTC_MODEM_HAL_TRACE_WARNING( "RECEIVED AN INVALID Channel Index Cmd = %d\n", channel_index );
         }
         return ( status );
     }
@@ -1668,14 +1821,33 @@ status_lorawan_t smtc_real_is_channel_index_valid( smtc_real_t* real, uint8_t ch
 #if defined( REGION_CN_470_RP_1_0 )
     case SMTC_REAL_REGION_CN_470_RP_1_0:
 #endif
+#if defined( REGION_CN_470 ) || defined( REGION_CN_470_RP_1_0 )
+    {
+        return ( ERRORLORAWAN );
+    }
+#endif
 #if defined( REGION_US_915 )
     case SMTC_REAL_REGION_US_915:
 #endif
 #if defined( REGION_AU_915 )
     case SMTC_REAL_REGION_AU_915:
 #endif
-#if defined( REGION_CN_470 ) || defined( REGION_CN_470_RP_1_0 ) || defined( REGION_US_915 ) || defined( REGION_AU_915 )
+#if defined( REGION_US_915 ) || defined( REGION_AU_915 )
     {
+        // TODO Implement this when implementing LoRaWAN 1.2.x, that will allow NewChannelReq for US/AU.
+        //  if( real_const.const_number_of_tx_channel > 72 )
+        //  {
+        //      // Only valid if channel index is in range of user-defined channels.
+        //      uint8_t last_block_mask = 0;
+        //      for( int i = 0; i < ( ( real_const.const_number_of_tx_channel - 1 ) % 8 ) + 1; i++ )
+        //      {
+        //          last_block_mask |= 1 << i;  // build (2^last_block_mask) - 1
+        //      }
+        //      if( 1 << ( channel_index % 8 ) & last_block_mask )
+        //      {
+        //          return ( OKLORAWAN );
+        //      }
+        //  }
         return ( ERRORLORAWAN );
     }
 #endif
@@ -1695,27 +1867,31 @@ status_lorawan_t smtc_real_is_payload_size_valid( smtc_real_t* real, uint8_t dr,
         SMTC_MODEM_HAL_PANIC( );
     }
 
-    uint8_t index = ( dwell_time_enabled * real_const.const_number_of_tx_dr ) + dr;
+    // uint8_t index = ( dwell_time_enabled * real_const.const_number_of_tx_dr ) + dr;
 
-#if defined( REGION_AU_915 )
-    if( real->region_type == SMTC_REAL_REGION_AU_915 )
-    {
-        // *2 because the array contains Tx and Rx datarate
-        index = ( dwell_time_enabled * real_const.const_number_of_tx_dr * 2 ) + dr;
-    }
-#endif
+    // #if defined( REGION_AU_915 )
+    //     if( real->region_type == SMTC_REAL_REGION_AU_915 )
+    //     {
+    //         // *2 because the array contains Tx and Rx datarate
+    //         index = ( dwell_time_enabled * real_const.const_number_of_tx_dr * 2 ) + dr;
+    //     }
+    // #endif
 
-    status_lorawan_t status = ( ( size + tx_fopts_current_length ) > ( real_const.const_max_payload_m[index] - 8 ) )
-                                  ? ERRORLORAWAN
-                                  : OKLORAWAN;
+    uint8_t          max_payload = ( direction_frame == UP_LINK )
+                                       ? ( dwell_time_enabled ? real_const.const_tx_max_payload_m_dwell_time_on[dr]
+                                                              : real_const.const_tx_max_payload_m_dwell_time_off[dr] )
+                                       : ( dwell_time_enabled ? real_const.const_rx_max_payload_m_dwell_time_on[dr]
+                                                              : real_const.const_rx_max_payload_m_dwell_time_off[dr] );
+    status_lorawan_t status = ( ( size + tx_fopts_current_length ) > ( max_payload - 8 ) ) ? ERRORLORAWAN : OKLORAWAN;
     if( status == ERRORLORAWAN )
     {
         SMTC_MODEM_HAL_TRACE_PRINTF( "Invalid size (data:%d + FOpts:%d) > %d for dr: %d\n", size,
-                                     tx_fopts_current_length, ( real_const.const_max_payload_m[index] - 8 ), dr );
+                                     tx_fopts_current_length, ( max_payload - 8 ), dr );
     }
     return ( status );
 }
 
+// Called only from NewChannelReq MAC command.
 void smtc_real_set_tx_frequency_channel( smtc_real_t* real, uint32_t tx_freq, uint8_t channel_index )
 {
     switch( real->region_type )
@@ -1730,7 +1906,7 @@ void smtc_real_set_tx_frequency_channel( smtc_real_t* real, uint32_t tx_freq, ui
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1761,16 +1937,38 @@ void smtc_real_set_tx_frequency_channel( smtc_real_t* real, uint32_t tx_freq, ui
 #if defined( REGION_CN_470_RP_1_0 )
     case SMTC_REAL_REGION_CN_470_RP_1_0:
 #endif
+#if defined( REGION_CN_470 ) || defined( REGION_CN_470_RP_1_0 )
+    {
+        // Not supported
+        break;
+    }
+#endif
 #if defined( REGION_US_915 )
     case SMTC_REAL_REGION_US_915:
 #endif
 #if defined( REGION_AU_915 )
     case SMTC_REAL_REGION_AU_915:
 #endif
-#if defined( REGION_CN_470 ) || defined( REGION_CN_470_RP_1_0 ) || defined( REGION_US_915 ) || defined( REGION_AU_915 )
+#if defined( REGION_US_915 ) || defined( REGION_AU_915 )
     {
+#if( defined( RP2_104 ) || defined( RP2_105 ) )
+        // TODO Uncomment when implementing LoRaWAN 1.2.x
+        //  if( channel_index >= real_const.const_number_of_tx_channel )
+        //  {
+        //      SMTC_MODEM_HAL_PANIC( );
+        //  }
+        //  else
+        //  {
+        //      if( real_const.const_number_of_tx_channel > 72 )
+        //      {
+        //          tx_frequency_channel_ctx[channel_index] = tx_freq;
+        //      }
+        //  }
+        break;
+#else
         // Not supported
         break;
+#endif
     }
 #endif
     default:
@@ -1793,7 +1991,7 @@ status_lorawan_t smtc_real_set_rx1_frequency_channel( smtc_real_t* real, uint32_
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1845,6 +2043,7 @@ status_lorawan_t smtc_real_set_rx1_frequency_channel( smtc_real_t* real, uint32_
     return ERRORLORAWAN;  // never reach => avoid warning
 }
 
+// Called only from new_channel_parser() (NewChannelReq MAC command)
 void smtc_real_set_channel_dr( smtc_real_t* real, uint8_t channel_index, uint8_t dr_min, uint8_t dr_max )
 {
     switch( real->region_type )
@@ -1859,7 +2058,7 @@ void smtc_real_set_channel_dr( smtc_real_t* real, uint8_t channel_index, uint8_t
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1881,9 +2080,24 @@ void smtc_real_set_channel_dr( smtc_real_t* real, uint8_t channel_index, uint8_t
         else
         {
             dr_bitfield_tx_channel_ctx[channel_index] = 0;
+            if( ( dr_max == 0 ) && dr_min > 0 )
+            {
+#if defined( RP2_105 )
+                // Enable DR13/DR12 only if they are available in the region
+                dr_bitfield_tx_channel_ctx[channel_index] |= ( ( ( 1 << DR13 ) & real_const.const_tx_dr_bitfield ) |
+                                                               ( ( 1 << DR12 ) & real_const.const_tx_dr_bitfield ) );
+                for( uint8_t i = dr_min - 1; i <= DR5; i++ )
+                {
+                    uint8_t tmp_dr = SMTC_GET_BIT16( &real_const.const_tx_dr_bitfield, i );
+                    SMTC_PUT_BIT16( &dr_bitfield_tx_channel_ctx[channel_index], i, tmp_dr );
+                }
+#else
+                SMTC_MODEM_HAL_PANIC( );
+#endif
+            }
             for( uint8_t i = dr_min; i <= dr_max; i++ )
             {
-                uint8_t tmp_dr = SMTC_GET_BIT16( &real_const.const_dr_bitfield, i );
+                uint8_t tmp_dr = SMTC_GET_BIT16( &real_const.const_tx_dr_bitfield, i );
                 SMTC_PUT_BIT16( &dr_bitfield_tx_channel_ctx[channel_index], i, tmp_dr );
             }
         }
@@ -1895,18 +2109,46 @@ void smtc_real_set_channel_dr( smtc_real_t* real, uint8_t channel_index, uint8_t
 #if defined( REGION_CN_470_RP_1_0 )
     case SMTC_REAL_REGION_CN_470_RP_1_0:
 #endif
+#if defined( REGION_CN_470 ) || defined( REGION_CN_470_RP_1_0 )
+    {
+        // Not supported
+        break;
+    }
+#endif
 #if defined( REGION_US_915 )
     case SMTC_REAL_REGION_US_915:
 #endif
 #if defined( REGION_AU_915 )
     case SMTC_REAL_REGION_AU_915:
 #endif
-#if defined( REGION_CN_470 ) || defined( REGION_CN_470_RP_1_0 ) || defined( REGION_US_915 ) || defined( REGION_AU_915 )
+#if defined( REGION_US_915 ) || defined( REGION_AU_915 )
     {
+#if( defined( RP2_104 ) || defined( RP2_105 ) )
+        // TODO Uncomment when implementing LoRaWAN 1.2.x
+        // if( channel_index >= real_const.const_number_of_tx_channel )
+        // {
+        //     SMTC_MODEM_HAL_PANIC( );
+        // }
+        // else
+        // {
+        //     if( real_const.const_number_of_tx_channel > 72 )
+        //     {
+        //         dr_bitfield_tx_channel_ctx[channel_index] = 0;
+        //         for( uint8_t i = dr_min; i <= dr_max; i++ )
+        //         {
+        //             uint8_t tmp_dr = SMTC_GET_BIT16( &real_const.const_tx_dr_bitfield, i );
+        //             SMTC_PUT_BIT16( &dr_bitfield_tx_channel_ctx[channel_index], i, tmp_dr );
+        //         }
+        //     }
+        // }
+        break;
+#else
         // Not supported
         break;
+#endif
     }
 #endif
+
     default:
         SMTC_MODEM_HAL_PANIC( );
         break;
@@ -1927,7 +2169,7 @@ void smtc_real_set_channel_enabled( smtc_real_t* real, uint8_t enable, uint8_t c
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -1948,7 +2190,7 @@ void smtc_real_set_channel_enabled( smtc_real_t* real, uint8_t enable, uint8_t c
         }
         else
         {
-            SMTC_PUT_BIT8( channel_index_enabled_ctx, channel_index, enable );
+            SMTC_PUT_BIT8( tx_channel_index_enabled_ctx, channel_index, enable );
         }
         break;
 #endif
@@ -1958,16 +2200,36 @@ void smtc_real_set_channel_enabled( smtc_real_t* real, uint8_t enable, uint8_t c
 #if defined( REGION_CN_470_RP_1_0 )
     case SMTC_REAL_REGION_CN_470_RP_1_0:
 #endif
-#if defined( REGION_US_915 )
-    case SMTC_REAL_REGION_US_915:
-#endif
-#if defined( REGION_AU_915 )
-    case SMTC_REAL_REGION_AU_915:
-#endif
-#if defined( REGION_CN_470 ) || defined( REGION_CN_470_RP_1_0 ) || defined( REGION_US_915 ) || defined( REGION_AU_915 )
+#if defined( REGION_CN_470 ) || defined( REGION_CN_470_RP_1_0 )
     {
         // Not supported
         break;
+    }
+#endif
+#if defined( REGION_US_915 )
+    case SMTC_REAL_REGION_US_915:
+    {
+#if( defined( RP2_104 ) || defined( RP2_105 ) )
+        // TODO Uncomment when implementing LoRaWAN 1.2.x
+        // region_us_915_set_channel_enabled( real, enable, channel_index );
+        break;
+#else
+        // Not supported
+        break;
+#endif
+    }
+#endif
+#if defined( REGION_AU_915 )
+    case SMTC_REAL_REGION_AU_915:
+    {
+#if( defined( RP2_104 ) || defined( RP2_105 ) )
+        // TODO Uncomment when implementing LoRaWAN 1.2.x
+        // region_au_915_set_channel_enabled( real, enable, channel_index );
+        break;
+#else
+        // Not supported
+        break;
+#endif
     }
 #endif
     default:
@@ -1990,7 +2252,7 @@ uint32_t smtc_real_get_tx_channel_frequency( smtc_real_t* real, uint8_t channel_
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -2029,14 +2291,14 @@ uint32_t smtc_real_get_tx_channel_frequency( smtc_real_t* real, uint8_t channel_
 #if defined( REGION_US_915 )
     case SMTC_REAL_REGION_US_915:
     {
-        return region_us_915_get_tx_frequency_channel( real, channel_index );
+        return region_us_915_get_tx_frequency_channel_fix( real, channel_index );
         break;
     }
 #endif
 #if defined( REGION_AU_915 )
     case SMTC_REAL_REGION_AU_915:
     {
-        return region_au_915_get_tx_frequency_channel( real, channel_index );
+        return region_au_915_get_tx_frequency_channel_fix( real, channel_index );
         break;
     }
 #endif
@@ -2061,7 +2323,7 @@ uint32_t smtc_real_get_rx1_channel_frequency( smtc_real_t* real, uint8_t channel
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -2126,7 +2388,7 @@ uint8_t smtc_real_get_min_tx_channel_dr( smtc_real_t* real )
     // Iterate on all actually enabled channels
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( ( SMTC_GET_BIT8( channel_index_enabled_ctx, i ) == CHANNEL_ENABLED ) )
+        if( ( SMTC_GET_BIT8( tx_channel_index_enabled_ctx, i ) == CHANNEL_ENABLED ) )
         {
             // Iterate on all valid DRs for this region
             for( uint8_t dr = real_const.const_min_tx_dr; dr <= real_const.const_max_tx_dr; dr++ )
@@ -2158,7 +2420,7 @@ uint8_t smtc_real_get_max_tx_channel_dr( smtc_real_t* real )
     uint8_t max_dr = real_const.const_min_tx_dr;  // start with the min dr and search a dr superior
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( ( SMTC_GET_BIT8( channel_index_enabled_ctx, i ) == CHANNEL_ENABLED ) )
+        if( ( SMTC_GET_BIT8( tx_channel_index_enabled_ctx, i ) == CHANNEL_ENABLED ) )
         {
             for( uint8_t dr = 0; dr <= real_const.const_max_tx_dr; dr++ )
             {
@@ -2178,12 +2440,13 @@ uint8_t smtc_real_get_max_tx_channel_dr( smtc_real_t* real )
     return ( max_dr );
 }
 
+// Get an unique uint16_t bitfield of all DRs on currently enabled channels
 uint16_t smtc_real_mask_tx_dr_channel( smtc_real_t* real )
 {
     uint16_t dr_mask = 0;
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( SMTC_GET_BIT8( channel_index_enabled_ctx, i ) == CHANNEL_ENABLED )
+        if( SMTC_GET_BIT8( tx_channel_index_enabled_ctx, i ) == CHANNEL_ENABLED )
         {
             dr_mask |= dr_bitfield_tx_channel_ctx[i];
         }
@@ -2192,6 +2455,8 @@ uint16_t smtc_real_mask_tx_dr_channel( smtc_real_t* real )
     return dr_mask;
 }
 
+// Get an unique uin16_t bitfield of all DRs on currently enabled channels without the ones unusable because of dwell
+// time
 uint16_t smtc_real_mask_tx_dr_channel_up_dwell_time_check( smtc_real_t* real )
 {
     uint16_t dr_mask = smtc_real_mask_tx_dr_channel( real );
@@ -2225,8 +2490,21 @@ uint8_t smtc_real_get_preamble_len( const smtc_real_t* real, uint8_t sf )
     }
 #endif
     default:
+    {
+        // Might be re-enabled later when implemented in Regional Parameters specs.
+        /*
+        if( ( sf == 5 ) || ( sf == 6 ) )
+        {
+            return 12;
+        }
+        else
+        {
+            return 8;
+        }
+        */
         return 8;
         break;
+    }
     }
 }
 
@@ -2280,7 +2558,7 @@ status_lorawan_t smtc_real_is_channel_mask_for_mobile_mode( const smtc_real_t* r
     return ( status );
 }
 
-modulation_type_t smtc_real_get_modulation_type_from_datarate( smtc_real_t* real, uint8_t datarate )
+modulation_type_t smtc_real_get_modulation_type_from_tx_datarate( smtc_real_t* real, uint8_t datarate )
 {
     switch( real->region_type )
     {
@@ -2302,7 +2580,7 @@ modulation_type_t smtc_real_get_modulation_type_from_datarate( smtc_real_t* real
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
     {
@@ -2313,14 +2591,14 @@ modulation_type_t smtc_real_get_modulation_type_from_datarate( smtc_real_t* real
 #if defined( REGION_US_915 )
     case SMTC_REAL_REGION_US_915:
     {
-        return region_us_915_get_modulation_type_from_datarate( datarate );
+        return region_us_915_get_modulation_type_from_tx_datarate( datarate );
         break;
     }
 #endif
 #if defined( REGION_AU_915 )
     case SMTC_REAL_REGION_AU_915:
     {
-        return region_au_915_get_modulation_type_from_datarate( datarate );
+        return region_au_915_get_modulation_type_from_tx_datarate( datarate );
         break;
     }
 #endif
@@ -2365,7 +2643,94 @@ modulation_type_t smtc_real_get_modulation_type_from_datarate( smtc_real_t* real
     }
     return 0;  // never reach => avoid warning
 }
-void smtc_real_lora_dr_to_sf_bw( smtc_real_t* real, uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw )
+
+modulation_type_t smtc_real_get_modulation_type_from_rx_datarate( smtc_real_t* real, uint8_t datarate )
+{
+    switch( real->region_type )
+    {
+#if defined( REGION_WW_2G4 )
+    case SMTC_REAL_REGION_WW_2G4:
+    {
+        return region_ww_2g4_get_modulation_type_from_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_EU_868 )
+    case SMTC_REAL_REGION_EU_868:
+    {
+        return region_eu_868_get_modulation_type_from_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_AS_923 )
+    case SMTC_REAL_REGION_AS_923:
+    case SMTC_REAL_REGION_AS_923_GRP2:
+    case SMTC_REAL_REGION_AS_923_GRP3:
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
+    case SMTC_REAL_REGION_AS_923_GRP4:
+#endif
+    {
+        return region_as_923_get_modulation_type_from_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_US_915 )
+    case SMTC_REAL_REGION_US_915:
+    {
+        return region_us_915_get_modulation_type_from_rx_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_AU_915 )
+    case SMTC_REAL_REGION_AU_915:
+    {
+        return region_au_915_get_modulation_type_from_rx_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_CN_470 )
+    case SMTC_REAL_REGION_CN_470:
+    {
+        return region_cn_470_get_modulation_type_from_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_CN_470_RP_1_0 )
+    case SMTC_REAL_REGION_CN_470_RP_1_0:
+    {
+        return region_cn_470_rp_1_0_get_modulation_type_from_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_IN_865 )
+    case SMTC_REAL_REGION_IN_865:
+    {
+        return region_in_865_get_modulation_type_from_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_KR_920 )
+    case SMTC_REAL_REGION_KR_920:
+    {
+        return region_kr_920_get_modulation_type_from_datarate( datarate );
+        break;
+    }
+#endif
+#if defined( REGION_RU_864 )
+    case SMTC_REAL_REGION_RU_864:
+    {
+        return region_ru_864_get_modulation_type_from_datarate( datarate );
+        break;
+    }
+#endif
+    default:
+        SMTC_MODEM_HAL_PANIC( );
+        break;
+    }
+    return 0;  // never reach => avoid warning
+}
+
+void smtc_real_lora_tx_dr_to_sf_bw( smtc_real_t* real, uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw )
 {
     switch( real->region_type )
     {
@@ -2387,7 +2752,7 @@ void smtc_real_lora_dr_to_sf_bw( smtc_real_t* real, uint8_t in_dr, uint8_t* out_
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
     {
@@ -2398,14 +2763,99 @@ void smtc_real_lora_dr_to_sf_bw( smtc_real_t* real, uint8_t in_dr, uint8_t* out_
 #if defined( REGION_US_915 )
     case SMTC_REAL_REGION_US_915:
     {
-        region_us_915_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        region_us_915_lora_tx_dr_to_sf_bw( in_dr, out_sf, out_bw );
         break;
     }
 #endif
 #if defined( REGION_AU_915 )
     case SMTC_REAL_REGION_AU_915:
     {
-        region_au_915_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        region_au_915_lora_tx_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_CN_470 )
+    case SMTC_REAL_REGION_CN_470:
+    {
+        region_cn_470_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_CN_470_RP_1_0 )
+    case SMTC_REAL_REGION_CN_470_RP_1_0:
+    {
+        region_cn_470_rp_1_0_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_IN_865 )
+    case SMTC_REAL_REGION_IN_865:
+    {
+        region_in_865_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_KR_920 )
+    case SMTC_REAL_REGION_KR_920:
+    {
+        region_kr_920_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_RU_864 )
+    case SMTC_REAL_REGION_RU_864:
+    {
+        region_ru_864_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+    default:
+        SMTC_MODEM_HAL_PANIC( );
+        break;
+    }
+}
+
+void smtc_real_lora_rx_dr_to_sf_bw( smtc_real_t* real, uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw )
+{
+    switch( real->region_type )
+    {
+#if defined( REGION_WW_2G4 )
+    case SMTC_REAL_REGION_WW_2G4:
+    {
+        region_ww_2g4_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_EU_868 )
+    case SMTC_REAL_REGION_EU_868:
+    {
+        region_eu_868_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_AS_923 )
+    case SMTC_REAL_REGION_AS_923:
+    case SMTC_REAL_REGION_AS_923_GRP2:
+    case SMTC_REAL_REGION_AS_923_GRP3:
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
+    case SMTC_REAL_REGION_AS_923_GRP4:
+#endif
+    {
+        region_as_923_lora_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_US_915 )
+    case SMTC_REAL_REGION_US_915:
+    {
+        region_us_915_lora_rx_dr_to_sf_bw( in_dr, out_sf, out_bw );
+        break;
+    }
+#endif
+#if defined( REGION_AU_915 )
+    case SMTC_REAL_REGION_AU_915:
+    {
+        region_au_915_lora_rx_dr_to_sf_bw( in_dr, out_sf, out_bw );
         break;
     }
 #endif
@@ -2465,7 +2915,7 @@ void smtc_real_fsk_dr_to_bitrate( smtc_real_t* real, uint8_t in_dr, uint8_t* out
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
     {
@@ -2582,7 +3032,7 @@ uint8_t smtc_real_get_number_of_enabled_channels_for_a_datarate( smtc_real_t* re
 
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( SMTC_GET_BIT8( channel_index_enabled_ctx, i ) == CHANNEL_ENABLED )
+        if( SMTC_GET_BIT8( tx_channel_index_enabled_ctx, i ) == CHANNEL_ENABLED )
         {
             if( SMTC_GET_BIT16( &dr_bitfield_tx_channel_ctx[i], datarate ) == 1 )
             {
@@ -2608,7 +3058,7 @@ int8_t smtc_real_clamp_output_power_eirp_vs_freq_and_dr( smtc_real_t* real, int8
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -2684,7 +3134,7 @@ bool smtc_real_get_current_enabled_frequency_list_for_a_datarate( smtc_real_t* r
     }
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( SMTC_GET_BIT8( channel_index_enabled_ctx, i ) == CHANNEL_ENABLED )
+        if( SMTC_GET_BIT8( tx_channel_index_enabled_ctx, i ) == CHANNEL_ENABLED )
         {
             if( SMTC_GET_BIT16( &dr_bitfield_tx_channel_ctx[i], datarate ) == 1 )
             {
@@ -2749,8 +3199,14 @@ uint8_t smtc_real_get_private_sync_word( smtc_real_t* real )
     return ( real_const.const_sync_word_private );
 }
 
-uint8_t smtc_real_get_sync_word( smtc_real_t* real )
+uint8_t smtc_real_get_sync_word( smtc_real_t* real, uint8_t sf )
 {
+    // When SF5 and SF6, the PRIVATE (0x12) sync word must be sent, independently of the current network type
+    // (public or private)
+    if( ( sf == 5 ) || ( sf == 6 ) )
+    {
+        return real_const.const_sync_word_private;
+    }
     return ( real_ctx.sync_word_ctx );
 }
 
@@ -2770,7 +3226,7 @@ uint8_t* smtc_real_get_gfsk_sync_word( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -2873,17 +3329,38 @@ uint8_t smtc_real_get_max_payload_size( smtc_real_t* real, uint8_t dr, direction
         SMTC_MODEM_HAL_PANIC( );
     }
 
-    uint8_t index = ( dwell_time_enabled * real_const.const_number_of_tx_dr ) + dr;
+    // uint8_t index = ( dwell_time_enabled * real_const.const_number_of_tx_dr ) + dr;
 
-#if defined( REGION_AU_915 )
-    if( real->region_type == SMTC_REAL_REGION_AU_915 )
+    // #if defined( REGION_AU_915 )
+    //     if( real->region_type == SMTC_REAL_REGION_AU_915 )
+    //     {
+    //         // *2 because the array contains Tx and Rx datarate
+    //         index = ( dwell_time_enabled * real_const.const_number_of_tx_dr * 2 ) + dr;
+    //     }
+    // #endif
+
+    if( direction_frame == UP_LINK )
     {
-        // *2 because the array contains Tx and Rx datarate
-        index = ( dwell_time_enabled * real_const.const_number_of_tx_dr * 2 ) + dr;
+        if( dwell_time_enabled )
+        {
+            return ( real_const.const_tx_max_payload_m_dwell_time_on[dr] );
+        }
+        else
+        {
+            return ( real_const.const_tx_max_payload_m_dwell_time_off[dr] );
+        }
     }
-#endif
-
-    return ( real_const.const_max_payload_m[index] );
+    else  // Downlink
+    {
+        if( dwell_time_enabled )
+        {
+            return ( real_const.const_rx_max_payload_m_dwell_time_on[dr] );
+        }
+        else
+        {
+            return ( real_const.const_rx_max_payload_m_dwell_time_off[dr] );
+        }
+    }
 }
 
 uint8_t smtc_real_get_default_max_eirp( smtc_real_t* real )
@@ -2910,7 +3387,7 @@ bool smtc_real_is_beacon_hopping( smtc_real_t* real )
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -2970,7 +3447,7 @@ uint32_t smtc_real_get_beacon_frequency( smtc_real_t* real, uint32_t gps_time_s 
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -3040,7 +3517,7 @@ uint32_t smtc_real_get_ping_slot_frequency( smtc_real_t* real, uint32_t gps_time
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
 #endif
@@ -3124,7 +3601,7 @@ status_lorawan_t smtc_real_is_frequency_valid( smtc_real_t* real, uint32_t frequ
     if( ( frequency > real_const.const_freq_max ) || ( frequency < real_const.const_freq_min ) )
     {
         status = ERRORLORAWAN;
-        SMTC_MODEM_HAL_TRACE_WARNING( "INVALID FREQUENCY = %d\n", frequency );
+        SMTC_MODEM_HAL_TRACE_WARNING( "INVALID FREQUENCY = %dHz\n", frequency );
     }
     return ( status );
 }
@@ -3148,15 +3625,31 @@ lr1mac_version_t smtc_real_get_regional_parameters_version( void )
     return version;
 }
 
-uint32_t smtc_real_get_symbol_duration_us( smtc_real_t* real, uint8_t datarate )
+uint32_t smtc_real_get_symbol_duration_us( smtc_real_t* real, uint8_t datarate, direction_frame_t direction_frame )
 {
-    modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate( real, datarate );
-    uint32_t          bw_temp         = 125;
+    modulation_type_t modulation_type = LORA;
+    if( direction_frame == DOWN_LINK )
+    {
+        modulation_type = smtc_real_get_modulation_type_from_rx_datarate( real, datarate );
+    }
+    else
+    {
+        modulation_type = smtc_real_get_modulation_type_from_tx_datarate( real, datarate );
+    }
+
+    uint32_t bw_temp = 125;
     if( modulation_type == LORA )
     {
         uint8_t            sf;
         lr1mac_bandwidth_t bw;
-        smtc_real_lora_dr_to_sf_bw( real, datarate, &sf, &bw );
+        if( direction_frame == DOWN_LINK )
+        {
+            smtc_real_lora_rx_dr_to_sf_bw( real, datarate, &sf, &bw );
+        }
+        else
+        {
+            smtc_real_lora_tx_dr_to_sf_bw( real, datarate, &sf, &bw );
+        }
         // Use lr1mac_utilities_get_symb_time_us
         switch( bw )
         {
@@ -3191,9 +3684,9 @@ void smtc_real_get_rx_window_parameters( smtc_real_t* real, uint8_t datarate, ui
                                          uint32_t* rx_timeout_preamble_locked_in_ms, uint8_t rx_done_incertitude,
                                          uint32_t crystal_error )
 {
-    uint32_t          tsymbol_us              = smtc_real_get_symbol_duration_us( real, datarate );
+    uint32_t          tsymbol_us              = smtc_real_get_symbol_duration_us( real, datarate, DOWN_LINK );
     uint32_t          min_rx_symb_duration_ms = MIN_RX_WINDOW_DURATION_MS + rx_done_incertitude;
-    modulation_type_t modulation_type         = smtc_real_get_modulation_type_from_datarate( real, datarate );
+    modulation_type_t modulation_type         = smtc_real_get_modulation_type_from_rx_datarate( real, datarate );
     uint8_t           min_rx_window_symb      = MIN_RX_WINDOW_SYMB;
 #if defined( LR11XX )
     if( modulation_type == LORA )
@@ -3202,7 +3695,7 @@ void smtc_real_get_rx_window_parameters( smtc_real_t* real, uint8_t datarate, ui
         // LR11xx has a minimum of 12 symbols for SF10 to SF12 in 500kHz BW to reach the sensitivity
         uint8_t            rx_sf;
         lr1mac_bandwidth_t rx_bw;
-        smtc_real_lora_dr_to_sf_bw( real, datarate, &rx_sf, &rx_bw );
+        smtc_real_lora_rx_dr_to_sf_bw( real, datarate, &rx_sf, &rx_bw );
 
         if( ( rx_bw == ( lr1mac_bandwidth_t ) RAL_LORA_BW_500_KHZ ) && ( rx_sf > 9 ) )
         {
@@ -3247,8 +3740,8 @@ void smtc_real_get_rx_window_parameters( smtc_real_t* real, uint8_t datarate, ui
 void smtc_real_get_rx_start_time_offset_ms( smtc_real_t* real, uint8_t datarate, int8_t board_delay_ms,
                                             uint16_t rx_window_symb, int32_t* rx_offset_ms )
 {
-    modulation_type_t modulation_type = smtc_real_get_modulation_type_from_datarate( real, datarate );
-    int32_t           tsymbol_us      = ( int32_t ) smtc_real_get_symbol_duration_us( real, datarate );
+    modulation_type_t modulation_type = smtc_real_get_modulation_type_from_rx_datarate( real, datarate );
+    int32_t           tsymbol_us      = ( int32_t ) smtc_real_get_symbol_duration_us( real, datarate, DOWN_LINK );
 
     if( modulation_type == FSK )
     {

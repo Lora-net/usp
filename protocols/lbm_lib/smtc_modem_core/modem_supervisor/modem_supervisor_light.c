@@ -42,7 +42,7 @@
 
 #include "modem_supervisor_light.h"
 #include "lorawan_send_management.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "lorawan_certification.h"
 #include "smtc_modem_hal.h"
 #include "modem_core.h"
@@ -89,7 +89,7 @@
  * \param [IN] b 2nd value
  * \retval maxValue Maximum value
  */
-#define MAX( a, b ) ( ( a ) > ( b ) ) ? ( a ) : ( b )
+#define MAX( a, b ) ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
 #endif
 
 #ifndef ABS
@@ -291,6 +291,7 @@ uint32_t modem_supervisor_engine( void )
     }
     if( task_manager.next_task_id != IDLE_TASK )
     {
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( supervisor_on_update_func[CURRENT_TASK_ID] ) );
         supervisor_on_update_func[CURRENT_TASK_ID]( supervisor_context_callback[CURRENT_TASK_ID] );
         task_manager.next_task_id = IDLE_TASK;
     }
@@ -299,6 +300,8 @@ uint32_t modem_supervisor_engine( void )
     if( sleep_time == 0 )  // launch task
     {
         task_manager.modem_task[task_manager.next_task_id].launched_timestamp = smtc_modem_hal_get_time_in_s( );
+
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( supervisor_on_launch_func[CURRENT_TASK_ID] ) );
         supervisor_on_launch_func[CURRENT_TASK_ID]( supervisor_context_callback[CURRENT_TASK_ID] );
         task_manager.modem_task[task_manager.next_task_id].priority = TASK_FINISH;
     }

@@ -39,7 +39,7 @@
 
 #include <stdint.h>
 
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 #include "ral_sx128x_bsp.h"
 #include "radio_utilities.h"
 

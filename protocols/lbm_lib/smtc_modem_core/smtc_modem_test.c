@@ -43,7 +43,7 @@
 #include "smtc_modem_test_api.h"
 #include "smtc_modem_api.h"
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_modem_utilities.h"
 #include "radio_planner.h"
 #include "lorawan_api.h"
@@ -704,7 +704,7 @@ smtc_modem_return_code_t smtc_modem_test_get_rssi( int8_t* rssi )
 
     if( modem_test_context.rssi_ready == false )
     {
-        SMTC_MODEM_HAL_TRACE_WARNING( "RSSI TEST RESULT NOT READY\n" )
+        SMTC_MODEM_HAL_TRACE_WARNING( "RSSI TEST RESULT NOT READY\n" );
         return_code = SMTC_MODEM_RC_BUSY;
     }
     else

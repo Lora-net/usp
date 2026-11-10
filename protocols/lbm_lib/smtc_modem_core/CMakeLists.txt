@@ -4,7 +4,7 @@
 set(SMTC_MODEM_CORE_INCLUDE_DIRS
     ${LORA_BASICS_MODEM_DIR}
     ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_CURRENT_LIST_DIR}/logging
+    # ${CMAKE_CURRENT_LIST_DIR}/logging
     ${CMAKE_CURRENT_LIST_DIR}/modem_supervisor
     ${CMAKE_CURRENT_LIST_DIR}/modem_utilities
     ${CMAKE_CURRENT_LIST_DIR}/lorawan_packages
@@ -15,21 +15,19 @@ set(SMTC_MODEM_CORE_INCLUDE_DIRS
     ${CMAKE_CURRENT_LIST_DIR}/lr1mac
     ${CMAKE_CURRENT_LIST_DIR}/lr1mac/src
     ${CMAKE_CURRENT_LIST_DIR}/lr1mac/src/services
-    ${CMAKE_CURRENT_LIST_DIR}/lr1mac/src/smtc_real/src
-
-    ${CMAKE_CURRENT_LIST_DIR}/../../../smtc_rac_lib/smtc_rac_api
-    ${CMAKE_CURRENT_LIST_DIR}/../../../smtc_rac_lib/radio_planner/src
-    ${CMAKE_CURRENT_LIST_DIR}/../../../smtc_rac_lib/smtc_ral/src
-    ${CMAKE_CURRENT_LIST_DIR}/../../../smtc_rac_lib/smtc_ralf/src
-    ${CMAKE_CURRENT_LIST_DIR}/../../../smtc_rac_lib/radio_drivers
-
+  
+    ${SMTC_RADIO_PLANNER_PATH}/src
+    ${SMTC_RAL_PATH}/src
+    ${SMTC_RALF_PATH}/src
+    ${SMTC_RADIO_DRIVERS_PATH}
+    
     ${CMAKE_CURRENT_LIST_DIR}/smtc_modem_crypto
     ${CMAKE_CURRENT_LIST_DIR}/smtc_modem_crypto/smtc_secure_element
 )
 
 # Logging library
-add_library(smtc_modem_logging INTERFACE)
-target_include_directories(smtc_modem_logging INTERFACE ${CMAKE_CURRENT_LIST_DIR}/logging)
+# add_library(smtc_modem_logging INTERFACE)
+# target_include_directories(smtc_modem_logging INTERFACE ${CMAKE_CURRENT_LIST_DIR}/logging)
 
 
 
@@ -37,6 +35,13 @@ target_include_directories(smtc_modem_logging INTERFACE ${CMAKE_CURRENT_LIST_DIR
 include(smtc_modem_crypto.cmake)
 
 add_library(lora_basics_modem STATIC)
+target_compile_definitions(lora_basics_modem PRIVATE USE_LBM)
+
+# Interface library - This one is used when upper levers (e.g Radio Planner) needs properties defined in LBM
+# to build. 
+add_library(lora_basics_modem_external_props INTERFACE)
+target_compile_definitions(lora_basics_modem_external_props INTERFACE USE_LBM)
+
 #target_link_libraries(lora_basics_modem PUBLIC smtc_ralf::smtc_ralf_${RADIO_FAMILY})
 
 add_subdirectory(lr1mac/src/smtc_real)
@@ -65,10 +70,22 @@ target_sources(lora_basics_modem PRIVATE
 
 target_include_directories(lora_basics_modem PRIVATE ${SMTC_MODEM_CORE_INCLUDE_DIRS})
 
+# API - PUBLIC
+target_include_directories(lora_basics_modem PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../smtc_modem_api>
+    $<INSTALL_INTERFACE:include>
+)
+
+# 
 target_link_libraries(lora_basics_modem PRIVATE
     smtc_modem_crypto
-    smtc_rac
-    smtc_modem_api_internal
+    radio_planner
+    # smtc_modem_hal_interface
+)
+
+target_link_libraries(lora_basics_modem PUBLIC
+    smtc_ralf::smtc_ralf_${RADIO_FAMILY}
+    smtc_ral::smtc_ral_${RADIO_FAMILY}
     smtc_modem_hal_interface
 )
 
@@ -80,6 +97,11 @@ if(NOT RADIO_FAMILY STREQUAL "udp_pf")
 endif()
 
 target_compile_definitions(lora_basics_modem PRIVATE ${RADIO_UPPER} ${RADIO_FAMILY_UPPER})
+
+# Add definition for LBM legacy contextes handling
+if(LBM_LEGACY)
+    target_compile_definitions(lora_basics_modem PRIVATE MODEM_RP_RALF_RAL_INTERNAL)
+endif()
 
 if(RADIO_FAMILY STREQUAL lr11xx)
     # This define is for LR11XX **outside** modem-e
@@ -94,6 +116,7 @@ if(RADIO_FAMILY STREQUAL lr20xx)
         lr20xx_driver_lr_fhss
     )
 
+    # TODO : move following line to RAL CMakeLists.txt
     target_link_libraries(smtc_ral_${RADIO_FAMILY} PRIVATE
         lr20xx_driver_lora
         lr20xx_driver_fsk
@@ -101,6 +124,13 @@ if(RADIO_FAMILY STREQUAL lr20xx)
         lr20xx_driver_lr_fhss
     )
 endif()
+
+# Link radio_planner to interface lib (propagate compile definitions)
+# PUBLIC: consumers of radio_planner (smtc_rac, smtc_flrc_protocol, ...) must see the
+# same ADD_CLASS_B/ADD_CSMA/ADD_RELAY_RX/ADD_RELAY_TX/ADD_CLASS_C defines as radio_planner
+# itself, since they share the radio_planner_hook_id_defs.h enum whose values depend on them.
+target_link_libraries(radio_planner PUBLIC lora_basics_modem_external_props)
+# LBM also uses
 
 ################################################################################
 # Compile definitions
@@ -127,13 +157,15 @@ endif()
 target_compile_definitions(lora_basics_modem PRIVATE NUMBER_OF_STACKS=${LBM_NUMBER_OF_STACKS})
 
 # RP_MARGIN_DELAY can be overridden from parent cmake or command line
-if(NOT DEFINED RP_MARGIN_DELAY)
-    set(RP_MARGIN_DELAY "8")
-endif()
-target_compile_definitions(lora_basics_modem PRIVATE RP_MARGIN_DELAY=${RP_MARGIN_DELAY})
+# Commented because not needed, as smtc_modem_core links radio_planner that target_compile_defs(RP_MARGIN_DELAY) as PUBLIC
+# if(NOT DEFINED RP_MARGIN_DELAY)
+#     set(RP_MARGIN_DELAY "8")
+# endif()
+# target_compile_definitions(lora_basics_modem PRIVATE RP_MARGIN_DELAY=${RP_MARGIN_DELAY})
 
 if(LBM_CLASS_B)
-    target_compile_definitions(lora_basics_modem INTERFACE ADD_CLASS_B)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_CLASS_B)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_CLASS_B)
     target_include_directories(lora_basics_modem PRIVATE
         lr1mac/src/lr1mac_class_b
     )
@@ -145,8 +177,9 @@ if(LBM_CLASS_B)
 endif()
 
 if(LBM_CLASS_C)
-     message(STATUS "Adding CLASS_C")
-    target_compile_definitions(lora_basics_modem INTERFACE ADD_CLASS_C)
+    message(STATUS "Adding CLASS_C")
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_CLASS_C)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_CLASS_C)
     target_include_directories(lora_basics_modem PRIVATE
         lr1mac/src/lr1mac_class_c
     )
@@ -156,7 +189,7 @@ if(LBM_CLASS_C)
 endif()
 
 if(LBM_MULTICAST)
-    target_compile_definitions(lora_basics_modem PRIVATE SMTC_MULTICAST)
+    target_compile_definitions(lora_basics_modem PUBLIC SMTC_MULTICAST)
     target_include_directories(lora_basics_modem PRIVATE
         lr1mac/src/services/smtc_multicast
     )
@@ -174,10 +207,12 @@ if(LBM_FUOTA AND LBM_MULTICAST)
 endif()
 
 if(LBM_CSMA)
-    target_compile_definitions(lora_basics_modem INTERFACE ADD_CSMA)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_CSMA)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_CSMA)
 
     if(LBM_CSMA_BY_DEFAULT)
         target_compile_definitions(lora_basics_modem PRIVATE ENABLE_CSMA_BY_DEFAULT)
+        target_compile_definitions(lora_basics_modem_external_props INTERFACE ENABLE_CSMA_BY_DEFAULT)
     endif()
 
     target_sources(lora_basics_modem PRIVATE
@@ -186,7 +221,8 @@ if(LBM_CSMA)
 endif()
 
 if(LBM_ALC_SYNC)
-    target_compile_definitions(lora_basics_modem PRIVATE ADD_SMTC_ALC_SYNC)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_SMTC_ALC_SYNC)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_SMTC_ALC_SYNC)
     target_include_directories(lora_basics_modem PRIVATE
         lorawan_packages/application_layer_clock_synchronization
     )
@@ -198,7 +234,8 @@ if(LBM_ALC_SYNC)
 endif()
 
 if(LBM_FUOTA)
-    target_compile_definitions(lora_basics_modem PRIVATE ADD_FUOTA=${LBM_FUOTA_VERSION})
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_FUOTA=${LBM_FUOTA_VERSION})
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_FUOTA=${LBM_FUOTA_VERSION})
     set(FUOTA_INCLUDE_V1
         lorawan_packages/fragmented_data_block_transport/v1.0.0
     )
@@ -225,7 +262,8 @@ if(LBM_FUOTA)
     )
 
     if(LBM_FUOTA_FMP)
-        target_compile_definitions(lora_basics_modem PRIVATE ENABLE_FUOTA_FMP)
+        target_compile_definitions(lora_basics_modem PUBLIC ENABLE_FUOTA_FMP)
+        target_compile_definitions(lora_basics_modem_external_props INTERFACE ENABLE_FUOTA_FMP)
         target_include_directories(lora_basics_modem PRIVATE
             lorawan_packages/firmware_management_protocol
         )
@@ -235,7 +273,8 @@ if(LBM_FUOTA)
     endif()
 
     if(LBM_FUOTA_MPA)
-        target_compile_definitions(lora_basics_modem PRIVATE ENABLE_FUOTA_MPA)
+        target_compile_definitions(lora_basics_modem PUBLIC ENABLE_FUOTA_MPA)
+        target_compile_definitions(lora_basics_modem_external_props INTERFACE ENABLE_FUOTA_MPA)
         target_include_directories(lora_basics_modem PRIVATE
             lorawan_packages/multi_package_access
         )
@@ -245,26 +284,36 @@ if(LBM_FUOTA)
     endif()
 
     if(NOT "${LBM_FUOTA_FRAGMENTS_MAX_NUM}" STREQUAL "")
-        target_compile_definitions(lora_basics_modem PRIVATE
+        target_compile_definitions(lora_basics_modem PUBLIC
+            FRAG_MAX_NB=${LBM_FUOTA_FRAGMENTS_MAX_NUM}
+        )
+        target_compile_definitions(lora_basics_modem_external_props INTERFACE 
             FRAG_MAX_NB=${LBM_FUOTA_FRAGMENTS_MAX_NUM}
         )
     endif()
 
     if(NOT "${LBM_FUOTA_FRAGMENTS_MAX_SIZE}" STREQUAL "")
-        target_compile_definitions(lora_basics_modem PRIVATE
+        target_compile_definitions(lora_basics_modem PUBLIC
+            FRAG_MAX_SIZE=${LBM_FUOTA_FRAGMENTS_MAX_SIZE}
+        )
+        target_compile_definitions(lora_basics_modem_external_props INTERFACE
             FRAG_MAX_SIZE=${LBM_FUOTA_FRAGMENTS_MAX_SIZE}
         )
     endif()
 
     if(NOT "${LBM_FUOTA_FRAGMENTS_MAX_REDUNDANCY}" STREQUAL "")
-        target_compile_definitions(lora_basics_modem PRIVATE
+        target_compile_definitions(lora_basics_modem PUBLIC
+            FRAG_MAX_REDUNDANCY=${LBM_FUOTA_FRAGMENTS_MAX_REDUNDANCY}
+        )
+        target_compile_definitions(lora_basics_modem_external_props INTERFACE
             FRAG_MAX_REDUNDANCY=${LBM_FUOTA_FRAGMENTS_MAX_REDUNDANCY}
         )
     endif()
 endif()
 
 if(LBM_ALMANAC)
-    target_compile_definitions(lora_basics_modem INTERFACE ADD_ALMANAC)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_ALMANAC)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_ALMANAC)
     target_include_directories(lora_basics_modem PRIVATE
         modem_services
         modem_services/almanac_packages
@@ -275,7 +324,8 @@ if(LBM_ALMANAC)
 endif()
 
 if(LBM_STREAM)
-    target_compile_definitions(lora_basics_modem PRIVATE ADD_SMTC_STREAM)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_SMTC_STREAM)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_SMTC_STREAM)
     target_include_directories(lora_basics_modem PRIVATE
         modem_services
         modem_services/stream_packages
@@ -287,7 +337,8 @@ if(LBM_STREAM)
 endif()
 
 if(LBM_LFU)
-    target_compile_definitions(lora_basics_modem PRIVATE ADD_SMTC_LFU)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_SMTC_LFU)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_SMTC_LFU)
     target_include_directories(lora_basics_modem PRIVATE
         modem_services
         modem_services/lfu_service
@@ -298,7 +349,8 @@ if(LBM_LFU)
 endif()
 
 if(LBM_DEVICE_MANAGEMENT)
-    target_compile_definitions(lora_basics_modem PRIVATE ADD_SMTC_CLOUD_DEVICE_MANAGEMENT)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_SMTC_CLOUD_DEVICE_MANAGEMENT)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_SMTC_CLOUD_DEVICE_MANAGEMENT)
     target_include_directories(lora_basics_modem PRIVATE
         modem_services
         modem_services/cloud_dm_package
@@ -309,7 +361,8 @@ if(LBM_DEVICE_MANAGEMENT)
 endif()
 
 if(LBM_GEOLOCATION)
-    target_compile_definitions(lora_basics_modem INTERFACE ADD_LBM_GEOLOCATION)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_LBM_GEOLOCATION)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_LBM_GEOLOCATION)
     target_include_directories(lora_basics_modem PUBLIC
         geolocation_services
     )
@@ -327,7 +380,8 @@ if(LBM_GEOLOCATION)
 endif()
 
 if(LBM_STORE_AND_FORWARD)
-    target_compile_definitions(lora_basics_modem PRIVATE ADD_SMTC_STORE_AND_FORWARD)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_SMTC_STORE_AND_FORWARD)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_SMTC_STORE_AND_FORWARD)
     target_include_directories(lora_basics_modem PRIVATE
         modem_services
         modem_services/store_and_forward
@@ -339,7 +393,8 @@ if(LBM_STORE_AND_FORWARD)
 endif()
 
 if(LBM_RELAY_RX)
-    target_compile_definitions(lora_basics_modem INTERFACE ADD_RELAY_RX)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_RELAY_RX)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_RELAY_RX)
     target_include_directories(lora_basics_modem PRIVATE
         lr1mac/src/relay/common
         lr1mac/src/relay/relay_rx
@@ -358,7 +413,8 @@ if(LBM_RELAY_RX)
 endif()
 
 if(LBM_RELAY_TX)
-    target_compile_definitions(lora_basics_modem INTERFACE ADD_RELAY_TX)
+    target_compile_definitions(lora_basics_modem PUBLIC ADD_RELAY_TX)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE ADD_RELAY_TX)
     target_include_directories(lora_basics_modem PRIVATE
         lr1mac/src/relay/common
         lr1mac/src/relay/relay_rx
@@ -377,7 +433,8 @@ if(LBM_RELAY_TX)
 endif()
 
 if(LBM_BEACON_TX)
-    target_compile_definitions(lora_basics_modem PRIVATE MODEM_BEACON_APP)
+    target_compile_definitions(lora_basics_modem PUBLIC MODEM_BEACON_APP)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE MODEM_BEACON_APP)
     target_include_directories(lora_basics_modem PRIVATE
         modem_services/beacon_tx_service
     )
@@ -387,7 +444,8 @@ if(LBM_BEACON_TX)
 endif()
 
 if(LBM_PERF_TEST)
-    target_compile_definitions(lora_basics_modem PRIVATE PERF_TEST_ENABLED)
+    target_compile_definitions(lora_basics_modem PUBLIC PERF_TEST_ENABLED)
+    target_compile_definitions(lora_basics_modem_external_props INTERFACE PERF_TEST_ENABLED)
 endif()
 
 if(LBM_TEST_BYPASS_JOIN_DUTY_CYCLES)

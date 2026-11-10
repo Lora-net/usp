@@ -43,7 +43,7 @@
 #include "modem_core.h"
 #include "modem_event_utilities.h"
 
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_real.h"
 #include "lorawan_api.h"
 #include "smtc_modem_api.h"
@@ -75,7 +75,7 @@
  * \param [IN] b 2nd value
  * \retval maxValue Maximum value
  */
-#define MAX( a, b ) ( ( a ) > ( b ) ) ? ( a ) : ( b )
+#define MAX( a, b ) ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
 #endif
 
 /*
@@ -202,6 +202,8 @@ void modem_context_init_light( void ( *callback )( void ), radio_planner_t* rp )
     for( uint8_t i = 0; i < NUMBER_OF_SERVICES; i++ )
     {
         task_id_tmp = cpt_of_services_init + ( NUMBER_OF_TASKS * modem_service_config[i].stack_id );
+
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( modem_service_config[i].callbacks_init_service ) );
 
         modem_service_config[i].callbacks_init_service(
             &modem_service_config[i].service_id, task_id_tmp,
@@ -335,7 +337,7 @@ int32_t modem_duty_cycle_get_status( uint8_t stack_id )
     if( smtc_duty_cycle_enable_get( ) == SMTC_DTC_ENABLED )
     {
         uint8_t  number_of_freq = 0;
-        uint32_t freq_list[16]  = { 0 };  // Generally region with duty cycle support 16 channels only
+        uint32_t freq_list[80]  = { 0 };  // Max channel nb is 80 since RP2-1.0.4 and above
 
         if( lorawan_api_get_current_enabled_frequencies_list(
                 &number_of_freq, freq_list, sizeof( freq_list ) / sizeof( freq_list[0] ), stack_id ) == true )
@@ -495,6 +497,7 @@ void modem_downlink_callback( lr1_stack_mac_down_data_t* rx_down_data )
 
     for( uint8_t i = 0; i < NUMBER_OF_SERVICES + NUMBER_OF_LORAWAN_MANAGEMENT_TASKS; i++ )
     {
+        SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( downlink_services_callback[i] ) );
         downlink_used_by_services += downlink_services_callback[i]( rx_down_data );
     }
 

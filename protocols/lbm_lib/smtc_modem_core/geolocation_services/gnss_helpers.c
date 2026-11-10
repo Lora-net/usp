@@ -38,7 +38,7 @@
  */
 
 #include "lr11xx_gnss.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 /*
  * -----------------------------------------------------------------------------

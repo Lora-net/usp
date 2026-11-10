@@ -10,6 +10,9 @@ set(DESCRIPTION "Multiprotocol (LoRaWAN + ranging) example")
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../toolchain.cmake)
 project(multiprotocol LANGUAGES C ASM DESCRIPTION "${DESCRIPTION}")
+
+# LBM is used in this sample
+set(INCLUDE_LBM ON CACHE BOOL "")
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../common.cmake)
 
 ################################################################################

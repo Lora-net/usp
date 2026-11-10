@@ -132,6 +132,7 @@ typedef struct smtc_flrp_mac_layer_s
     smtc_flrp_mac_layer_tx_done_f      mac_tx_done_cb;
     smtc_flrp_mac_burst_stats_t        burst_stats;
     smtc_flrp_burst_rx_stats_t         payload_stats;
+    smtc_flrp_burst_tx_stats_t         tx_stats;
 
     bool    crypto_enabled;
     uint8_t dev_eui[SMTC_FLRP_EUI_LENGTH];
@@ -170,6 +171,7 @@ typedef struct smtc_flrp_mac_layer_s
                                                                                               missed in the burst */
     bool     burst_retry_needed;
     uint32_t timestamp_start_burst_ms;
+    uint32_t timestamp_start_mac_ms;
     uint32_t next_burst_start_delay_ms; /*!< Delay for the next burst (first, retry or multiburst)*/
     uint32_t
         burst_transmission_timeout; /*!< Time in ms to send a burst, after this timeout the transmission is aborted */
@@ -237,7 +239,7 @@ void smtc_flrp_mac_layer_process( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer );
  */
 smtc_flrp_mac_layer_status_t smtc_flrp_mac_layer_start_tx_transaction( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer,
                                                                        uint32_t start_time, uint8_t* data_buffer,
-                                                                       uint32_t               buffer_size,
+                                                                       uint32_t                      buffer_size,
                                                                        const smtc_flrp_mac_config_t* mac_config );
 
 /*!
@@ -258,7 +260,7 @@ smtc_flrp_mac_layer_status_t smtc_flrp_mac_layer_start_tx_transaction( smtc_flrp
 
 smtc_flrp_mac_layer_status_t smtc_flrp_mac_layer_start_rx_transaction( smtc_flrp_mac_layer_t* smtc_flrp_mac_layer,
                                                                        uint32_t start_time, uint8_t* data_buffer,
-                                                                       uint32_t               buffer_size,
+                                                                       uint32_t                      buffer_size,
                                                                        const smtc_flrp_mac_config_t* mac_config );
 
 #ifdef __cplusplus

@@ -35,7 +35,7 @@
 #include <stdbool.h>
 
 #include "relay_real.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_duty_cycle.h"
 #include "smtc_modem_hal.h"
 #if defined( REGION_AS_923 )
@@ -160,11 +160,17 @@ static status_lorawan_t region_cn_470_relay_get_default( uint8_t idx, uint8_t* d
     case 0:
         *freq_wor = 472100000;
         *freq_ack = 485300000;
+        *datarate = 3;
         break;
 
     case 1:
         *freq_wor = 494900000;
         *freq_ack = 505500000;
+#if defined( RP2_105 )
+        *datarate = 5;  // SF7-125kHz for ch 1 in RP2-1.0.5
+#else
+        *datarate = 3;  // SF9-125kHz
+#endif
         break;
 
     default:
@@ -172,7 +178,6 @@ static status_lorawan_t region_cn_470_relay_get_default( uint8_t idx, uint8_t* d
         break;
     }
 
-    *datarate = 3;
     return OKLORAWAN;
 }
 #endif
@@ -196,11 +201,17 @@ static status_lorawan_t region_in_865_relay_get_default( uint8_t idx, uint8_t* d
     case 0:
         *freq_wor = 866000000;
         *freq_ack = 866200000;
+        *datarate = 3;
         break;
 
     case 1:
         *freq_wor = 866700000;
         *freq_ack = 866900000;
+#if defined( RP2_105 )
+        *datarate = 5;  // SF7-125kHz for ch 1 in RP2-1.0.5
+#else
+        *datarate = 3;  // SF9-125kHz
+#endif
         break;
 
     default:
@@ -208,7 +219,6 @@ static status_lorawan_t region_in_865_relay_get_default( uint8_t idx, uint8_t* d
         break;
     }
 
-    *datarate = 3;
     return OKLORAWAN;
 }
 #endif
@@ -232,11 +242,17 @@ static status_lorawan_t region_kr_920_relay_get_default( uint8_t idx, uint8_t* d
     case 0:
         *freq_wor = 922700000;
         *freq_ack = 922900000;
+        *datarate = 3;
         break;
 
     case 1:
         *freq_wor = 923100000;
         *freq_ack = 923300000;
+#if defined( RP2_105 )
+        *datarate = 5;  // SF7-125kHz for ch 1 in RP2-1.0.5
+#else
+        *datarate = 3;  // SF9-125kHz
+#endif
         break;
 
     default:
@@ -244,7 +260,6 @@ static status_lorawan_t region_kr_920_relay_get_default( uint8_t idx, uint8_t* d
         break;
     }
 
-    *datarate = 3;
     return OKLORAWAN;
 }
 #endif
@@ -268,18 +283,23 @@ static status_lorawan_t region_ru_864_relay_get_default( uint8_t idx, uint8_t* d
     case 0:
         *freq_wor = 866100000;
         *freq_ack = 866300000;
+        *datarate = 3;
         break;
 
     case 1:
         *freq_wor = 866500000;
         *freq_ack = 866900000;
+#if defined( RP2_105 )
+        *datarate = 5;  // SF7-125kHz for ch 1 in RP2-1.0.5
+#else
+        *datarate = 3;  // SF9-125kHz
+#endif
         break;
 
     default:
         return ERRORLORAWAN;
         break;
     }
-    *datarate = 3;
 
     return OKLORAWAN;
 }
@@ -341,19 +361,23 @@ static status_lorawan_t region_eu_868_relay_get_default( uint8_t idx, uint8_t* d
     case 0:
         *freq_wor = 865100000;
         *freq_ack = 865300000;
+        *datarate = 3;
         break;
 
     case 1:
         *freq_wor = 865500000;
         *freq_ack = 865900000;
+#if defined( RP2_105 )
+        *datarate = 5;  // SF7-125kHz for ch 1 in RP2-1.0.5
+#else
+        *datarate = 3;
+#endif
         break;
 
     default:
         return ERRORLORAWAN;
         break;
     }
-    *datarate = 3;
-
     return OKLORAWAN;
 }
 #endif
@@ -370,18 +394,24 @@ static status_lorawan_t region_eu_868_relay_get_default( uint8_t idx, uint8_t* d
  * @return ERRORLORAWAN no valid config exist for this channel
  */
 static status_lorawan_t region_ww_2g4_relay_get_default( uint8_t idx, uint8_t* datarate, uint32_t* freq_wor,
-                                                        uint32_t* freq_ack )
+                                                         uint32_t* freq_ack )
 {
     switch( idx )
     {
     case 0:
         *freq_wor = 2423000000;
         *freq_ack = 2477000000;
+        *datarate = 3;
         break;
 
     case 1:
         *freq_wor = 2423000000;
         *freq_ack = 2477000000;
+#if defined( RP2_105 )
+        *datarate = 5;  // SF7-125kHz for ch 1 in RP2-1.0.5
+#else
+        *datarate = 3;
+#endif
         break;
 
     default:
@@ -389,7 +419,6 @@ static status_lorawan_t region_ww_2g4_relay_get_default( uint8_t idx, uint8_t* d
         break;
     }
 
-    *datarate = 3;
     return OKLORAWAN;
 }
 #endif
@@ -400,7 +429,8 @@ status_lorawan_t smtc_relay_get_default_channel_config( const smtc_real_t* real,
     switch( real->region_type )
     {
 #if defined( REGION_EU_868 )
-    case SMTC_REAL_REGION_EU_868: {
+    case SMTC_REAL_REGION_EU_868:
+    {
         return region_eu_868_relay_get_default( idx, datarate, freq_wor, freq_ack );
     }
 #endif
@@ -408,7 +438,7 @@ status_lorawan_t smtc_relay_get_default_channel_config( const smtc_real_t* real,
     case SMTC_REAL_REGION_AS_923:
     case SMTC_REAL_REGION_AS_923_GRP2:
     case SMTC_REAL_REGION_AS_923_GRP3:
-#if defined( RP2_103 )
+#if ( defined( RP2_103 ) || defined( RP2_104 ) || defined( RP2_105 ) )
     case SMTC_REAL_REGION_AS_923_GRP4:
 #endif
     {
@@ -419,43 +449,51 @@ status_lorawan_t smtc_relay_get_default_channel_config( const smtc_real_t* real,
     }
 #endif
 #if defined( REGION_US_915 )
-    case SMTC_REAL_REGION_US_915: {
+    case SMTC_REAL_REGION_US_915:
+    {
         return region_us_915_relay_get_default( idx, datarate, freq_wor, freq_ack );
     }
 #endif
 #if defined( REGION_AU_915 )
-    case SMTC_REAL_REGION_AU_915: {
+    case SMTC_REAL_REGION_AU_915:
+    {
         return region_au_915_relay_get_default( idx, datarate, freq_wor, freq_ack );
     }
 #endif
 #if defined( REGION_CN_470 )
-    case SMTC_REAL_REGION_CN_470: {
+    case SMTC_REAL_REGION_CN_470:
+    {
         return region_cn_470_relay_get_default( idx, datarate, freq_wor, freq_ack );
     }
 #endif
 #if defined( REGION_CN_470_RP_1_0 )
-    case SMTC_REAL_REGION_CN_470_RP_1_0: {
+    case SMTC_REAL_REGION_CN_470_RP_1_0:
+    {
         return region_cn_470_rp_1_0_relay_get_default( idx, datarate, freq_wor, freq_ack );
     }
 #endif
 #if defined( REGION_IN_865 )
-    case SMTC_REAL_REGION_IN_865: {
+    case SMTC_REAL_REGION_IN_865:
+    {
         return region_in_865_relay_get_default( idx, datarate, freq_wor, freq_ack );
     }
 #endif
 #if defined( REGION_KR_920 )
-    case SMTC_REAL_REGION_KR_920: {
+    case SMTC_REAL_REGION_KR_920:
+    {
         return region_kr_920_relay_get_default( idx, datarate, freq_wor, freq_ack );
     }
 #endif
 #if defined( REGION_RU_864 )
-    case SMTC_REAL_REGION_RU_864: {
+    case SMTC_REAL_REGION_RU_864:
+    {
         return region_ru_864_relay_get_default( idx, datarate, freq_wor, freq_ack );
     }
 #endif
 
 #if defined( REGION_WW_2G4 )
-    case SMTC_REAL_REGION_WW_2G4: {
+    case SMTC_REAL_REGION_WW_2G4:
+    {
         return region_ww_2g4_relay_get_default( idx, datarate, freq_wor, freq_ack );
         break;
     }

@@ -35,17 +35,17 @@
 #include <string.h>
 
 #include "smtc_modem_crypto.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_services_common.h"
 #include "rose.h"
 #include "rose_defs.h"
 
-//#include "lmic_defines.h"
-//#include "board.h"
-//#include "secure-element.h"
-//#include "lr1mac_utilities.h"
-//#include "lorawan_api.h"
-//#include "smtc_crypto.h"
+// #include "lmic_defines.h"
+// #include "board.h"
+// #include "secure-element.h"
+// #include "lr1mac_utilities.h"
+// #include "lorawan_api.h"
+// #include "smtc_crypto.h"
 
 // TODO JLG
 // Extract this in utilities
@@ -248,7 +248,7 @@ STATIC void ROSE_payload_encrypt( rose_t* ROSE, const uint8_t* buffer, uint16_t 
     // See Milestone 17 specification for nonce description
     nonce[0]  = 0x01;
     nonce[5]  = dir;
-    nonce[10] = ( sequenceCounter ) &0xFF;
+    nonce[10] = ( sequenceCounter ) & 0xFF;
     nonce[11] = ( sequenceCounter >> 8 ) & 0xFF;
     nonce[12] = ( sequenceCounter >> 16 ) & 0xFF;
     nonce[13] = ( sequenceCounter >> 24 ) & 0xFF;
@@ -506,7 +506,7 @@ addHdr:
             int off = pTransferSize[0];
             pTransferSize[0] += SDATA_PCTX_LEN;
             frame[off] = ROSE_encWL( ROSE->wl );
-            os_wlsbf2( &frame[off + 1], ( uint16_t )( soff >> 16 ) );
+            os_wlsbf2( &frame[off + 1], ( uint16_t ) ( soff >> 16 ) );
         }
         ROSE->framecnt = ( ROSE->framecnt + 1 ) % ( ROSE->pctxintv + 1 );
     }

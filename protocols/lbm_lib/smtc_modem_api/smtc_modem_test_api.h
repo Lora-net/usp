@@ -72,6 +72,16 @@ typedef enum smtc_modem_test_mode_sync_word_e
     SYNC_WORD_0x56 = 0x56,
 } smtc_modem_test_mode_sync_word_t;
 
+/**
+ * @brief Test mode Bandwith type (high bandwidth)
+ */
+typedef enum smtc_modem_test_bw_m_e
+{
+    SMTC_MODEM_TEST_BW_12M = 15,
+    SMTC_MODEM_TEST_BW_18M,
+    SMTC_MODEM_TEST_BW_24M,
+} smtc_modem_test_bw_m_t;
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC FUNCTIONS PROTOTYPES ---------------------------------------------

@@ -47,8 +47,8 @@
 #include "smtc_flrp_api.h"
 #include "smtc_flrp_core.h"
 #include "smtc_flrp_mac_config.h"
-#include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_wor.h"
 
 #include "smtc_flrp_api_tests.h"
@@ -113,7 +113,10 @@ static void smtc_flrp_init_and_get_config( smtc_flrp_mac_radio_config_t* flrc_ra
                                            smtc_flrp_wor_radio_config_t* wor_tx_radio_config,
                                            smtc_flrp_frequency_plan_t    freq_plan );
 
-static void smtc_flrp_core_start_mac( smtc_flrp_core_t* smtc_flrp_core, bool device_is_initiator );
+static smtc_flrp_mac_layer_status_t smtc_flrp_core_start_mac( smtc_flrp_core_t* smtc_flrp_core,
+                                                              bool              device_is_initiator );
+static void smtc_flrp_core_invoke_rx_callback( smtc_flrp_core_t* smtc_flrp_core, smtc_flrp_return_code_t status,
+                                               uint32_t payload_size, uint8_t* src_addr );
 
 /*
  * -----------------------------------------------------------------------------
@@ -140,7 +143,7 @@ smtc_flrp_return_code_t smtc_flrp_init( smtc_flrp_api_config_t config, smtc_flrp
     memset( &smtc_flrp_core_obj, 0, sizeof( smtc_flrp_core_t ) );
     smtc_flrp_bind_wor_exchange_phase_mask( &smtc_flrp_core_obj.wor_exchange_phase_bits );
 
-    memcpy( smtc_flrp_core_obj.dev_eui, config.dev_eui, SMTC_FLRP_EUI_LENGTH );
+    memcpy( smtc_flrp_core_obj.dev_eui, config.dev_eui, SMTC_FLRP_EUI_LENGTH * sizeof( uint8_t ) );
 
     smtc_wor_static_radio_config_t wor_static_radio_config = {
         .cr                        = WOR_LORA_CODING_RATE,
@@ -197,6 +200,14 @@ smtc_flrp_return_code_t smtc_flrp_initiate_transmission( uint8_t* payload, uint3
         return SMTC_FLRP_RC_INVALID_PARAMS;
     }
 
+    if( ( smtc_flrp_core_obj.state == SMTC_FLRP_CORE_STATE_WOR_TX ) ||
+        ( smtc_flrp_core_obj.state == SMTC_FLRP_CORE_STATE_DATA ) )
+    {
+        SMTC_MODEM_HAL_TRACE_WARNING( "SMTC FLRC CORE : initiate transmission rejected (state=%u)\n",
+                                      ( unsigned ) smtc_flrp_core_obj.state );
+        return SMTC_FLRP_RC_BUSY;
+    }
+
     SMTC_MODEM_HAL_TRACE_INFO( "SMTC FLRC CORE : initiate transmission\n" );
 
     smtc_flrp_core_obj.wor_exchange_phase_bits = 0;
@@ -225,6 +236,14 @@ smtc_flrp_return_code_t smtc_flrp_initiate_reception( uint8_t* payload, uint32_t
     if( ( payload_size == 0 ) || ( payload == NULL ) || ( com_config.com_mode == SMTC_FLRP_COM_ONE_WAY ) )
     {
         return SMTC_FLRP_RC_INVALID_PARAMS;
+    }
+
+    if( ( smtc_flrp_core_obj.state == SMTC_FLRP_CORE_STATE_WOR_TX ) ||
+        ( smtc_flrp_core_obj.state == SMTC_FLRP_CORE_STATE_DATA ) )
+    {
+        SMTC_MODEM_HAL_TRACE_WARNING( "SMTC FLRC CORE : initiate reception rejected (state=%u)\n",
+                                      ( unsigned ) smtc_flrp_core_obj.state );
+        return SMTC_FLRP_RC_BUSY;
     }
 
     SMTC_MODEM_HAL_TRACE_INFO( "SMTC FLRC CORE : initiate reception\n" );
@@ -323,7 +342,7 @@ smtc_flrp_radio_config_t smtc_flrp_get_current_radio_config( void )
         .flrc.burst_target_per = smtc_flrp_core_obj.flrc_radio_config.burst_target_per,
     };
     memcpy( flrp_radio_config.flrc.channels_freq_hz, smtc_flrp_core_obj.flrc_radio_config.frequencies_hz,
-            SMTC_FLRP_NB_CHANNELS_MAX );
+            SMTC_FLRP_NB_CHANNELS_MAX * sizeof( uint32_t ) );
 
     return flrp_radio_config;
 }
@@ -337,8 +356,9 @@ smtc_flrp_return_code_t smtc_flrp_set_new_radio_config( smtc_flrp_radio_config_t
         return SMTC_FLRP_RC_BUSY;
     }
 
-    if( ( radio_config.flrc.nb_channels > SMTC_FLRP_NB_CHANNELS_MAX ) ||
-        ( radio_config.flrc.default_channel > SMTC_FLRP_NB_CHANNELS_MAX ) ||
+    if( ( radio_config.flrc.nb_channels < 1 ) || ( radio_config.flrc.nb_channels > SMTC_FLRP_NB_CHANNELS_MAX ) ||
+        ( radio_config.flrc.default_channel > ( SMTC_FLRP_NB_CHANNELS_MAX - 1 ) ) ||
+        ( radio_config.flrc.default_channel > ( radio_config.flrc.nb_channels - 1 ) ) ||
         ( radio_config.flrc.interframe_delay_us > SMTC_FLRP_DELAYS_MAX ) ||
         ( radio_config.flrc.adaptive_link_interframe_delay_us > SMTC_FLRP_DELAYS_MAX ) ||
         ( radio_config.flrc.start_burst_delay_us > SMTC_FLRP_DELAYS_MAX ) ||
@@ -351,7 +371,7 @@ smtc_flrp_return_code_t smtc_flrp_set_new_radio_config( smtc_flrp_radio_config_t
     smtc_flrp_core_obj.wor_rx_radio_config = radio_config.wor_rx;
     smtc_flrp_core_obj.wor_tx_radio_config = radio_config.wor_tx;
     memcpy( smtc_flrp_core_obj.flrc_radio_config.frequencies_hz, radio_config.flrc.channels_freq_hz,
-            SMTC_FLRP_NB_CHANNELS_MAX );
+            SMTC_FLRP_NB_CHANNELS_MAX * sizeof( uint32_t ) );
     smtc_flrp_core_obj.flrc_radio_config.nb_frequencies       = radio_config.flrc.nb_channels;
     smtc_flrp_core_obj.flrc_radio_config.default_channel      = radio_config.flrc.default_channel;
     smtc_flrp_core_obj.flrc_radio_config.raw_bit_rate         = radio_config.flrc.raw_bit_rate;
@@ -369,16 +389,17 @@ smtc_flrp_return_code_t smtc_flrp_set_new_radio_config( smtc_flrp_radio_config_t
 smtc_flrp_flrc_advanced_radio_config_t smtc_flrp_get_current_advanced_flrc_radio_config( void )
 {
     smtc_flrp_flrc_advanced_radio_config_t flrc_advanced_radio_config = {
-        .cr                 = smtc_flrp_core_obj.flrc_radio_config.cr,
-        .pulse_shape        = smtc_flrp_core_obj.flrc_radio_config.pulse_shape,
-        .preambule_len      = smtc_flrp_core_obj.flrc_radio_config.preambule_len,
-        .sync_word_len      = smtc_flrp_core_obj.flrc_radio_config.sync_word_len,
-        .tx_syncword_index  = smtc_flrp_core_obj.flrc_radio_config.tx_syncword_index,
-        .rx_match_sync_word = smtc_flrp_core_obj.flrc_radio_config.rx_match_sync_word,
-        .pld_is_fix         = smtc_flrp_core_obj.flrc_radio_config.pld_is_fix,
-        .crc_type           = smtc_flrp_core_obj.flrc_radio_config.crc_type,
-        .crc_seed           = smtc_flrp_core_obj.flrc_radio_config.crc_seed,
-        .crc_polynomial     = smtc_flrp_core_obj.flrc_radio_config.crc_polynomial,
+        .cr                       = smtc_flrp_core_obj.flrc_radio_config.cr,
+        .pulse_shape              = smtc_flrp_core_obj.flrc_radio_config.pulse_shape,
+        .preambule_len            = smtc_flrp_core_obj.flrc_radio_config.preambule_len,
+        .sync_word_len            = smtc_flrp_core_obj.flrc_radio_config.sync_word_len,
+        .tx_syncword_index        = smtc_flrp_core_obj.flrc_radio_config.tx_syncword_index,
+        .rx_match_sync_word       = smtc_flrp_core_obj.flrc_radio_config.rx_match_sync_word,
+        .pld_is_fix               = smtc_flrp_core_obj.flrc_radio_config.pld_is_fix,
+        .crc_type                 = smtc_flrp_core_obj.flrc_radio_config.crc_type,
+        .crc_seed                 = smtc_flrp_core_obj.flrc_radio_config.crc_seed,
+        .crc_polynomial           = smtc_flrp_core_obj.flrc_radio_config.crc_polynomial,
+        .frequency_offset_enabled = smtc_flrp_core_obj.flrc_radio_config.frequency_offset_enabled
     };
 
     memcpy( flrc_advanced_radio_config.sync_word, smtc_flrp_core_obj.flrc_radio_config.sync_word,
@@ -397,16 +418,17 @@ smtc_flrp_return_code_t smtc_flrp_set_new_advanced_flrc_radio_config(
         return SMTC_FLRP_RC_BUSY;
     }
 
-    smtc_flrp_core_obj.flrc_radio_config.cr                 = radio_config.cr;
-    smtc_flrp_core_obj.flrc_radio_config.pulse_shape        = radio_config.pulse_shape;
-    smtc_flrp_core_obj.flrc_radio_config.preambule_len      = radio_config.preambule_len;
-    smtc_flrp_core_obj.flrc_radio_config.sync_word_len      = radio_config.sync_word_len;
-    smtc_flrp_core_obj.flrc_radio_config.tx_syncword_index  = radio_config.tx_syncword_index;
-    smtc_flrp_core_obj.flrc_radio_config.rx_match_sync_word = radio_config.rx_match_sync_word;
-    smtc_flrp_core_obj.flrc_radio_config.pld_is_fix         = radio_config.pld_is_fix;
-    smtc_flrp_core_obj.flrc_radio_config.crc_type           = radio_config.crc_type;
-    smtc_flrp_core_obj.flrc_radio_config.crc_seed           = radio_config.crc_seed;
-    smtc_flrp_core_obj.flrc_radio_config.crc_polynomial     = radio_config.crc_polynomial;
+    smtc_flrp_core_obj.flrc_radio_config.cr                       = radio_config.cr;
+    smtc_flrp_core_obj.flrc_radio_config.pulse_shape              = radio_config.pulse_shape;
+    smtc_flrp_core_obj.flrc_radio_config.preambule_len            = radio_config.preambule_len;
+    smtc_flrp_core_obj.flrc_radio_config.sync_word_len            = radio_config.sync_word_len;
+    smtc_flrp_core_obj.flrc_radio_config.tx_syncword_index        = radio_config.tx_syncword_index;
+    smtc_flrp_core_obj.flrc_radio_config.rx_match_sync_word       = radio_config.rx_match_sync_word;
+    smtc_flrp_core_obj.flrc_radio_config.pld_is_fix               = radio_config.pld_is_fix;
+    smtc_flrp_core_obj.flrc_radio_config.crc_type                 = radio_config.crc_type;
+    smtc_flrp_core_obj.flrc_radio_config.crc_seed                 = radio_config.crc_seed;
+    smtc_flrp_core_obj.flrc_radio_config.crc_polynomial           = radio_config.crc_polynomial;
+    smtc_flrp_core_obj.flrc_radio_config.frequency_offset_enabled = radio_config.frequency_offset_enabled;
     memcpy( smtc_flrp_core_obj.flrc_radio_config.sync_word, radio_config.sync_word, 3 * SMTC_FLRP_SIZE_SYNC_WORD_MAX );
 
     return SMTC_FLRP_RC_OK;
@@ -429,8 +451,15 @@ void smtc_flrp_run_engine( void )
     case SMTC_FLRP_CORE_STATE_WOR_RX:
         if( smtc_flrp_core_obj.wor_event == SMTC_FLRP_CORE_WOR_SUCCESS )
         {
-            smtc_flrp_core_start_mac( &smtc_flrp_core_obj, false );
-            smtc_flrp_core_obj.state = SMTC_FLRP_CORE_STATE_DATA;
+            if( smtc_flrp_core_start_mac( &smtc_flrp_core_obj, false ) == SMTC_FLRP_MAC_LAYER_STATUS_OK )
+            {
+                smtc_flrp_core_obj.state = SMTC_FLRP_CORE_STATE_DATA;
+            }
+            else
+            {
+                smtc_flrp_core_obj.wor_exchange_phase_bits = 0;
+                smtc_flrp_core_obj.state                   = SMTC_FLRP_CORE_STATE_IDLE;
+            }
         }
         else if( ( smtc_flrp_core_obj.wor_event == SMTC_FLRP_CORE_WOR_FAILED ) ||
                  ( smtc_flrp_core_obj.wor_event == SMTC_FLRP_CORE_WOR_RX_ABORT ) )
@@ -444,8 +473,15 @@ void smtc_flrp_run_engine( void )
 
         if( smtc_flrp_core_obj.wor_event == SMTC_FLRP_CORE_WOR_SUCCESS )
         {
-            smtc_flrp_core_start_mac( &smtc_flrp_core_obj, true );
-            smtc_flrp_core_obj.state = SMTC_FLRP_CORE_STATE_DATA;
+            if( smtc_flrp_core_start_mac( &smtc_flrp_core_obj, true ) == SMTC_FLRP_MAC_LAYER_STATUS_OK )
+            {
+                smtc_flrp_core_obj.state = SMTC_FLRP_CORE_STATE_DATA;
+            }
+            else
+            {
+                smtc_flrp_core_obj.wor_exchange_phase_bits = 0;
+                smtc_flrp_core_obj.state                   = SMTC_FLRP_CORE_STATE_IDLE;
+            }
         }
         else if( smtc_flrp_core_obj.wor_event == SMTC_FLRP_CORE_WOR_FAILED )
         {
@@ -485,6 +521,20 @@ bool smtc_flrp_call_run( void )
     }
 
     return ret;
+}
+
+bool smtc_flrp_is_transaction_active( void )
+{
+    if( !smtc_flrp_core_obj.initialized )
+    {
+        return false;
+    }
+
+    /* WOR_RX is only ever entered for background/periodic listening, not for a real one-shot
+     * transaction, so it must not be reported as "active" or GET_STATS would stay busy forever
+     * whenever periodic listening is enabled. */
+    return ( ( smtc_flrp_core_obj.state == SMTC_FLRP_CORE_STATE_WOR_TX ) ||
+             ( smtc_flrp_core_obj.state == SMTC_FLRP_CORE_STATE_DATA ) );
 }
 
 uint8_t smtc_flrp_core_get_mac_radio_access_id( void )
@@ -558,9 +608,9 @@ static void smtc_flrp_init_and_get_config( smtc_flrp_mac_radio_config_t* flrc_ra
 {
     flrc_radio_config->nb_frequencies = DATA_FLRC_NB_FREQ;
     uint32_t freq_ref =
-        ( freq_plan == SMTC_FLRP_FREQ_2GHz4 ) ? DATA_FLRC_2GHz4_RF_FREQ_IN_HZ : DATA_FLRC_865MHz_RF_FREQ_IN_HZ;
+        ( freq_plan == SMTC_FLRP_FREQ_2GHz4 ) ? DATA_FLRC_2GHz4_RF_FREQ_IN_HZ : DATA_FLRC_SUBGIG_RF_FREQ_IN_HZ;
     uint32_t channel_step =
-        ( freq_plan == SMTC_FLRP_FREQ_2GHz4 ) ? DATA_FLRC_CHANNEL_STEP_2GHz4_HZ : DATA_FLRC_CHANNEL_STEP_865MHz_HZ;
+        ( freq_plan == SMTC_FLRP_FREQ_2GHz4 ) ? DATA_FLRC_CHANNEL_STEP_2GHz4_HZ : DATA_FLRC_CHANNEL_STEP_SUBGIG_HZ;
     for( uint8_t i = 0; i < DATA_FLRC_NB_FREQ; i++ )
     {
         flrc_radio_config->frequencies_hz[i] = freq_ref + channel_step * i;
@@ -583,12 +633,13 @@ static void smtc_flrp_init_and_get_config( smtc_flrp_mac_radio_config_t* flrc_ra
     flrc_radio_config->burst_target_per                  = DATA_FLRC_BURST_TARGET_PER_PERCENTAGE;
     flrc_radio_config->crc_seed                          = DATA_FLRC_CRC_SEED;
     flrc_radio_config->crc_polynomial                    = DATA_FLRC_CRC_POLYNOMIAL;
+    flrc_radio_config->frequency_offset_enabled          = true;
     memcpy( flrc_radio_config->sync_word[0], &flrc_default_syncword_1[0], SMTC_FLRP_SIZE_SYNC_WORD_MAX );
     memcpy( flrc_radio_config->sync_word[1], &flrc_default_syncword_2[0], SMTC_FLRP_SIZE_SYNC_WORD_MAX );
     memcpy( flrc_radio_config->sync_word[2], &flrc_default_syncword_3[0], SMTC_FLRP_SIZE_SYNC_WORD_MAX );
 
     wor_rx_radio_config->frequency_hz =
-        ( freq_plan == SMTC_FLRP_FREQ_2GHz4 ) ? WOR_2GHz4_RF_FREQ_IN_HZ : WOR_865MHz_RF_FREQ_IN_HZ;
+        ( freq_plan == SMTC_FLRP_FREQ_2GHz4 ) ? WOR_2GHz4_RF_FREQ_IN_HZ : WOR_SUBGIG_RF_FREQ_IN_HZ;
     wor_rx_radio_config->sf              = WOR_LORA_SPREADING_FACTOR;
     wor_rx_radio_config->bw              = WOR_LORA_BANDWIDTH;
     wor_rx_radio_config->tx_power_in_dbm = TX_OUTPUT_POWER_DBM;
@@ -596,13 +647,14 @@ static void smtc_flrp_init_and_get_config( smtc_flrp_mac_radio_config_t* flrc_ra
     memcpy( wor_tx_radio_config, wor_rx_radio_config, sizeof( smtc_flrp_wor_radio_config_t ) );
 }
 
-static void smtc_flrp_core_start_mac( smtc_flrp_core_t* smtc_flrp_core, bool device_is_initiator )
+static smtc_flrp_mac_layer_status_t smtc_flrp_core_start_mac( smtc_flrp_core_t* smtc_flrp_core,
+                                                              bool              device_is_initiator )
 {
     smtc_flrp_mac_layer_status_t mac_status = SMTC_FLRP_MAC_LAYER_STATUS_OK;
-    smtc_wor_t* wor_obj = device_is_initiator ? &smtc_flrp_core->smtc_wor_tx_obj : &smtc_flrp_core->smtc_wor_rx_obj;
-    uint8_t*    dest_dev_eui = device_is_initiator ? smtc_flrp_core->smtc_wor_tx_obj.wor_data_trx.u.flrc.slave_dev_eui
-                                                   : smtc_flrp_core->smtc_wor_rx_obj.wor_data_trx.u.flrc.initiator_dev_eui;
-    uint32_t    timestamp_start_next_phase_ms = smtc_flrp_core_obj.radio_end_timestamp_ms;
+    smtc_wor_t* wor_obj   = device_is_initiator ? &smtc_flrp_core->smtc_wor_tx_obj : &smtc_flrp_core->smtc_wor_rx_obj;
+    uint8_t* dest_dev_eui = device_is_initiator ? smtc_flrp_core->smtc_wor_tx_obj.wor_data_trx.u.flrc.slave_dev_eui
+                                                : smtc_flrp_core->smtc_wor_rx_obj.wor_data_trx.u.flrc.initiator_dev_eui;
+    uint32_t timestamp_start_next_phase_ms = smtc_flrp_core_obj.radio_end_timestamp_ms;
 
     smtc_flrp_mac_config_t mac_cfg_wor = {
         .dest_dev_eui         = dest_dev_eui,
@@ -659,6 +711,8 @@ static void smtc_flrp_core_start_mac( smtc_flrp_core_t* smtc_flrp_core, bool dev
         smtc_flrp_core_return_error( smtc_flrp_core, convert_mac_status_to_flrc_error_code( mac_status ), dest_dev_eui,
                                      is_tx );
     }
+
+    return mac_status;
 }
 
 static void smtc_flrp_configure_wor_data( smtc_flrp_core_t* smtc_flrp_core, smtc_wor_data_t* wor_data,
@@ -669,14 +723,14 @@ static void smtc_flrp_configure_wor_data( smtc_flrp_core_t* smtc_flrp_core, smtc
     // Init tx wor data
     wor_data->type                        = SMTC_WOR_TYPE_FLRC;
     wor_data->u.flrc.link_adaptation_mode = com_config.link_adaptation_mode;
-    memcpy( wor_data->u.flrc.initiator_dev_eui, smtc_flrp_core->dev_eui, SMTC_FLRP_EUI_LENGTH );
+    memcpy( wor_data->u.flrc.initiator_dev_eui, smtc_flrp_core->dev_eui, SMTC_FLRP_EUI_LENGTH * sizeof( uint8_t ) );
 
     wor_data->u.flrc.wor_ack_required    = ( com_config.com_mode != SMTC_FLRP_COM_ONE_WAY );
     wor_data->u.flrc.burst_ack_required  = ( com_config.com_mode == SMTC_FLRP_BIDIRECTIONAL );
     wor_data->u.flrc.default_flrc_dr     = flrc_radio_config.raw_bit_rate;
     wor_data->u.flrc.default_channel     = flrc_radio_config.default_channel;
     wor_data->u.flrc.default_coding_rate = flrc_radio_config.cr;
-    memcpy( wor_data->u.flrc.slave_dev_eui, com_config.slave_dev_eui, SMTC_FLRP_EUI_LENGTH );
+    memcpy( wor_data->u.flrc.slave_dev_eui, com_config.slave_dev_eui, SMTC_FLRP_EUI_LENGTH * sizeof( uint8_t ) );
     if( com_config.com_mode != SMTC_FLRP_COM_ONE_WAY )
     {
         wor_data->u.flrc.filter_len = 0x3F;
@@ -753,13 +807,31 @@ static void smtc_flrp_restart_reception( smtc_flrp_core_t* smtc_flrp_core_obj, u
     if( wor_status != SMTC_WOR_STATUS_SUCCESS )
     {
         SMTC_MODEM_HAL_TRACE_ERROR( "SMTC FLRC CORE : Failed to start WOR reception (status %u)\n", wor_status );
-        smtc_flrp_rx_stats_t stats = { 0 };
-        if( smtc_flrp_core_obj->rx_user_callback != NULL )
-        {
-            smtc_flrp_core_obj->rx_user_callback( smtc_flrp_core_obj->user_context,
-                                                  convert_wor_status_to_flrc_error_code( wor_status ), 0, NULL, stats );
-        }
+        smtc_flrp_core_invoke_rx_callback( smtc_flrp_core_obj, convert_wor_status_to_flrc_error_code( wor_status ), 0,
+                                           NULL );
     }
+}
+
+static void smtc_flrp_core_invoke_rx_callback( smtc_flrp_core_t* smtc_flrp_core, smtc_flrp_return_code_t status,
+                                               uint32_t payload_size, uint8_t* src_addr )
+{
+    if( smtc_flrp_core->rx_user_callback == NULL )
+    {
+        return;
+    }
+
+    smtc_flrp_rx_stats_t stats = { 0 };
+    stats.wor                  = smtc_flrp_core->wor_rx_stats;
+    if( smtc_flrp_core->state == SMTC_FLRP_CORE_STATE_DATA )
+    {
+        stats.burst = smtc_flrp_core->smtc_flrp_mac_layer_obj.payload_stats;
+    }
+    else
+    {
+        stats.burst.exchange_phase_success_mask = smtc_flrp_core->wor_exchange_phase_bits;
+    }
+
+    smtc_flrp_core->rx_user_callback( smtc_flrp_core->user_context, status, payload_size, src_addr, stats );
 }
 
 static void smtc_flrp_core_return_error( smtc_flrp_core_t* smtc_flrp_core, smtc_flrp_return_code_t status,
@@ -769,17 +841,14 @@ static void smtc_flrp_core_return_error( smtc_flrp_core_t* smtc_flrp_core, smtc_
     {
         if( smtc_flrp_core->tx_user_callback != NULL )
         {
-            smtc_flrp_core->tx_user_callback( smtc_flrp_core->user_context, status, false, dest_addr );
+            smtc_flrp_tx_stats_t stats = { 0 };
+            stats.wor                  = smtc_flrp_core->wor_rx_stats;
+            smtc_flrp_core->tx_user_callback( smtc_flrp_core->user_context, status, false, dest_addr, stats );
         }
     }
     else
     {
-        if( smtc_flrp_core->rx_user_callback != NULL )
-        {
-            smtc_flrp_rx_stats_t stats = { 0 };
-            stats.wor                  = smtc_flrp_core->wor_rx_stats;
-            smtc_flrp_core->rx_user_callback( smtc_flrp_core->user_context, status, 0, dest_addr, stats );
-        }
+        smtc_flrp_core_invoke_rx_callback( smtc_flrp_core, status, 0, dest_addr );
     }
 }
 
@@ -860,40 +929,41 @@ static void smtc_flrp_mac_tx_done_cb( smtc_flrp_mac_layer_status_t status, uint3
         return;
     }
 
-    smtc_flrp_core_obj.state = SMTC_FLRP_CORE_STATE_IDLE;
-
     smtc_flrp_core_obj.radio_end_timestamp_ms =
         smtc_flrp_core_obj.smtc_flrp_mac_layer_obj.transaction->smtc_rac_data_result.radio_end_timestamp_ms;
 
     if( smtc_flrp_core_obj.tx_user_callback != NULL )
     {
+        smtc_flrp_tx_stats_t stats = { 0 };
+        stats.wor                  = smtc_flrp_core_obj.wor_rx_stats;
+        stats.burst                = smtc_flrp_core_obj.smtc_flrp_mac_layer_obj.tx_stats;
         smtc_flrp_core_obj.tx_user_callback( smtc_flrp_core_obj.user_context,
                                              convert_mac_status_to_flrc_error_code( status ),
-                                             ( status == SMTC_FLRP_MAC_LAYER_STATUS_OK ), dest_addr );
+                                             ( status == SMTC_FLRP_MAC_LAYER_STATUS_OK ), dest_addr, stats );
     }
+
+    smtc_flrp_core_obj.state = SMTC_FLRP_CORE_STATE_IDLE;
 }
 
 static void smtc_flrp_mac_rx_done_cb( smtc_flrp_mac_layer_status_t status, uint32_t data_size, uint32_t timestamp_ms,
                                       uint8_t* dest_addr )
 {
+    UNUSED( timestamp_ms );
+
     if( smtc_flrp_core_obj.state != SMTC_FLRP_CORE_STATE_DATA )
     {
+        SMTC_MODEM_HAL_TRACE_WARNING( "[FLRP] MAC RX done ignored (core state=%u)\n",
+                                      ( unsigned ) smtc_flrp_core_obj.state );
         return;
     }
 
-    smtc_flrp_core_obj.state = SMTC_FLRP_CORE_STATE_IDLE;
-
     smtc_flrp_core_obj.radio_end_timestamp_ms =
         smtc_flrp_core_obj.smtc_flrp_mac_layer_obj.transaction->smtc_rac_data_result.radio_end_timestamp_ms;
-    if( smtc_flrp_core_obj.rx_user_callback != NULL )
-    {
-        smtc_flrp_rx_stats_t stats = { 0 };
-        stats.wor                  = smtc_flrp_core_obj.wor_rx_stats;
-        stats.burst                = smtc_flrp_core_obj.smtc_flrp_mac_layer_obj.payload_stats;
-        smtc_flrp_core_obj.rx_user_callback( smtc_flrp_core_obj.user_context,
-                                             convert_mac_status_to_flrc_error_code( status ), data_size, dest_addr,
-                                             stats );
-    }
+
+    smtc_flrp_core_invoke_rx_callback( &smtc_flrp_core_obj, convert_mac_status_to_flrc_error_code( status ), data_size,
+                                       dest_addr );
+
+    smtc_flrp_core_obj.state = SMTC_FLRP_CORE_STATE_IDLE;
 }
 
 /* --- EOF ------------------------------------------------------------------ */

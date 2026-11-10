@@ -41,7 +41,7 @@
 #include "smtc_modem_hal.h"
 #include "region_cn_470_defs.h"
 #include "region_cn_470.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -51,7 +51,7 @@
 #define real_const real->real_const
 
 #define dr_bitfield_tx_channel real->region.cn470.dr_bitfield_tx_channel
-#define channel_index_enabled real->region.cn470.channel_index_enabled
+#define tx_channel_index_enabled real->region.cn470.tx_channel_index_enabled
 #define dr_distribution_init real->region.cn470.dr_distribution_init
 #define dr_distribution real->region.cn470.dr_distribution
 #define join_dr_distribution real->region.cn470.join_dr_distribution
@@ -99,52 +99,54 @@ static const char* smtc_real_channel_plan_cn470_str[] = {
 
 void region_cn_470_init( smtc_real_t* real )
 {
-    real_const.const_number_of_tx_channel         = NUMBER_OF_TX_CHANNEL_CN_470;
-    real_const.const_number_of_rx_channel         = NUMBER_OF_RX_CHANNEL_CN_470;
-    real_const.const_number_of_channel_bank       = BANK_MAX_CN470;
-    real_const.const_join_accept_delay1           = JOIN_ACCEPT_DELAY1_CN_470;
-    real_const.const_received_delay1              = RECEIVE_DELAY1_CN_470;
-    real_const.const_tx_power_dbm                 = TX_POWER_EIRP_CN_470 - 2;  // EIRP to ERP
-    real_const.const_max_tx_power_idx             = MAX_TX_POWER_IDX_CN_470;
-    real_const.const_adr_ack_limit                = ADR_ACK_LIMIT_CN_470;
-    real_const.const_adr_ack_delay                = ADR_ACK_DELAY_CN_470;
-    real_const.const_datarate_offsets             = &datarate_offsets_cn_470[0][0];
-    real_const.const_datarate_backoff             = &datarate_backoff_cn_470[0];
-    real_const.const_ack_timeout                  = ACK_TIMEOUT_CN_470;
-    real_const.const_freq_min                     = FREQMIN_CN_470;
-    real_const.const_freq_max                     = FREQMAX_CN_470;
-    real_const.const_frequency_factor             = FREQUENCY_FACTOR_CN_470;
-    real_const.const_rx2_dr_init                  = RX2DR_INIT_CN_470;
-    real_const.const_sync_word_private            = SYNC_WORD_PRIVATE_CN_470;
-    real_const.const_sync_word_public             = SYNC_WORD_PUBLIC_CN_470;
-    real_const.const_sync_word_gfsk               = ( uint8_t* ) SYNC_WORD_GFSK_CN_470;
-    real_const.const_min_tx_dr                    = MIN_TX_DR_CN_470;
-    real_const.const_max_tx_dr                    = MAX_TX_DR_CN_470;
-    real_const.const_min_tx_dr_limit              = MIN_TX_DR_LIMIT_CN_470;
-    real_const.const_number_of_tx_dr              = NUMBER_OF_TX_DR_CN_470;
-    real_const.const_min_rx_dr                    = MIN_RX_DR_CN_470;
-    real_const.const_max_rx_dr                    = MAX_RX_DR_CN_470;
-    real_const.const_number_rx1_dr_offset         = NUMBER_RX1_DR_OFFSET_CN_470;
-    real_const.const_dr_bitfield                  = DR_BITFIELD_SUPPORTED_CN_470;
-    real_const.const_default_tx_dr_bit_field      = DEFAULT_TX_DR_BIT_FIELD_CN_470;
-    real_const.const_tx_param_setup_req_supported = TX_PARAM_SETUP_REQ_SUPPORTED_CN_470;
-    real_const.const_new_channel_req_supported    = NEW_CHANNEL_REQ_SUPPORTED_CN_470;
-    real_const.const_dtc_supported                = DTC_SUPPORTED_CN_470;
-    real_const.const_lbt_supported                = LBT_SUPPORTED_CN_470;
-    real_const.const_lbt_sniff_duration_ms        = LBT_SNIFF_DURATION_MS_CN_470;
-    real_const.const_lbt_threshold_dbm            = LBT_THRESHOLD_DBM_CN_470;
-    real_const.const_lbt_bw_hz                    = LBT_BW_HZ_CN_470;
-    real_const.const_max_payload_m                = &M_cn_470[0];
-    real_const.const_coding_rate                  = RAL_LORA_CR_4_5;
-    real_const.const_mobile_longrange_dr_distri   = &MOBILE_LONGRANGE_DR_DISTRIBUTION_CN_470[0];
-    real_const.const_mobile_lowpower_dr_distri    = &MOBILE_LOWPER_DR_DISTRIBUTION_CN_470[0];
-    real_const.const_default_dr_distri            = &DEFAULT_DR_DISTRIBUTION_CN_470[0];
-    real_const.const_cf_list_type_supported       = CF_LIST_SUPPORTED_CN_470;
-    real_const.const_beacon_dr                    = BEACON_DR_CN_470;
+    real_const.const_number_of_tx_channel            = NUMBER_OF_TX_CHANNEL_CN_470;
+    real_const.const_number_of_rx_channel            = NUMBER_OF_RX_CHANNEL_CN_470;
+    real_const.const_number_of_channel_banks         = BANK_MAX_CN470;
+    real_const.const_join_accept_delay1              = JOIN_ACCEPT_DELAY1_CN_470;
+    real_const.const_received_delay1                 = RECEIVE_DELAY1_CN_470;
+    real_const.const_tx_power_dbm                    = TX_POWER_EIRP_CN_470 - 2;  // EIRP to ERP
+    real_const.const_max_tx_power_idx                = MAX_TX_POWER_IDX_CN_470;
+    real_const.const_adr_ack_limit                   = ADR_ACK_LIMIT_CN_470;
+    real_const.const_adr_ack_delay                   = ADR_ACK_DELAY_CN_470;
+    real_const.const_datarate_offsets                = &datarate_offsets_cn_470[0][0];
+    real_const.const_datarate_backoff                = &datarate_backoff_cn_470[0];
+    real_const.const_ack_timeout                     = ACK_TIMEOUT_CN_470;
+    real_const.const_freq_min                        = FREQMIN_CN_470;
+    real_const.const_freq_max                        = FREQMAX_CN_470;
+    real_const.const_frequency_factor                = FREQUENCY_FACTOR_CN_470;
+    real_const.const_rx2_dr_init                     = RX2DR_INIT_CN_470;
+    real_const.const_sync_word_private               = SYNC_WORD_PRIVATE_CN_470;
+    real_const.const_sync_word_public                = SYNC_WORD_PUBLIC_CN_470;
+    real_const.const_sync_word_gfsk                  = ( uint8_t* ) SYNC_WORD_GFSK_CN_470;
+    real_const.const_min_tx_dr                       = MIN_TX_DR_CN_470;
+    real_const.const_max_tx_dr                       = MAX_TX_DR_CN_470;
+    real_const.const_min_tx_dr_limit                 = MIN_TX_DR_LIMIT_CN_470;
+    real_const.const_number_of_tx_dr                 = NUMBER_OF_TX_DR_CN_470;
+    real_const.const_min_rx_dr                       = MIN_RX_DR_CN_470;
+    real_const.const_max_rx_dr                       = MAX_RX_DR_CN_470;
+    real_const.const_number_rx1_dr_offset            = NUMBER_RX1_DR_OFFSET_CN_470;
+    real_const.const_tx_dr_bitfield                  = DR_BITFIELD_SUPPORTED_CN_470;
+    real_const.const_rx_dr_bitfield                  = DR_BITFIELD_SUPPORTED_CN_470;
+    real_const.const_default_tx_dr_bit_field         = DEFAULT_TX_DR_BIT_FIELD_CN_470;
+    real_const.const_tx_param_setup_req_supported    = TX_PARAM_SETUP_REQ_SUPPORTED_CN_470;
+    real_const.const_new_channel_req_supported       = NEW_CHANNEL_REQ_SUPPORTED_CN_470;
+    real_const.const_dtc_supported                   = DTC_SUPPORTED_CN_470;
+    real_const.const_lbt_supported                   = LBT_SUPPORTED_CN_470;
+    real_const.const_lbt_sniff_duration_ms           = LBT_SNIFF_DURATION_MS_CN_470;
+    real_const.const_lbt_threshold_dbm               = LBT_THRESHOLD_DBM_CN_470;
+    real_const.const_lbt_bw_hz                       = LBT_BW_HZ_CN_470;
+    real_const.const_tx_max_payload_m_dwell_time_off = &M_cn_470[0];
+    real_const.const_rx_max_payload_m_dwell_time_off = &M_cn_470[0];
+    real_const.const_coding_rate                     = RAL_LORA_CR_4_5;
+    real_const.const_mobile_longrange_dr_distri      = &MOBILE_LONGRANGE_DR_DISTRIBUTION_CN_470[0];
+    real_const.const_mobile_lowpower_dr_distri       = &MOBILE_LOWPER_DR_DISTRIBUTION_CN_470[0];
+    real_const.const_default_dr_distri               = &DEFAULT_DR_DISTRIBUTION_CN_470[0];
+    real_const.const_cf_list_type_supported          = CF_LIST_SUPPORTED_CN_470;
+    real_const.const_beacon_dr                       = BEACON_DR_CN_470;
 
     real_ctx.tx_frequency_channel_ctx        = NULL;
     real_ctx.rx1_frequency_channel_ctx       = NULL;
-    real_ctx.channel_index_enabled_ctx       = &channel_index_enabled[0];
+    real_ctx.tx_channel_index_enabled_ctx    = &tx_channel_index_enabled[0];
     real_ctx.unwrapped_channel_mask_ctx      = &unwrapped_channel_mask[0];
     real_ctx.dr_bitfield_tx_channel_ctx      = &dr_bitfield_tx_channel[0];
     real_ctx.dr_distribution_init_ctx        = &dr_distribution_init[0];
@@ -168,7 +170,7 @@ void region_cn_470_config( smtc_real_t* real )
 #endif
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_DISABLED );
+        SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_DISABLED );
         dr_bitfield_tx_channel[i] = 0;
     }
 
@@ -180,7 +182,7 @@ void region_cn_470_config( smtc_real_t* real )
         {
             err = false;
 #endif
-            SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_ENABLED );
+            SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_ENABLED );
             dr_bitfield_tx_channel[i] = real_const.const_default_tx_dr_bit_field;
 
             SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG(
@@ -216,7 +218,7 @@ void region_cn_470_config_session( smtc_real_t* real )
 #if defined( HYBRID_CN470_MONO_CHANNEL )
         for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
         {
-            SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_DISABLED );
+            SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_DISABLED );
             dr_bitfield_tx_channel[i] = 0;
         }
 #endif
@@ -231,7 +233,7 @@ void region_cn_470_config_session( smtc_real_t* real )
                     "idx:%u, TxFreq: %d, RxFreq: %d, dr: 0x%x,\n", i, region_cn_470_get_tx_frequency_channel( real, i ),
                     region_cn_470_get_rx1_frequency_channel( real, i ), dr_bitfield_tx_channel[i] );
                 SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( "%s", ( ( i % 8 ) == 7 ) ? "---\n" : "" );
-                SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_ENABLED );
+                SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_ENABLED );
                 dr_bitfield_tx_channel[i] = real_const.const_default_tx_dr_bit_field;
 #if defined( HYBRID_CN470_MONO_CHANNEL )
             }
@@ -244,7 +246,7 @@ void region_cn_470_config_session( smtc_real_t* real )
 #if defined( HYBRID_CN470_MONO_CHANNEL )
         for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
         {
-            SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_DISABLED );
+            SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_DISABLED );
             dr_bitfield_tx_channel[i] = 0;
         }
 #endif
@@ -260,7 +262,7 @@ void region_cn_470_config_session( smtc_real_t* real )
                                                    region_cn_470_get_tx_frequency_channel( real, i ),
                                                    dr_bitfield_tx_channel[i] );
                 SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( "%s", ( ( i % 8 ) == 7 ) ? "---\n" : "" );
-                SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_ENABLED );
+                SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_ENABLED );
                 dr_bitfield_tx_channel[i] = real_const.const_default_tx_dr_bit_field;
 #if defined( HYBRID_CN470_MONO_CHANNEL )
             }
@@ -307,7 +309,7 @@ status_lorawan_t region_cn_470_get_join_next_channel( smtc_real_t* real, uint8_t
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
         // Channel must be enabled and frequency not 0
-        if( ( SMTC_GET_BIT8( channel_index_enabled, i ) == CHANNEL_ENABLED ) &&
+        if( ( SMTC_GET_BIT8( tx_channel_index_enabled, i ) == CHANNEL_ENABLED ) &&
             ( common_join_channel_cn_470[i][0] != 0 ) )
         {
             if( SMTC_GET_BIT16( &dr_bitfield_tx_channel[i], tx_data_rate ) == 1 )
@@ -352,7 +354,7 @@ status_lorawan_t region_cn_470_get_next_channel( smtc_real_t* real, uint8_t tx_d
 
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( SMTC_GET_BIT8( channel_index_enabled, i ) == CHANNEL_ENABLED )
+        if( SMTC_GET_BIT8( tx_channel_index_enabled, i ) == CHANNEL_ENABLED )
         {
             if( SMTC_GET_BIT16( &dr_bitfield_tx_channel[i], tx_data_rate ) == 1 )
             {
@@ -506,7 +508,7 @@ bool region_cn_470_are_all_default_channels_enabled( smtc_real_t* real )
 {
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( SMTC_GET_BIT8( channel_index_enabled, i ) == 0 )
+        if( SMTC_GET_BIT8( tx_channel_index_enabled, i ) == 0 )
         {
             return false;
         }
@@ -521,7 +523,7 @@ void region_cn_470_enable_all_channels_with_valid_freq( smtc_real_t* real )
 #else
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_ENABLED );
+        SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_ENABLED );
         dr_bitfield_tx_channel[i] = DEFAULT_TX_DR_BIT_FIELD_CN_470;
     }
 #endif

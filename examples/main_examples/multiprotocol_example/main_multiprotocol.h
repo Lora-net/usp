@@ -80,7 +80,7 @@
  * @brief Define the delay between two consecutive periodical uplink messages (in seconds) triggered by alarm
  */
 #ifndef PERIODICAL_UPLINK_DELAY_S
-#define PERIODICAL_UPLINK_DELAY_S 600
+#define PERIODICAL_UPLINK_DELAY_S 60
 #endif
 
 /**

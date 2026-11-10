@@ -44,7 +44,7 @@
 
 #include "modem_supervisor_light.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "modem_core.h"
 #include "lorawan_api.h"
 #include "lorawan_alcsync.h"
@@ -520,9 +520,10 @@ uint8_t lorawan_alcsync_service_downlink_handler( lr1_stack_mac_down_data_t* rx_
 
     return MODEM_DOWNLINK_UNCONSUMED;
 }
-bool lorawan_alcsync_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_t* nb_bytes_read_payload_in,
-                                   receive_win_t rx_window, uint8_t* payload_out, uint8_t* payload_out_length,
-                                   const uint8_t max_payload_out_length, uint32_t rx_timestamp_ms )
+bool lorawan_alcsync_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_t payload_in_length,
+                                   uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window, uint8_t* payload_out,
+                                   uint8_t* payload_out_length, const uint8_t max_payload_out_length,
+                                   uint32_t rx_timestamp_ms )
 
 {
     if( is_received_on_multicast_window( rx_window ) == true )
@@ -549,8 +550,16 @@ bool lorawan_alcsync_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_
         return false;
     }
 
+    if( payload_in_length < 1 )
+    {
+        return false;
+    }
     uint8_t cmd_id = payload_in[0];
     if( cmd_id >= ALC_SYNC_NB_CMD_REQ )
+    {
+        return false;
+    }
+    if( payload_in_length < alcsync_req_cmd_size[cmd_id] )
     {
         return false;
     }

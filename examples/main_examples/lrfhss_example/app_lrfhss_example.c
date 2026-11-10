@@ -43,7 +43,7 @@
 #include "app_lrfhss_example.h"
 #include "smtc_rac_api.h"
 
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "LRFHSS-APP"

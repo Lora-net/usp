@@ -87,6 +87,11 @@ extern "C" {
  */
 #define SMTC_MODEM_DM_USER_DATA_LENGTH 8
 
+/**
+ * @brief Maximum number of channel masks
+ */
+#define SMTC_MODEM_MAX_NB_CHANNEL_MASK 6
+
 /*
  * -----------------------------------------------------------------------------
  * --- PUBLIC TYPES ------------------------------------------------------------
@@ -357,6 +362,8 @@ typedef enum smtc_modem_event_type_e
     SMTC_MODEM_EVENT_TEST_MODE,
     SMTC_MODEM_EVENT_REGIONAL_DUTY_CYCLE,
     SMTC_MODEM_EVENT_NO_DOWNLINK_THRESHOLD,  //!< ADR backoff end, or user-defined no RX number threshold
+    SMTC_MODEM_EVENT_RESET_REQUEST,  //!< Modem needs to be reset, for example The LoRaWAN certification could request a
+                                     //!< DUT reset
     SMTC_MODEM_EVENT_MAX,
 } smtc_modem_event_type_t;
 
@@ -522,7 +529,10 @@ typedef struct smtc_modem_event_s
         {
             smtc_modem_event_no_rx_threshold_status_t status;
         } no_downlink;
-
+        struct
+        {
+            uint8_t status;
+        } reset_request;
     } event_data;
 } smtc_modem_event_t;
 
@@ -841,6 +851,36 @@ smtc_modem_return_code_t smtc_modem_get_status( uint8_t stack_id, smtc_modem_sta
  * @retval SMTC_MODEM_RC_BUSY          Modem is currently in test mode
  */
 smtc_modem_return_code_t smtc_modem_get_modem_version( smtc_modem_version_t* firmware_version );
+
+/**
+ * @brief Set the threshold number of uplinks without downlink before reset stack
+ *
+ * @param [in] stack_id Stack identifier
+ * @param [in] no_rx_packet_reset_threshold Threshold number of uplinks without downlink before reset stack
+ *
+ * @return Modem return code as defined in @ref smtc_modem_return_code_t
+ * @retval SMTC_MODEM_RC_OK            Command executed without errors
+ * @retval SMTC_MODEM_RC_INVALID       \p no_rx_packet_reset_threshold is out of the [1:65535] range
+ * @retval SMTC_MODEM_RC_BUSY              Modem is currently in test mode
+ * @retval SMTC_MODEM_RC_INVALID_STACK_ID  Invalid \p stack_id
+ */
+smtc_modem_return_code_t smtc_modem_lorawan_set_no_rx_packet_threshold( uint8_t  stack_id,
+                                                                        uint16_t no_rx_packet_reset_threshold );
+
+/**
+ * @brief Get the threshold number of uplinks without downlink before reset stack
+ *
+ * @param [in] stack_id Stack identifier
+ * @param [out] no_rx_packet_reset_threshold Threshold number of uplinks without downlink before reset stack
+ *
+ * @return Modem return code as defined in @ref smtc_modem_return_code_t
+ * @retval SMTC_MODEM_RC_OK            Command executed without errors
+ * @retval SMTC_MODEM_RC_INVALID       \p no_rx_packet_reset_threshold is NULL
+ * @retval SMTC_MODEM_RC_BUSY              Modem is currently in test mode
+ * @retval SMTC_MODEM_RC_INVALID_STACK_ID  Invalid \p stack_id
+ */
+smtc_modem_return_code_t smtc_modem_lorawan_get_no_rx_packet_threshold( uint8_t   stack_id,
+                                                                        uint16_t* no_rx_packet_reset_threshold );
 
 /**
  * @brief Get the current value of the lost connection counter
@@ -1206,6 +1246,46 @@ smtc_modem_return_code_t smtc_modem_get_nb_trans( uint8_t stack_id, uint8_t* nb_
  * @retval SMTC_MODEM_RC_INVALID_STACK_ID  Invalid \p stack_id
  */
 smtc_modem_return_code_t smtc_modem_get_enabled_datarates( uint8_t stack_id, uint16_t* enabled_datarates_mask );
+
+/**
+ * @brief Get the current enabled channel mask
+ *
+ * @remark Returns a bitfield where each bit represents one channel. The number
+ *         of bytes depends on the region (e.g. 9 bytes for US915/AU915).
+ *
+ * @param [in]  stack_id      Stack identifier
+ * @param [out] channel_mask  Buffer to receive the mask (caller must provide at least 12 bytes)
+ * @param [out] mask_size     Number of valid bytes written to channel_mask
+ *
+ * @return Modem return code as defined in @ref smtc_modem_return_code_t
+ * @retval SMTC_MODEM_RC_OK                Command executed without errors
+ * @retval SMTC_MODEM_RC_INVALID           \p channel_mask or \p mask_size is NULL
+ * @retval SMTC_MODEM_RC_BUSY              Modem is currently in test mode
+ * @retval SMTC_MODEM_RC_INVALID_STACK_ID  Invalid \p stack_id
+ */
+smtc_modem_return_code_t smtc_modem_get_channel_mask( uint8_t stack_id, uint8_t* channel_mask, uint8_t* mask_size );
+
+/**
+ * @brief Set the LoRaWAN uplink channel mask
+ *
+ * @remark Uses the same encoding as the LinkADRReq ChMaskCntl / ChMask fields.
+ *         Up to 6 (ch_mask_cntl, ch_mask) pairs can be provided to configure
+ *         all channel banks in a single call (like a batch of LinkADRReq).
+ *         Must be called before join for ABP with fixed channel plan regions.
+ *
+ * @param [in] stack_id      Stack identifier
+ * @param [in] ch_mask_cntl  Array of channel mask control values (same as LinkADRReq ChMaskCntl)
+ * @param [in] ch_mask       Array of channel masks (same as LinkADRReq ChMask)
+ * @param [in] nb_mask       Number of masks (1 to 6)
+ *
+ * @return Modem return code as defined in @ref smtc_modem_return_code_t
+ * @retval SMTC_MODEM_RC_OK                Command executed without errors
+ * @retval SMTC_MODEM_RC_INVALID           Invalid ch_mask_cntl, ch_mask or nb_mask
+ * @retval SMTC_MODEM_RC_BUSY              Modem is currently in test mode
+ * @retval SMTC_MODEM_RC_INVALID_STACK_ID  Invalid \p stack_id
+ */
+smtc_modem_return_code_t smtc_modem_set_channel_mask( uint8_t stack_id, const uint8_t* ch_mask_cntl,
+                                                      const uint16_t* ch_mask, uint8_t nb_mask );
 
 /**
  * @brief Set the LoRaWan stack ADR ACK limit and ADR ACK delay regarding the ADR fallback if no downlink are received

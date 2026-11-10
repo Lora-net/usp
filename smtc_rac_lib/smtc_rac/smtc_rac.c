@@ -48,7 +48,7 @@
 #include "ralf.h"
 #include "smtc_rac_api.h"
 #include "smtc_rac_version.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_rac_local_func.h"
 #if defined( SX128X )
 #include "ralf_sx128x.h"
@@ -62,6 +62,10 @@
 #include "ralf_lr20xx.h"
 #elif defined( UDP_PF )
 #include "ralf_udp_pf.h"
+#endif
+
+#if USE_LBM
+#include "smtc_modem_utilities.h"
 #endif
 
 /*
@@ -358,7 +362,7 @@ void smtc_rac_init( void )
     smtc_modem_hal_irq_config_radio_irq( rp_radio_irq_callback, &smtc_rac_radio_planner );
     RAC_CORE_LOG_DEBUG( "Radio IRQ callback configured via HAL" );
 
-    RAC_CORE_LOG_INFO( "Setting up radio planner hooks..." );
+    RAC_CORE_LOG_INFO( "Setting up radio planner primary hook..." );
     rp_hook_init( &smtc_rac_radio_planner, RP_HOOK_ID_SUSPEND, ( void ( * )( void* ) )( smtc_rac_empty_callback ),
                   &smtc_rac_radio_planner );
     RAC_CORE_LOG_DEBUG( "Radio planner suspend hook configured" );
@@ -368,6 +372,13 @@ void smtc_rac_init( void )
         smtc_rac_context_private[i] = NULL;
     }
     RAC_CORE_LOG_DEBUG( "Private context array initialized" );
+
+// Inititalize LBM, if present
+#if USE_LBM
+    RAC_CORE_LOG_INFO( "Setting RAC contextes for LBM..." );
+    smtc_modem_set_rp_ralf_contextes( &smtc_rac_radio_planner, &smtc_rac_radio );
+    RAC_CORE_LOG_DEBUG( "Done." );
+#endif
 
     RAC_CORE_LOG_INFO( "===== RAC INITIALIZATION COMPLETE =====" );
     smtc_modem_hal_unprotect_api_call( );

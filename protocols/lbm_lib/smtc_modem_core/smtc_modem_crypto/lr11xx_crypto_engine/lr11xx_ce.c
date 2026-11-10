@@ -47,7 +47,7 @@
 #include "lr11xx_crypto_engine.h"
 #include "modem_core.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 #include <string.h>  //for memset
 
@@ -69,12 +69,12 @@
 /**
  * Maximum size of the message that can be handled by the crypto operations
  */
-#define CRYPTO_MAXMESSAGE_SIZE 256
+#define CRYPTO_MAXMESSAGE_SIZE 255
 
 /**
  * Maximum size of the buffer for crypto operations
  */
-#define CRYPTO_BUFFER_SIZE CRYPTO_MAXMESSAGE_SIZE + MIC_BLOCK_BX_SIZE
+#define CRYPTO_BUFFER_SIZE ( CRYPTO_MAXMESSAGE_SIZE + MIC_BLOCK_BX_SIZE )
 
 /**
  * JoinAccept frame maximum size
@@ -588,7 +588,7 @@ smtc_se_return_code_t smtc_secure_element_store_context( uint8_t stack_id )
 
 smtc_se_return_code_t smtc_secure_element_restore_context( uint8_t stack_id )
 {
-    lr11xx_ce_context_nvm_t ctx;
+    lr11xx_ce_context_nvm_t ctx = { 0 };
     smtc_modem_hal_context_restore( CONTEXT_SECURE_ELEMENT, 0, ( uint8_t* ) &ctx, sizeof( ctx ) );
     if( lr11xx_ce_crc( ( uint8_t* ) &ctx, sizeof( ctx ) - sizeof( ctx.crc ) ) == ctx.crc )
     {

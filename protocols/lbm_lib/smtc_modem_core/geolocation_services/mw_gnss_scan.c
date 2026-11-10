@@ -52,7 +52,7 @@
 #include "modem_supervisor_light.h"
 #include "modem_event_utilities.h"
 #include "smtc_modem_hal.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 #include "smtc_modem_geolocation_api.h"
 #include "radio_planner.h"
 #include "radio_planner_hook_id_defs.h"
@@ -445,16 +445,16 @@ static void mw_gnss_scan_service_on_launch( void* context_callback )
 
     time_ms = smtc_modem_hal_get_time_in_ms( ) + 300; /* 300ms for scheduling delay */
 
-    rp_task_t rp_task        = { 0 };
-    rp_task.hook_id          = mw_gnss_task_obj.rp_hook_id;
-    rp_task.state            = RP_TASK_STATE_ASAP;
-    rp_task.start_time_ms    = time_ms;
-    rp_task.duration_time_ms = ( ( mw_gnss_task_obj.last_scan_mode == LR11XX_GNSS_LAST_SCAN_MODE_ASSISTED )
-                                     ? GNSS_SCAN_DURATION_ASSISTED_S
-                                     : GNSS_SCAN_DURATION_AUTONOMOUS_S ) *
-                               1000;
-    rp_task.type                           = RP_TASK_TYPE_GNSS_SNIFF;
-    rp_task.launch_task_callbacks          = gnss_rp_task_launch;
+    rp_task_t rp_task             = { 0 };
+    rp_task.hook_id               = mw_gnss_task_obj.rp_hook_id;
+    rp_task.state                 = RP_TASK_STATE_ASAP;
+    rp_task.start_time_ms         = time_ms;
+    rp_task.duration_time_ms      = ( ( mw_gnss_task_obj.last_scan_mode == LR11XX_GNSS_LAST_SCAN_MODE_ASSISTED )
+                                          ? GNSS_SCAN_DURATION_ASSISTED_S
+                                          : GNSS_SCAN_DURATION_AUTONOMOUS_S ) *
+                                    1000;
+    rp_task.type                  = RP_TASK_TYPE_GNSS_SNIFF;
+    rp_task.launch_task_callbacks = gnss_rp_task_launch;
     rp_radio_params_t fake_rp_radio_params = { 0 };
     if( rp_task_enqueue( modem_get_rp( ), &rp_task, NULL, 0, &fake_rp_radio_params ) != RP_HOOK_STATUS_OK )
     {
@@ -489,16 +489,16 @@ static void gnss_scan_next( uint32_t delay_s )
     uint32_t time_ms  = smtc_modem_hal_get_time_in_ms( ) + 300; /* 300ms for scheduling delay */
     uint32_t delay_ms = delay_s * 1000;
 
-    rp_task_t rp_task        = { 0 };
-    rp_task.hook_id          = mw_gnss_task_obj.rp_hook_id;
-    rp_task.state            = RP_TASK_STATE_ASAP;
-    rp_task.start_time_ms    = time_ms + delay_ms;
-    rp_task.duration_time_ms = ( ( mw_gnss_task_obj.last_scan_mode == LR11XX_GNSS_LAST_SCAN_MODE_ASSISTED )
-                                     ? GNSS_SCAN_DURATION_ASSISTED_S
-                                     : GNSS_SCAN_DURATION_AUTONOMOUS_S ) *
-                               1000;
-    rp_task.type                           = RP_TASK_TYPE_GNSS_SNIFF;
-    rp_task.launch_task_callbacks          = gnss_rp_task_launch;
+    rp_task_t rp_task             = { 0 };
+    rp_task.hook_id               = mw_gnss_task_obj.rp_hook_id;
+    rp_task.state                 = RP_TASK_STATE_ASAP;
+    rp_task.start_time_ms         = time_ms + delay_ms;
+    rp_task.duration_time_ms      = ( ( mw_gnss_task_obj.last_scan_mode == LR11XX_GNSS_LAST_SCAN_MODE_ASSISTED )
+                                          ? GNSS_SCAN_DURATION_ASSISTED_S
+                                          : GNSS_SCAN_DURATION_AUTONOMOUS_S ) *
+                                    1000;
+    rp_task.type                  = RP_TASK_TYPE_GNSS_SNIFF;
+    rp_task.launch_task_callbacks = gnss_rp_task_launch;
     rp_radio_params_t fake_rp_radio_params = { 0 };
     if( rp_task_enqueue( modem_get_rp( ), &rp_task, NULL, 0, &fake_rp_radio_params ) != RP_HOOK_STATUS_OK )
     {
@@ -687,8 +687,8 @@ static void gnss_rp_task_launch( void* context )
     /* Start scan */
     uint8_t scan_parameters = LR11XX_GNSS_RESULTS_DOPPLER_ENABLE_MASK | LR11XX_GNSS_RESULTS_DOPPLER_MASK |
                               LR11XX_GNSS_RESULTS_DEMODULATE_TIME_MASK;
-    lr11xx_status = lr11xx_gnss_scan( modem_get_radio_ctx( ), LR11XX_GNSS_OPTION_MID_EFFORT, scan_parameters,
-                                      GNSS_RESULT_NB_SVS_MAX );
+    lr11xx_status           = lr11xx_gnss_scan( modem_get_radio_ctx( ), LR11XX_GNSS_OPTION_MID_EFFORT, scan_parameters,
+                                                GNSS_RESULT_NB_SVS_MAX );
     if( lr11xx_status != LR11XX_STATUS_OK )
     {
         SMTC_MODEM_HAL_TRACE_ERROR( "lr11xx_gnss_scan() failed\n" );

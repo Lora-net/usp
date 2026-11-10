@@ -40,7 +40,8 @@
 #include <stdbool.h>  // bool type
 
 #include "modem_event_utilities.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_lbm_code_ptr.h"
+#include "smtc_core_hal_trace.h"
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE CONSTANTS -------------------------------------------------------
@@ -166,7 +167,7 @@ void increment_asynchronous_msgnumber( uint8_t event_type, uint8_t status, uint8
     increment_modem_event_count_and_status( event_type, status );
     modem_event_stack_id[event_type] = stack_id;
 
-    if( *app_callback != NULL )
+    SMTC_MODEM_HAL_PANIC_ON_FAILURE( SMTC_LBM_IS_VALID_FN_PTR( app_callback ) );
     {
         app_callback( );
     }

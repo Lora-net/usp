@@ -60,14 +60,20 @@ extern "C" {
 enum RP_HOOK_ID_DEF
 {
     RP_HOOK_ID_SUSPEND = 0,
+#if defined( USE_SMTC_RAC )
     //@TODO have to find a way to manage it in case of multistack
     RP_HOOK_RAC_VERY_HIGH_PRIORITY,
 
+#if defined( USE_FLRP )
+    RP_HOOK_RAC_FLRS_SYNC,
     RP_HOOK_RAC_FLRP_MAC,
+#endif
 
     RP_HOOK_RAC_HIGH_PRIORITY,
     RP_HOOK_RAC_MEDIUM_PRIORITY,
+#endif
 
+#if defined( USE_LBM )
 #if defined( ADD_LBM_GEOLOCATION )
     RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS_ALMANAC,
     RP_HOOK_ID_DIRECT_RP_ACCESS_GNSS,
@@ -112,13 +118,18 @@ enum RP_HOOK_ID_DEF
 #else
     RP_HOOK_ID_DIRECT_RP_ACCESS,
 #endif
-
+#endif /* USE_LBM */
+#if defined( USE_SMTC_RAC )
     RP_HOOK_RAC_LOW_PRIORITY,
 
+#if defined( USE_FLRP )
     RP_HOOK_RAC_FLRP_WOR_TX,
     RP_HOOK_RAC_FLRP_WOR_RX,
+#endif  // USE_FLRP
 
     RP_HOOK_RAC_VERY_LOW_PRIORITY,
+#endif
+#if defined( USE_LBM )
 #if defined( ADD_BLE )
     RP_HOOK_ID_BLE_RX_BEACON,
     RP_HOOK_ID_BLE_TX_BEACON,
@@ -144,6 +155,9 @@ enum RP_HOOK_ID_DEF
     RP_HOOK_ID_MAX,
 #endif
 #endif  // ADD_RELAY_TX
+#else   // No LBM, need HOOK_ID_MAX properly computed
+    RP_HOOK_ID_MAX,
+#endif  /* USE_LBM */
 
 };
 #endif

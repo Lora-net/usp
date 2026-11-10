@@ -128,10 +128,10 @@ For the parameters exposed directly by the sample application, see
 | FLRC coding rate | `DATA_FLRC_CR` | CR 1/2 |
 | FLRC burst interframe | `DATA_FLRC_MIN_INTERFRAME_DURATION_US` | 700 µs (field range 0 – 25.5 ms) — **must be paired with the PA ramp time; see [Interframe and PA ramp time tuning](#interframe-and-pa-ramp-time-tuning) below** |
 | Channels count | `DATA_FLRC_NB_FREQ` | 3 |
-| Channel hopping step | `DATA_FLRC_CHANNEL_STEP_865MHz_HZ` / `_2GHz4_HZ` | 2.7 MHz / 5 MHz — channel N center = base + step × N; adjust the step to keep all channels within your market's regulatory sub-band |
+| Channel hopping step | `DATA_FLRC_CHANNEL_STEP_SUBGIG_HZ` / `_2GHz4_HZ` | 2.7 MHz / 5 MHz — channel N center = base + step × N; adjust the step to keep all channels within your market's regulatory sub-band |
 | Retry / burst target PER | `DATA_FLRC_BURST_TARGET_PER_PERCENTAGE` | 0 % (0 → retry ≤ 3× burst TOA; 100 → no retry; between → retry only missing packets) |
 | FLRC CRC (crypto off) | `DATA_FLRC_CRC` | 2 bytes |
-| WOR / FLRC frequency | `WOR_865MHz_RF_FREQ_IN_HZ` / `WOR_2GHz4_RF_FREQ_IN_HZ` | 865.1 MHz / 2.412 GHz |
+| WOR / FLRC frequency | `WOR_SUBGIG_RF_FREQ_IN_HZ` / `WOR_2GHz4_RF_FREQ_IN_HZ` | 865.7 MHz / 2.412 GHz |
 | WOR modulation | `WOR_LORA_SPREADING_FACTOR` / `_BANDWIDTH` / `_CODING_RATE` | SF10, BW 500 kHz, CR 4/8 (LI), private syncword |
 | WOR low-power preset | `WOR_LORA_LONG_PREAMBLE_MS` / `RESTART_WOR_RX_DELAY_MS` | preset A (1 s / 950 ms, slave RX ~1.3 %); preset B (100 ms / 80 ms, ~13 %) |
 | WOR slave RX window (CAD) | `WOR_SYM_NB_TIMEOUT` | 6 symbols (≈ 12.3 ms at SF10/BW500) |
@@ -213,7 +213,7 @@ Not yet fixed / not validated:
 - CN470 sub-GHz band: Due to the high level of interference in this band, adaptive channel selection and FLRC BURST retry may cause transfer failures in some circumstances. Disabling both is recommended if the issue occurs.
 - 2.4 GHz band: Best sensitivity requires a PA Ramp Time of 128 µs or higher (the 272 µs default value meets this). Lower values degrade performance. Additional configurations are under investigation.
 - In Phase-3 (Data transfer), each transfer is limited to 255 bursts, and each burst is limited to a maximum of 255 packets or 400 ms of time-on-air. At low datarate the maximum transferable size drops (~1.35 MB worst case vs 16 MB best case) due to the ToA limitation. This 400ms ToA limit can be increased to suit your use case (MAC_BURST_MAX_TIME_MS in smtc_flrp_mac_layer.c).
-- In Phase-2 (Adaptive Link), the default configuration supports dynamically configuring up to 3 channels. Using more requires recompiling both the initiator and slave with matching values for DATA_FLRC_NB_FREQ and the channel-step defines (DATA_FLRC_CHANNEL_STEP_865MHz_HZ / DATA_FLRC_CHANNEL_STEP_2GHz4_HZ). These defines shall be identical on both devices.
+- In Phase-2 (Adaptive Link), the default configuration supports dynamically configuring up to 3 channels. Using more requires recompiling both the initiator and slave with matching values for DATA_FLRC_NB_FREQ and the channel-step defines (DATA_FLRC_CHANNEL_STEP_SUBGIG_HZ / DATA_FLRC_CHANNEL_STEP_2GHz4_HZ). These defines shall be identical on both devices.
 - Disabling Adaptive Link is not recommended, as only predefined-size bursts can be used in that mode.
 
 Features not yet developed:

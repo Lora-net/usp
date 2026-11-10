@@ -144,9 +144,10 @@ uint16_t smtc_real_mask_tx_dr_channel_up_dwell_time_check( smtc_real_t* real );
  * @brief
  *
  * @param real
+ * @param cf_list_type
  * @return cf_list_type_t
  */
-cf_list_type_t smtc_real_cf_list_type_supported( smtc_real_t* real );
+bool smtc_real_is_cf_list_type_supported( smtc_real_t* real, cf_list_type_t cf_list_type );
 
 /**
  * \brief
@@ -216,12 +217,28 @@ int8_t smtc_real_convert_power_cmd( smtc_real_t* real, uint8_t power_cmd, uint8_
 void smtc_real_set_channel_mask( smtc_real_t* real );
 
 /**
+ * \brief  Get the current enabled channel mask and its size in bytes
+ * \param [IN]  real
+ * \param [OUT] channel_mask  Buffer to receive the mask (must be at least *mask_size bytes)
+ * \param [OUT] mask_size     Number of bytes in the mask
+ */
+void smtc_real_get_channel_mask( smtc_real_t* real, uint8_t* channel_mask, uint8_t* mask_size );
+
+/**
  * \brief
  * \remark
  * \param [IN]  none
  * \param [OUT] return
  */
 void smtc_real_init_channel_mask( smtc_real_t* real );
+
+/**
+ * \brief
+ * \remark
+ * \param [IN]  none
+ * \param [OUT] return
+ */
+void smtc_real_init_channel_mask_before_multiple_linkadrreq( smtc_real_t* real );
 
 /**
  * \brief
@@ -303,6 +320,14 @@ status_lorawan_t smtc_real_is_rx_dr_valid( smtc_real_t* real, uint8_t dr );
  * \param [OUT] return
  */
 status_lorawan_t smtc_real_is_tx_dr_valid( smtc_real_t* real, uint8_t dr );
+
+/**
+ * \brief
+ * \remark
+ * \param [IN]  none
+ * \param [OUT] return
+ */
+status_lorawan_t smtc_real_is_tx_dr_range_valid( smtc_real_t* real, uint8_t dr_min, uint8_t dr_max );
 
 /**
  * \brief
@@ -512,7 +537,7 @@ uint8_t smtc_real_get_private_sync_word( smtc_real_t* real );
  * \param [IN]  none
  * \param [OUT] return
  */
-uint8_t smtc_real_get_sync_word( smtc_real_t* real );
+uint8_t smtc_real_get_sync_word( smtc_real_t* real, uint8_t sf );
 
 /**
  * @brief
@@ -688,17 +713,36 @@ uint32_t smtc_real_get_lbt_bw_hz( const smtc_real_t* real );
  * @param datarate
  * @return modulation_type_t
  */
-modulation_type_t smtc_real_get_modulation_type_from_datarate( smtc_real_t* real, uint8_t datarate );
+modulation_type_t smtc_real_get_modulation_type_from_tx_datarate( smtc_real_t* real, uint8_t datarate );
 
 /**
- * @brief Convert LoRaWAN Datarate to LoRa SF and BW
+ * @brief Get the corresponding RF modulation from a Datarate
+ *
+ * @param real
+ * @param datarate
+ * @return modulation_type_t
+ */
+modulation_type_t smtc_real_get_modulation_type_from_rx_datarate( smtc_real_t* real, uint8_t datarate );
+
+/**
+ * @brief Convert LoRaWAN TX Datarate to LoRa SF and BW
  *
  * @param real
  * @param in_dr
  * @param out_sf
  * @param out_bw
  */
-void smtc_real_lora_dr_to_sf_bw( smtc_real_t* real, uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw );
+void smtc_real_lora_tx_dr_to_sf_bw( smtc_real_t* real, uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw );
+
+/**
+ * @brief Convert LoRaWAN RX Datarate to LoRa SF and BW
+ *
+ * @param real
+ * @param in_dr
+ * @param out_sf
+ * @param out_bw
+ */
+void smtc_real_lora_rx_dr_to_sf_bw( smtc_real_t* real, uint8_t in_dr, uint8_t* out_sf, lr1mac_bandwidth_t* out_bw );
 
 /**
  * @brief Convert LoRaWAN Datarate to FSK bitrate
@@ -771,12 +815,14 @@ bool smtc_real_get_current_enabled_frequency_list_for_a_datarate( smtc_real_t* r
 lr1mac_version_t smtc_real_get_regional_parameters_version( void );
 
 /**
- * @brief
+ * @brief Get symbol duration in us
  *
- * @param
+ * @param real
+ * @param datarate
+ * @param direction_frame
  * @return
  */
-uint32_t smtc_real_get_symbol_duration_us( smtc_real_t* real, uint8_t datarate );
+uint32_t smtc_real_get_symbol_duration_us( smtc_real_t* real, uint8_t datarate, direction_frame_t direction_frame );
 
 /**
  * @brief

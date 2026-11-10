@@ -131,8 +131,9 @@ void lorawan_fmp_package_service_get_id( uint8_t* pkt_id, uint8_t* pkt_version, 
  * @return true     successfully parsed
  * @return false    parsing error
  */
-bool lorawan_fmp_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_t* nb_bytes_read_payload_in,
-                               receive_win_t rx_window, uint8_t* payload_out, uint8_t* payload_out_length,
+bool lorawan_fmp_mpa_injector( uint8_t stack_id, uint8_t* payload_in, uint8_t payload_in_length,
+                               uint8_t* nb_bytes_read_payload_in, receive_win_t rx_window,
+                               uint8_t* payload_out, uint8_t* payload_out_length,
                                const uint8_t max_payload_out_length, uint32_t rx_timestamp_ms );
 #ifdef __cplusplus
 }

@@ -40,10 +40,8 @@
 #include <stdbool.h>  // bool type
 #include <string.h>
 
-#include "smtc_modem_api.h"
-#include "smtc_modem_utilities.h"
 
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "PORTING"
@@ -69,50 +67,55 @@
 #endif
 
 #if defined( LR20XX )
-    #ifndef LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE
-        #define LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE 0       //Define this macro to execute SPI endurance test, then set LR20XX_PORTING_TEST_SPI_REGMEM_NB_ITERATIONS, set LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES
-    #endif
+#ifndef LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE
+#define LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE \
+    0  // Define this macro to execute SPI endurance test, then set LR20XX_PORTING_TEST_SPI_REGMEM_NB_ITERATIONS, set
+       // LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES
+#endif
 
-    #if(LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE != 0)
-        #include "lr20xx_regmem.h"
-        #include "lr20xx_radio_fifo.h"
-        #include "lr20xx_status.h"
-        #include "lr20xx_hal.h"
+#if ( LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE != 0 )
+#include "lr20xx_regmem.h"
+#include "lr20xx_radio_fifo.h"
+#include "lr20xx_status.h"
+#include "lr20xx_hal.h"
 
-        /* Number of full write/read/verify sweeps; 0 means the maximum with a uint32_t (reload watchdog periodically). */
-        #ifndef LR20XX_PORTING_TEST_SPI_REGMEM_NB_ITERATIONS
-            #define LR20XX_PORTING_TEST_SPI_REGMEM_NB_ITERATIONS ( 10000u )  //  <---Set the number of iterations - 
-        #endif
+/* Number of full write/read/verify sweeps; 0 means the maximum with a uint32_t (reload watchdog periodically). */
+#ifndef LR20XX_PORTING_TEST_SPI_REGMEM_NB_ITERATIONS
+#define LR20XX_PORTING_TEST_SPI_REGMEM_NB_ITERATIONS ( 10000u )  //  <---Set the number of iterations -
+#endif
 
-        #ifndef LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES
-            /* Small region (bytes) for FIFO + regmem endurance; must be a multiple of 4 (see LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES). */
-            #define LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES ( 1024u )  //  <---Set the length in bytes of the memory to write (SPI Write and Read memory is done by 128 Bytes bloc)
-        #endif
+#ifndef LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES
+/* Small region (bytes) for FIFO + regmem endurance; must be a multiple of 4 (see
+ * LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES). */
+#define LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES \
+    ( 1024u )  //  <---Set the length in bytes of the memory to write (SPI Write and Read memory is done by 128 Bytes
+               //  bloc)
+#endif
 
-        #define LR20XX_PORTING_TEST_SPI_RX_TX_COMMON_ADRESS ( 0x00804000UL )       //We are using the same adress to write and read in > Adress of the TxFifo used usualy
-        
+#define LR20XX_PORTING_TEST_SPI_RX_TX_COMMON_ADRESS \
+    ( 0x00804000UL )  // We are using the same adress to write and read in > Adress of the TxFifo used usualy
 
-        /* lr20xx_regmem_write_regmem32 / read work in 32-bit words: span must be a whole number of words (multiple of 4 bytes). */
-        #if ( LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES % 4u ) != 0u
-            #error "LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES must be a multiple of 4"
-        #endif
+/* lr20xx_regmem_write_regmem32 / read work in 32-bit words: span must be a whole number of words (multiple of 4 bytes).
+ */
+#if ( LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES % 4u ) != 0u
+#error "LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES must be a multiple of 4"
+#endif
 
-        
-
-        #ifndef LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_INDEX_OFFSET
-            /* Word-index offset for pattern B vs A: same stride 0x11111111 but shifted (idx + offset). */
-            #define LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_INDEX_OFFSET ( 256u )
-        #endif
-        #ifndef LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_A_WORD
-            /* Pattern A: 0x00000000, 0x11111111, 0x22222222, … at word indices 0, 1, 2, … */
-            #define LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_A_WORD( idx ) ( ( uint32_t )( idx ) * 0x11111111UL )
-        #endif
-        #ifndef LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_WORD
-            /* Pattern B: same stride as A, starting from index offset (default LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_INDEX_OFFSET). */
-            #define LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_WORD( idx )                                               \
-            ( ( ( uint32_t )( idx ) + LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_INDEX_OFFSET ) * 0x11111111UL )
-        #endif
-    #endif /* LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE */
+#ifndef LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_INDEX_OFFSET
+/* Word-index offset for pattern B vs A: same stride 0x11111111 but shifted (idx + offset). */
+#define LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_INDEX_OFFSET ( 256u )
+#endif
+#ifndef LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_A_WORD
+/* Pattern A: 0x00000000, 0x11111111, 0x22222222, … at word indices 0, 1, 2, … */
+#define LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_A_WORD( idx ) ( ( uint32_t ) ( idx ) * 0x11111111UL )
+#endif
+#ifndef LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_WORD
+/* Pattern B: same stride as A, starting from index offset (default
+ * LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_INDEX_OFFSET). */
+#define LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_WORD( idx ) \
+    ( ( ( uint32_t ) ( idx ) + LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_INDEX_OFFSET ) * 0x11111111UL )
+#endif
+#endif /* LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE */
 #endif /* LR20XX */
 
 /*
@@ -138,7 +141,7 @@
 #elif defined( LR2022 )
 #define LR20XX_FW_VERSION_MAJOR 0x02
 #define LR20XX_FW_VERSION_MINOR 0x00
-#elif defined( LR2012 ) 
+#elif defined( LR2012 )
 #define LR20XX_FW_VERSION_MAJOR 0x02
 #define LR20XX_FW_VERSION_MINOR 0x00
 #endif
@@ -269,7 +272,7 @@ static ralf_params_lora_t tx_lora_param = { .sync_word                       = S
                                             .pkt_params.crc_is_on            = true,
                                             .pkt_params.invert_iq_is_on      = false,
                                             .pkt_params.preamble_len_in_symb = 8 };
-#if( ENABLE_TEST_FLASH != 0 )
+#if ( ENABLE_TEST_FLASH != 0 )
 static const char* name_context_type[] = { "MODEM", "KEY_MODEM",      "LORAWAN_STACK",
                                            "FUOTA", "SECURE_ELEMENT", "STORE_AND_FORWARD" };
 #endif
@@ -288,9 +291,10 @@ static return_code_test_t test_get_time_in_s( void );
 static return_code_test_t test_get_time_in_ms( void );
 
 static bool porting_test_spi( void );
-#if(LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE != 0)
+#if ( LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE != 0 )
 static bool porting_test_spi_regmem_endurance( void );
-static bool porting_test_spi_regmem_one_sweep( const void* context, bool use_pattern_b, uint32_t base_addr, uint32_t size_bytes );
+static bool porting_test_spi_regmem_one_sweep( const void* context, bool use_pattern_b, uint32_t base_addr,
+                                               uint32_t size_bytes );
 #endif
 static bool porting_test_radio_irq( void );
 static bool porting_test_get_time( void );
@@ -302,7 +306,7 @@ static bool porting_test_config_rx_radio( void );
 static bool porting_test_config_tx_radio( void );
 static bool porting_test_sleep_ms( void );
 static bool porting_test_timer_irq_low_power( void );
-#if( ENABLE_TEST_FLASH != 0 )
+#if ( ENABLE_TEST_FLASH != 0 )
 static bool test_context_store_restore( modem_context_type_t context_type );
 static bool porting_test_flash( void );
 #endif
@@ -331,7 +335,7 @@ int main( void )
     // Tests
     SMTC_HAL_TRACE_MSG( "\n\n\nPORTING_TESTS example is starting \n\n" );
 
-#if( ENABLE_TEST_FLASH == 0 )
+#if ( ENABLE_TEST_FLASH == 0 )
 
     ret = porting_test_spi( );
     if( ret == false )
@@ -339,13 +343,13 @@ int main( void )
         return 1;
     }
 
-    #if( LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE != 0 )
+#if ( LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE != 0 )
     ret = porting_test_spi_regmem_endurance( );
     if( ret == false )
     {
         return 1;
     }
-    #endif
+#endif
 
     ret = porting_test_radio_irq( );
     if( ret == false )
@@ -529,16 +533,18 @@ static bool porting_test_spi( void )
     return true;
 }
 
-#if(LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE != 0)
+#if ( LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE != 0 )
 
 /**
- * @brief Write then read back @p size_bytes at @p base_addr using lr20xx_regmem_*_extended (chunks ≤ @ref LR20XX_REGMEM_MAX_WRITE_READ_WORDS words). Regmem sweep on @ref LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES (default 24) at @ref LR20XX_PORTING_TEST_SPI_RX_TX_COMMON_ADRESS.
+ * @brief Write then read back @p size_bytes at @p base_addr using lr20xx_regmem_*_extended (chunks ≤ @ref
+ * LR20XX_REGMEM_MAX_WRITE_READ_WORDS words). Regmem sweep on @ref LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES (default
+ * 24) at @ref LR20XX_PORTING_TEST_SPI_RX_TX_COMMON_ADRESS.
  *
  * Pattern A or B is defined for every word index by LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_A_WORD( idx ) /
  * LR20XX_PORTING_TEST_SPI_REGMEM_PATTERN_B_WORD( idx ).
  */
 static bool porting_test_spi_regmem_one_sweep( const void* context, bool use_pattern_b, uint32_t base_addr,
-                                                  uint32_t size_bytes )
+                                               uint32_t size_bytes )
 {
     const uint32_t total_words = size_bytes / 4u;
 
@@ -577,8 +583,8 @@ static bool porting_test_spi_regmem_one_sweep( const void* context, bool use_pat
 
         if( lr20xx_regmem_write_regmem32( context, addr, wr, chunk_words ) != LR20XX_STATUS_OK )
         {
-            PORTING_TEST_MSG_NOK( " lr20xx_regmem_write_regmem32 @ 0x%08lX words=%u \n",
-                                  ( unsigned long ) addr, ( unsigned ) chunk_words );
+            PORTING_TEST_MSG_NOK( " lr20xx_regmem_write_regmem32 @ 0x%08lX words=%u \n", ( unsigned long ) addr,
+                                  ( unsigned ) chunk_words );
             return false;
         }
         offset_words += chunk_words;
@@ -603,8 +609,8 @@ static bool porting_test_spi_regmem_one_sweep( const void* context, bool use_pat
 
         if( lr20xx_regmem_read_regmem32( context, addr, rd, chunk_words ) != LR20XX_STATUS_OK )
         {
-            PORTING_TEST_MSG_NOK( " lr20xx_regmem_read_regmem32 @ 0x%08lX words=%u \n",
-                                  ( unsigned long ) addr, ( unsigned ) chunk_words );
+            PORTING_TEST_MSG_NOK( " lr20xx_regmem_read_regmem32 @ 0x%08lX words=%u \n", ( unsigned long ) addr,
+                                  ( unsigned ) chunk_words );
             return false;
         }
 
@@ -622,9 +628,8 @@ static bool porting_test_spi_regmem_one_sweep( const void* context, bool use_pat
             }
             if( rd[i] != expect )
             {
-                PORTING_TEST_MSG_NOK( " Mismatch @ 0x%08lX idx=%lu exp=0x%08lX rd=0x%08lX \n",
-                                      ( unsigned long ) addr, ( unsigned long ) idx, ( unsigned long ) expect,
-                                      ( unsigned long ) rd[i] );
+                PORTING_TEST_MSG_NOK( " Mismatch @ 0x%08lX idx=%lu exp=0x%08lX rd=0x%08lX \n", ( unsigned long ) addr,
+                                      ( unsigned long ) idx, ( unsigned long ) expect, ( unsigned long ) rd[i] );
                 return false;
             }
         }
@@ -634,7 +639,6 @@ static bool porting_test_spi_regmem_one_sweep( const void* context, bool use_pat
 
     return true;
 }
-
 
 /**
  * @brief Endurance test: alternate two full-size patterns (LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES) on the region.
@@ -656,36 +660,34 @@ static bool porting_test_spi_regmem_endurance( void )
         return ret;
     }
 
-    const void* const context = modem_radio.ral.context;
-    uint32_t max_iter = LR20XX_PORTING_TEST_SPI_REGMEM_NB_ITERATIONS;
+    const void* const context  = modem_radio.ral.context;
+    uint32_t          max_iter = LR20XX_PORTING_TEST_SPI_REGMEM_NB_ITERATIONS;
 
-    if(max_iter == 0u)
+    if( max_iter == 0u )
     {
         max_iter = UINT32_MAX;
     }
 
-    for(uint32_t iter = 0u; iter < max_iter; iter++)
+    for( uint32_t iter = 0u; iter < max_iter; iter++ )
     {
         const bool use_pattern_b = ( ( iter & 1u ) != 0u );
 
-        if( !porting_test_spi_regmem_one_sweep( context, use_pattern_b, LR20XX_PORTING_TEST_SPI_RX_TX_COMMON_ADRESS, LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES ) )
+        if( !porting_test_spi_regmem_one_sweep( context, use_pattern_b, LR20XX_PORTING_TEST_SPI_RX_TX_COMMON_ADRESS,
+                                                LR20XX_PORTING_TEST_SPI_REGMEM_SIZE_BYTES ) )
         {
             PORTING_TEST_MSG_WARN( " Endurance failed at iteration %lu \n", ( unsigned long ) iter );
             return false;
         }
 
-        if(( ( iter % 1000u ) == 0u ) || (iter == (max_iter-1u)))
+        if( ( ( iter % 1000u ) == 0u ) || ( iter == ( max_iter - 1u ) ) )
         {
             PORTING_TEST_MSG_WARN( " regmem endurance: iteration %lu \n", ( unsigned long ) iter );
         }
     }
 
-    
-
     PORTING_TEST_MSG_OK( );
     return true;
 }
-
 
 #endif /* defined( LR20XX_PORTING_TEST_SPI_REGMEM_ENDURANCE ) */
 
@@ -1633,7 +1635,7 @@ static bool porting_test_timer_irq_low_power( void )
  * -----------------------------------------------------------------------------
  * --- FLASH PORTING TESTS -----------------------------------------------------
  */
-#if( ENABLE_TEST_FLASH != 0 )
+#if ( ENABLE_TEST_FLASH != 0 )
 
 /**
  * @brief Test read/write context in flash

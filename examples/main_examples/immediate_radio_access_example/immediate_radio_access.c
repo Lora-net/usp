@@ -50,7 +50,7 @@
 #include "smtc_rac_api.h"
 #include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "IMMEDIATE-RADIO"
@@ -159,8 +159,8 @@ static ral_status_t set_sleep( void )
 {
     void*                           radio_driver_context = smtc_rac_get_radio_driver_context( );
     const lr20xx_system_sleep_cfg_t radio_sleep_cfg      = {
-             .is_ram_retention_enabled = true,
-             .is_clk_32k_enabled       = false,
+        .is_ram_retention_enabled = true,
+        .is_clk_32k_enabled       = false,
     };
 
     return ( ral_status_t ) lr20xx_system_set_sleep_mode( radio_driver_context, &radio_sleep_cfg, 0 );

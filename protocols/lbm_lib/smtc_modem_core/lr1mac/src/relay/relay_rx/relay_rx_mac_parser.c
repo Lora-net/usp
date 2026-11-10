@@ -42,7 +42,7 @@
 #include "relay_rx_api.h"
 #include "relay_real.h"
 #include "smtc_real.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -289,7 +289,7 @@ static bool relay_mac_update_config_relay_parser( lr1_stack_mac_t* lr1_mac, rela
                 SMTC_MODEM_HAL_TRACE_PRINTF( "Second channel DR: Invalid value\n" );
                 ack_ret = RELAY_CLEAR_BIT( ack_ret, RELAY_CID_CONFIG_RELAY_ACK_BIT_SECOND_CH_DR );
             }
-            else if( smtc_real_get_modulation_type_from_datarate( lr1_mac->real, config.channel_cfg[1].dr ) != LORA )
+            else if( smtc_real_get_modulation_type_from_rx_datarate( lr1_mac->real, config.channel_cfg[1].dr ) != LORA )
             {
                 SMTC_MODEM_HAL_TRACE_PRINTF( "Second channel DR: Non LORA\n" );
                 ack_ret = RELAY_CLEAR_BIT( ack_ret, RELAY_CID_CONFIG_RELAY_ACK_BIT_SECOND_CH_DR );
@@ -578,7 +578,7 @@ static uint32_t get_symbol_time_ms( smtc_real_t* real, uint8_t dr )
 {
     uint8_t            sf;
     lr1mac_bandwidth_t bw;
-    smtc_real_lora_dr_to_sf_bw( real, dr, &sf, &bw );
+    smtc_real_lora_rx_dr_to_sf_bw( real, dr, &sf, &bw );
 
     uint32_t toa_symb = 1 << sf;
 

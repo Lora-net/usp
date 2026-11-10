@@ -132,10 +132,39 @@ int hal_spi_transfer( const uint8_t* tx_buf, uint8_t* rx_buf, size_t len )
     tr.delay_usecs   = 0;
     tr.speed_hz      = SPI_SPEED_HZ;
     tr.bits_per_word = 8;
-    // No cs_change needed since we use SPI_NO_CS mode
 
     return ioctl( spi_fd, SPI_IOC_MESSAGE( 1 ), &tr );
 }
+
+int hal_spi_nss_pulse( uint16_t duration_us )
+{
+    struct spi_ioc_transfer tr;
+    memset( &tr, 0, sizeof( tr ) );
+
+    // This relies on two spidev behaviours that are documented but may not be
+    // implemented by all SPI controller drivers:
+    //
+    //   1. len=0 with delay_usecs>0: the spidev documentation states that
+    //      "this delay can be the only protocol effect, if the buffer length
+    //      is zero", meaning NSS is asserted low, held for delay_usecs with
+    //      no clock activity, then released high.
+    //
+    //   2. delay_usecs: the delay is inserted after the last bit (or
+    //      immediately if len=0) before NSS is released.
+    //
+    // If the target platform SPI driver does not support these behaviours,
+    // this function must be replaced with a direct GPIO toggle of the NSS pin
+    // for the required duration.
+    tr.tx_buf        = 0;
+    tr.rx_buf        = 0;
+    tr.len           = 0;
+    tr.delay_usecs   = duration_us;
+    tr.speed_hz      = SPI_SPEED_HZ;
+    tr.bits_per_word = 8;
+
+    return ioctl( spi_fd, SPI_IOC_MESSAGE( 1 ), &tr );
+}
+
 
 /*
  * -----------------------------------------------------------------------------

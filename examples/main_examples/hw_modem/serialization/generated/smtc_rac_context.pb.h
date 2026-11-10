@@ -473,7 +473,18 @@ typedef struct _flrp_rx_payload_stats_pb_t
     int32_t                                                         rssi_mean;
     uint32_t                                                        exchange_phase_success_mask;
     flrp_rx_payload_stats_pb_t_last_burst_missed_packets_bitfield_t last_burst_missed_packets_bitfield;
+    uint32_t                                                        frequency_hz;
+    int32_t                                                         frequency_offset_hz;
 } flrp_rx_payload_stats_pb_t;
+
+/* Maps smtc_flrp_burst_tx_stats_t burst statistics (smtc_flrp_api.h) */
+typedef struct _flrp_tx_payload_stats_pb_t
+{
+    uint32_t payload_bit_rate_bps;
+    uint32_t burst_bit_rate_bps;
+    uint32_t frequency_hz;
+    int32_t  frequency_offset_hz;
+} flrp_tx_payload_stats_pb_t;
 
 typedef PB_BYTES_ARRAY_T( 8 ) flrp_stats_tx_pb_t_dest_addr_t;
 /* Last FLRP TX callback snapshot (CMD_FLRP_GET_STATS) */
@@ -482,6 +493,10 @@ typedef struct _flrp_stats_tx_pb_t
     smtc_flrp_return_code_pb_t     flrp_return_code;
     bool                           send_successfully;
     flrp_stats_tx_pb_t_dest_addr_t dest_addr; /* Up to SMTC_FLRP_EUI_LENGTH (8) */
+    bool                           has_payload_stats;
+    flrp_tx_payload_stats_pb_t     payload_stats;
+    int32_t                        wor_rssi; /* WOR or WOR ACK RSSI in dBm (smtc_flrp_wor_rx_stats_t.rssi) */
+    int32_t                        wor_snr;  /* WOR or WOR ACK SNR in dB (smtc_flrp_wor_rx_stats_t.snr) */
 } flrp_stats_tx_pb_t;
 
 typedef PB_BYTES_ARRAY_T( 8 ) flrp_stats_rx_pb_t_src_addr_t;
@@ -516,38 +531,6 @@ typedef struct _flrp_api_config_pb_t
     uint32_t                       crystal_error;  /* Crystal error parameter for WOR (see smtc_flrp_init) */
 } flrp_api_config_pb_t;
 
-typedef PB_BYTES_ARRAY_T( 4 ) flrc_protocol_radio_config_pb_t_sync_word_1_t;
-typedef PB_BYTES_ARRAY_T( 4 ) flrc_protocol_radio_config_pb_t_sync_word_2_t;
-typedef PB_BYTES_ARRAY_T( 4 ) flrc_protocol_radio_config_pb_t_sync_word_3_t;
-/* Request message for CMD_SET_FLRC_BURST_PARAMS command
- Sets radio configuration for FLRP protocol (maps to smtc_flrp_radio_config_t) */
-typedef struct _flrc_protocol_radio_config_pb_t
-{
-    uint32_t                                      frequencies_hz[16]; /* Up to 16 channel frequencies in Hz */
-    uint32_t                                      nb_frequencies;     /* Number of active frequencies */
-    uint32_t                                      default_channel;    /* Default channel index */
-    ral_flrc_raw_bit_rate_pb_t                    raw_bit_rate;       /* Raw bit rate */
-    ral_flrc_cr_pb_t                              cr;                 /* Coding rate */
-    ral_flrc_pulse_shape_pb_t                     pulse_shape;        /* Pulse shaping filter */
-    ral_flrc_preamble_length_pb_t                 preamble_len;       /* Preamble length */
-    ral_flrc_sync_word_len_pb_t                   sync_word_len;      /* Sync word length */
-    ral_flrc_tx_syncword_pb_t                     tx_syncword_index;  /* TX sync word index */
-    ral_flrc_rx_match_sync_word_pb_t              rx_match_sync_word; /* RX sync word match */
-    bool                                          pld_is_fix;      /* Fixed (true) or variable (false) payload length */
-    ral_flrc_crc_type_pb_t                        crc_type;        /* CRC type */
-    int32_t                                       tx_power_in_dbm; /* TX power in dBm */
-    uint32_t                                      interframe_delay_us;  /* Delay between frames in burst */
-    uint32_t                                      start_burst_delay_us; /* Delay before starting a burst */
-    uint32_t                                      start_ack_delay_us;   /* Delay before starting a burst ack */
-    uint32_t                                      adaptive_link_interframe_delay_us; /* Delay for FLRC REQ/ACK frames */
-    uint32_t                                      burst_target_per; /* Max PER to consider burst valid (%) */
-    uint32_t                                      crc_seed;         /* FLRC CRC seed (developer / test API) */
-    uint32_t                                      crc_polynomial;   /* FLRC CRC polynomial (developer / test API) */
-    flrc_protocol_radio_config_pb_t_sync_word_1_t sync_word_1;      /* Sync word 0 (up to 4 bytes) */
-    flrc_protocol_radio_config_pb_t_sync_word_2_t sync_word_2;      /* Sync word 1 (up to 4 bytes) */
-    flrc_protocol_radio_config_pb_t_sync_word_3_t sync_word_3;      /* Sync word 2 (up to 4 bytes) */
-} flrc_protocol_radio_config_pb_t;
-
 typedef PB_BYTES_ARRAY_T( 4 ) flrp_flrc_advanced_radio_config_pb_t_sync_word_1_t;
 typedef PB_BYTES_ARRAY_T( 4 ) flrp_flrc_advanced_radio_config_pb_t_sync_word_2_t;
 typedef PB_BYTES_ARRAY_T( 4 ) flrp_flrc_advanced_radio_config_pb_t_sync_word_3_t;
@@ -568,6 +551,7 @@ typedef struct _flrp_flrc_advanced_radio_config_pb_t
         sync_word_1; /* sync_word[0], up to SMTC_FLRP_SIZE_SYNC_WORD_MAX */
     flrp_flrc_advanced_radio_config_pb_t_sync_word_2_t sync_word_2;
     flrp_flrc_advanced_radio_config_pb_t_sync_word_3_t sync_word_3;
+    bool                                               frequency_offset_enabled;
 } flrp_flrc_advanced_radio_config_pb_t;
 
 /* Mirrors smtc_flrp_flrc_radio_config_t (smtc_flrp_api.h) */
@@ -623,17 +607,13 @@ typedef struct _flrp_initiate_transmission_pb_t
     uint32_t             payload_size;
 } flrp_initiate_transmission_pb_t;
 
-/* Response message for CMD_GET_FLRC_BURST_STATS command
- Returns statistics only. Full payload is retrieved via NHM_CMD_USP_GET_RESULTS. */
-typedef struct _flrc_burst_stats_pb_t
+/* Request for CMD_FLRP_INITIATE_RECEPTION: com config + expected payload byte count (data in flrp_buffer) */
+typedef struct _flrp_initiate_reception_pb_t
 {
-    uint32_t rx_data_size;                /* Size of received data in bytes */
-    uint32_t nb_packets_received;         /* Number of packets received successfully */
-    uint32_t nb_packets_crc_error;        /* Number of packets with CRC errors */
-    int32_t  rssi_mean;                   /* Mean RSSI value in dBm */
-    uint32_t radio_access_id;             /* Radio access ID for NHM_CMD_USP_GET_RESULTS */
-    uint32_t exchange_phase_success_mask; /* Bit mask of smtc_flrp_exchange_phase_success_bit_t */
-} flrc_burst_stats_pb_t;
+    bool                 has_com_config;
+    flrp_com_config_pb_t com_config;
+    uint32_t             payload_size;
+} flrp_initiate_reception_pb_t;
 
 #ifdef __cplusplus
 extern "C" {
@@ -801,15 +781,6 @@ extern "C" {
 
 #define flrp_api_config_pb_t_freq_plan_ENUMTYPE smtc_flrp_frequency_plan_pb_t
 
-#define flrc_protocol_radio_config_pb_t_raw_bit_rate_ENUMTYPE ral_flrc_raw_bit_rate_pb_t
-#define flrc_protocol_radio_config_pb_t_cr_ENUMTYPE ral_flrc_cr_pb_t
-#define flrc_protocol_radio_config_pb_t_pulse_shape_ENUMTYPE ral_flrc_pulse_shape_pb_t
-#define flrc_protocol_radio_config_pb_t_preamble_len_ENUMTYPE ral_flrc_preamble_length_pb_t
-#define flrc_protocol_radio_config_pb_t_sync_word_len_ENUMTYPE ral_flrc_sync_word_len_pb_t
-#define flrc_protocol_radio_config_pb_t_tx_syncword_index_ENUMTYPE ral_flrc_tx_syncword_pb_t
-#define flrc_protocol_radio_config_pb_t_rx_match_sync_word_ENUMTYPE ral_flrc_rx_match_sync_word_pb_t
-#define flrc_protocol_radio_config_pb_t_crc_type_ENUMTYPE ral_flrc_crc_type_pb_t
-
 #define flrp_flrc_advanced_radio_config_pb_t_cr_ENUMTYPE ral_flrc_cr_pb_t
 #define flrp_flrc_advanced_radio_config_pb_t_pulse_shape_ENUMTYPE ral_flrc_pulse_shape_pb_t
 #define flrp_flrc_advanced_radio_config_pb_t_preamble_len_ENUMTYPE ral_flrc_preamble_length_pb_t
@@ -900,23 +871,15 @@ extern "C" {
     }
 #define flrp_rx_payload_stats_pb_t_init_default \
     {                                           \
-        0, 0, 0, 0, 0, 0, 0,                    \
-        {                                       \
-            0,                                  \
-            {                                   \
-                0                               \
-            }                                   \
-        }                                       \
+        0, 0, 0, 0, 0, 0, 0, { 0, { 0 } }, 0, 0 \
     }
-#define flrp_stats_tx_pb_t_init_default     \
-    {                                       \
-        _smtc_flrp_return_code_pb_t_MIN, 0, \
-        {                                   \
-            0,                              \
-            {                               \
-                0                           \
-            }                               \
-        }                                   \
+#define flrp_tx_payload_stats_pb_t_init_default \
+    {                                           \
+        0, 0, 0, 0                              \
+    }
+#define flrp_stats_tx_pb_t_init_default                                                                        \
+    {                                                                                                          \
+        _smtc_flrp_return_code_pb_t_MIN, 0, { 0, { 0 } }, false, flrp_tx_payload_stats_pb_t_init_default, 0, 0 \
     }
 #define flrp_stats_rx_pb_t_init_default                                                                        \
     {                                                                                                          \
@@ -930,30 +893,11 @@ extern "C" {
     {                                                          \
         { 0, { 0 } }, 0, _smtc_flrp_frequency_plan_pb_t_MIN, 0 \
     }
-#define flrc_protocol_radio_config_pb_t_init_default                                                                 \
-    {                                                                                                                \
-        { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, 0, _ral_flrc_raw_bit_rate_pb_t_MIN,                   \
-            _ral_flrc_cr_pb_t_MIN, _ral_flrc_pulse_shape_pb_t_MIN, _ral_flrc_preamble_length_pb_t_MIN,               \
-            _ral_flrc_sync_word_len_pb_t_MIN, _ral_flrc_tx_syncword_pb_t_MIN, _ral_flrc_rx_match_sync_word_pb_t_MIN, \
-            0, _ral_flrc_crc_type_pb_t_MIN, 0, 0, 0, 0, 0, 0, 0, 0, { 0, { 0 } }, { 0, { 0 } },                      \
-        {                                                                                                            \
-            0,                                                                                                       \
-            {                                                                                                        \
-                0                                                                                                    \
-            }                                                                                                        \
-        }                                                                                                            \
-    }
 #define flrp_flrc_advanced_radio_config_pb_t_init_default                                                            \
     {                                                                                                                \
         _ral_flrc_cr_pb_t_MIN, _ral_flrc_pulse_shape_pb_t_MIN, _ral_flrc_preamble_length_pb_t_MIN,                   \
             _ral_flrc_sync_word_len_pb_t_MIN, _ral_flrc_tx_syncword_pb_t_MIN, _ral_flrc_rx_match_sync_word_pb_t_MIN, \
-            0, _ral_flrc_crc_type_pb_t_MIN, 0, 0, { 0, { 0 } }, { 0, { 0 } },                                        \
-        {                                                                                                            \
-            0,                                                                                                       \
-            {                                                                                                        \
-                0                                                                                                    \
-            }                                                                                                        \
-        }                                                                                                            \
+            0, _ral_flrc_crc_type_pb_t_MIN, 0, 0, { 0, { 0 } }, { 0, { 0 } }, { 0, { 0 } }, 0                        \
     }
 #define flrp_flrc_radio_config_pb_t_init_default                                                                    \
     {                                                                                                               \
@@ -976,9 +920,9 @@ extern "C" {
     {                                                \
         false, flrp_com_config_pb_t_init_default, 0  \
     }
-#define flrc_burst_stats_pb_t_init_default \
-    {                                      \
-        0, 0, 0, 0, 0, 0                   \
+#define flrp_initiate_reception_pb_t_init_default   \
+    {                                               \
+        false, flrp_com_config_pb_t_init_default, 0 \
     }
 #define rttof_params_pb_t_init_zero       \
     {                                     \
@@ -1051,25 +995,17 @@ extern "C" {
         _rac_transaction_status_pb_t_MIN, _smtc_rac_return_code_pb_t_MIN, false, smtc_rac_data_result_pb_t_init_zero, \
             _rp_status_pb_t_MIN, 0                                                                                    \
     }
-#define flrp_rx_payload_stats_pb_t_init_zero \
-    {                                        \
-        0, 0, 0, 0, 0, 0, 0,                 \
-        {                                    \
-            0,                               \
-            {                                \
-                0                            \
-            }                                \
-        }                                    \
+#define flrp_rx_payload_stats_pb_t_init_zero    \
+    {                                           \
+        0, 0, 0, 0, 0, 0, 0, { 0, { 0 } }, 0, 0 \
     }
-#define flrp_stats_tx_pb_t_init_zero        \
-    {                                       \
-        _smtc_flrp_return_code_pb_t_MIN, 0, \
-        {                                   \
-            0,                              \
-            {                               \
-                0                           \
-            }                               \
-        }                                   \
+#define flrp_tx_payload_stats_pb_t_init_zero \
+    {                                        \
+        0, 0, 0, 0                           \
+    }
+#define flrp_stats_tx_pb_t_init_zero                                                                        \
+    {                                                                                                       \
+        _smtc_flrp_return_code_pb_t_MIN, 0, { 0, { 0 } }, false, flrp_tx_payload_stats_pb_t_init_zero, 0, 0 \
     }
 #define flrp_stats_rx_pb_t_init_zero                                                                        \
     {                                                                                                       \
@@ -1083,30 +1019,11 @@ extern "C" {
     {                                                          \
         { 0, { 0 } }, 0, _smtc_flrp_frequency_plan_pb_t_MIN, 0 \
     }
-#define flrc_protocol_radio_config_pb_t_init_zero                                                                    \
-    {                                                                                                                \
-        { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, 0, _ral_flrc_raw_bit_rate_pb_t_MIN,                   \
-            _ral_flrc_cr_pb_t_MIN, _ral_flrc_pulse_shape_pb_t_MIN, _ral_flrc_preamble_length_pb_t_MIN,               \
-            _ral_flrc_sync_word_len_pb_t_MIN, _ral_flrc_tx_syncword_pb_t_MIN, _ral_flrc_rx_match_sync_word_pb_t_MIN, \
-            0, _ral_flrc_crc_type_pb_t_MIN, 0, 0, 0, 0, 0, 0, 0, 0, { 0, { 0 } }, { 0, { 0 } },                      \
-        {                                                                                                            \
-            0,                                                                                                       \
-            {                                                                                                        \
-                0                                                                                                    \
-            }                                                                                                        \
-        }                                                                                                            \
-    }
 #define flrp_flrc_advanced_radio_config_pb_t_init_zero                                                               \
     {                                                                                                                \
         _ral_flrc_cr_pb_t_MIN, _ral_flrc_pulse_shape_pb_t_MIN, _ral_flrc_preamble_length_pb_t_MIN,                   \
             _ral_flrc_sync_word_len_pb_t_MIN, _ral_flrc_tx_syncword_pb_t_MIN, _ral_flrc_rx_match_sync_word_pb_t_MIN, \
-            0, _ral_flrc_crc_type_pb_t_MIN, 0, 0, { 0, { 0 } }, { 0, { 0 } },                                        \
-        {                                                                                                            \
-            0,                                                                                                       \
-            {                                                                                                        \
-                0                                                                                                    \
-            }                                                                                                        \
-        }                                                                                                            \
+            0, _ral_flrc_crc_type_pb_t_MIN, 0, 0, { 0, { 0 } }, { 0, { 0 } }, { 0, { 0 } }, 0                        \
     }
 #define flrp_flrc_radio_config_pb_t_init_zero                                                                       \
     {                                                                                                               \
@@ -1129,9 +1046,9 @@ extern "C" {
     {                                             \
         false, flrp_com_config_pb_t_init_zero, 0  \
     }
-#define flrc_burst_stats_pb_t_init_zero \
-    {                                   \
-        0, 0, 0, 0, 0, 0                \
+#define flrp_initiate_reception_pb_t_init_zero   \
+    {                                            \
+        false, flrp_com_config_pb_t_init_zero, 0 \
     }
 
 /* Field tags (for use in manual encoding/decoding) */
@@ -1235,9 +1152,18 @@ extern "C" {
 #define flrp_rx_payload_stats_pb_t_rssi_mean_tag 6
 #define flrp_rx_payload_stats_pb_t_exchange_phase_success_mask_tag 7
 #define flrp_rx_payload_stats_pb_t_last_burst_missed_packets_bitfield_tag 8
+#define flrp_rx_payload_stats_pb_t_frequency_hz_tag 9
+#define flrp_rx_payload_stats_pb_t_frequency_offset_hz_tag 10
+#define flrp_tx_payload_stats_pb_t_payload_bit_rate_bps_tag 1
+#define flrp_tx_payload_stats_pb_t_burst_bit_rate_bps_tag 2
+#define flrp_tx_payload_stats_pb_t_frequency_hz_tag 3
+#define flrp_tx_payload_stats_pb_t_frequency_offset_hz_tag 4
 #define flrp_stats_tx_pb_t_flrp_return_code_tag 1
 #define flrp_stats_tx_pb_t_send_successfully_tag 2
 #define flrp_stats_tx_pb_t_dest_addr_tag 3
+#define flrp_stats_tx_pb_t_payload_stats_tag 4
+#define flrp_stats_tx_pb_t_wor_rssi_tag 5
+#define flrp_stats_tx_pb_t_wor_snr_tag 6
 #define flrp_stats_rx_pb_t_flrp_return_code_tag 1
 #define flrp_stats_rx_pb_t_payload_size_tag 2
 #define flrp_stats_rx_pb_t_src_addr_tag 3
@@ -1250,29 +1176,6 @@ extern "C" {
 #define flrp_api_config_pb_t_crypto_enabled_tag 2
 #define flrp_api_config_pb_t_freq_plan_tag 3
 #define flrp_api_config_pb_t_crystal_error_tag 4
-#define flrc_protocol_radio_config_pb_t_frequencies_hz_tag 1
-#define flrc_protocol_radio_config_pb_t_nb_frequencies_tag 2
-#define flrc_protocol_radio_config_pb_t_default_channel_tag 3
-#define flrc_protocol_radio_config_pb_t_raw_bit_rate_tag 4
-#define flrc_protocol_radio_config_pb_t_cr_tag 5
-#define flrc_protocol_radio_config_pb_t_pulse_shape_tag 6
-#define flrc_protocol_radio_config_pb_t_preamble_len_tag 7
-#define flrc_protocol_radio_config_pb_t_sync_word_len_tag 8
-#define flrc_protocol_radio_config_pb_t_tx_syncword_index_tag 9
-#define flrc_protocol_radio_config_pb_t_rx_match_sync_word_tag 10
-#define flrc_protocol_radio_config_pb_t_pld_is_fix_tag 11
-#define flrc_protocol_radio_config_pb_t_crc_type_tag 12
-#define flrc_protocol_radio_config_pb_t_tx_power_in_dbm_tag 13
-#define flrc_protocol_radio_config_pb_t_interframe_delay_us_tag 14
-#define flrc_protocol_radio_config_pb_t_start_burst_delay_us_tag 15
-#define flrc_protocol_radio_config_pb_t_start_ack_delay_us_tag 16
-#define flrc_protocol_radio_config_pb_t_adaptive_link_interframe_delay_us_tag 17
-#define flrc_protocol_radio_config_pb_t_burst_target_per_tag 18
-#define flrc_protocol_radio_config_pb_t_crc_seed_tag 19
-#define flrc_protocol_radio_config_pb_t_crc_polynomial_tag 20
-#define flrc_protocol_radio_config_pb_t_sync_word_1_tag 21
-#define flrc_protocol_radio_config_pb_t_sync_word_2_tag 22
-#define flrc_protocol_radio_config_pb_t_sync_word_3_tag 23
 #define flrp_flrc_advanced_radio_config_pb_t_cr_tag 1
 #define flrp_flrc_advanced_radio_config_pb_t_pulse_shape_tag 2
 #define flrp_flrc_advanced_radio_config_pb_t_preamble_len_tag 3
@@ -1286,6 +1189,7 @@ extern "C" {
 #define flrp_flrc_advanced_radio_config_pb_t_sync_word_1_tag 11
 #define flrp_flrc_advanced_radio_config_pb_t_sync_word_2_tag 12
 #define flrp_flrc_advanced_radio_config_pb_t_sync_word_3_tag 13
+#define flrp_flrc_advanced_radio_config_pb_t_frequency_offset_enabled_tag 14
 #define flrp_flrc_radio_config_pb_t_channels_freq_hz_tag 1
 #define flrp_flrc_radio_config_pb_t_nb_channels_tag 2
 #define flrp_flrc_radio_config_pb_t_default_channel_tag 3
@@ -1309,12 +1213,8 @@ extern "C" {
 #define flrp_com_config_pb_t_link_adaptation_mode_tag 4
 #define flrp_initiate_transmission_pb_t_com_config_tag 1
 #define flrp_initiate_transmission_pb_t_payload_size_tag 2
-#define flrc_burst_stats_pb_t_rx_data_size_tag 1
-#define flrc_burst_stats_pb_t_nb_packets_received_tag 2
-#define flrc_burst_stats_pb_t_nb_packets_crc_error_tag 3
-#define flrc_burst_stats_pb_t_rssi_mean_tag 4
-#define flrc_burst_stats_pb_t_radio_access_id_tag 5
-#define flrc_burst_stats_pb_t_exchange_phase_success_mask_tag 6
+#define flrp_initiate_reception_pb_t_com_config_tag 1
+#define flrp_initiate_reception_pb_t_payload_size_tag 2
 
 /* Struct field encoding specification for nanopb */
 #define rttof_params_pb_t_FIELDLIST( X, a )                     \
@@ -1475,24 +1375,38 @@ extern "C" {
 #define rac_results_pb_t_DEFAULT NULL
 #define rac_results_pb_t_results_MSGTYPE smtc_rac_data_result_pb_t
 
-#define flrp_rx_payload_stats_pb_t_FIELDLIST( X, a )                 \
-    X( a, STATIC, SINGULAR, UINT32, nb_packets_received_ok, 1 )      \
-    X( a, STATIC, SINGULAR, UINT32, nb_packets_check_error, 2 )      \
-    X( a, STATIC, SINGULAR, UINT32, nb_packets_received_nok, 3 )     \
-    X( a, STATIC, SINGULAR, UINT32, nb_packets_expected, 4 )         \
-    X( a, STATIC, SINGULAR, UINT32, payload_size_expected, 5 )       \
-    X( a, STATIC, SINGULAR, INT32, rssi_mean, 6 )                    \
-    X( a, STATIC, SINGULAR, UINT32, exchange_phase_success_mask, 7 ) \
-    X( a, STATIC, SINGULAR, BYTES, last_burst_missed_packets_bitfield, 8 )
+#define flrp_rx_payload_stats_pb_t_FIELDLIST( X, a )                       \
+    X( a, STATIC, SINGULAR, UINT32, nb_packets_received_ok, 1 )            \
+    X( a, STATIC, SINGULAR, UINT32, nb_packets_check_error, 2 )            \
+    X( a, STATIC, SINGULAR, UINT32, nb_packets_received_nok, 3 )           \
+    X( a, STATIC, SINGULAR, UINT32, nb_packets_expected, 4 )               \
+    X( a, STATIC, SINGULAR, UINT32, payload_size_expected, 5 )             \
+    X( a, STATIC, SINGULAR, INT32, rssi_mean, 6 )                          \
+    X( a, STATIC, SINGULAR, UINT32, exchange_phase_success_mask, 7 )       \
+    X( a, STATIC, SINGULAR, BYTES, last_burst_missed_packets_bitfield, 8 ) \
+    X( a, STATIC, SINGULAR, UINT32, frequency_hz, 9 )                      \
+    X( a, STATIC, SINGULAR, INT32, frequency_offset_hz, 10 )
 #define flrp_rx_payload_stats_pb_t_CALLBACK NULL
 #define flrp_rx_payload_stats_pb_t_DEFAULT NULL
+
+#define flrp_tx_payload_stats_pb_t_FIELDLIST( X, a )          \
+    X( a, STATIC, SINGULAR, UINT32, payload_bit_rate_bps, 1 ) \
+    X( a, STATIC, SINGULAR, UINT32, burst_bit_rate_bps, 2 )   \
+    X( a, STATIC, SINGULAR, UINT32, frequency_hz, 3 )         \
+    X( a, STATIC, SINGULAR, INT32, frequency_offset_hz, 4 )
+#define flrp_tx_payload_stats_pb_t_CALLBACK NULL
+#define flrp_tx_payload_stats_pb_t_DEFAULT NULL
 
 #define flrp_stats_tx_pb_t_FIELDLIST( X, a )             \
     X( a, STATIC, SINGULAR, UENUM, flrp_return_code, 1 ) \
     X( a, STATIC, SINGULAR, BOOL, send_successfully, 2 ) \
-    X( a, STATIC, SINGULAR, BYTES, dest_addr, 3 )
+    X( a, STATIC, SINGULAR, BYTES, dest_addr, 3 )        \
+    X( a, STATIC, OPTIONAL, MESSAGE, payload_stats, 4 )  \
+    X( a, STATIC, SINGULAR, INT32, wor_rssi, 5 )         \
+    X( a, STATIC, SINGULAR, INT32, wor_snr, 6 )
 #define flrp_stats_tx_pb_t_CALLBACK NULL
 #define flrp_stats_tx_pb_t_DEFAULT NULL
+#define flrp_stats_tx_pb_t_payload_stats_MSGTYPE flrp_tx_payload_stats_pb_t
 
 #define flrp_stats_rx_pb_t_FIELDLIST( X, a )             \
     X( a, STATIC, SINGULAR, UENUM, flrp_return_code, 1 ) \
@@ -1521,33 +1435,6 @@ extern "C" {
 #define flrp_api_config_pb_t_CALLBACK NULL
 #define flrp_api_config_pb_t_DEFAULT NULL
 
-#define flrc_protocol_radio_config_pb_t_FIELDLIST( X, a )                   \
-    X( a, STATIC, FIXARRAY, UINT32, frequencies_hz, 1 )                     \
-    X( a, STATIC, SINGULAR, UINT32, nb_frequencies, 2 )                     \
-    X( a, STATIC, SINGULAR, UINT32, default_channel, 3 )                    \
-    X( a, STATIC, SINGULAR, UENUM, raw_bit_rate, 4 )                        \
-    X( a, STATIC, SINGULAR, UENUM, cr, 5 )                                  \
-    X( a, STATIC, SINGULAR, UENUM, pulse_shape, 6 )                         \
-    X( a, STATIC, SINGULAR, UENUM, preamble_len, 7 )                        \
-    X( a, STATIC, SINGULAR, UENUM, sync_word_len, 8 )                       \
-    X( a, STATIC, SINGULAR, UENUM, tx_syncword_index, 9 )                   \
-    X( a, STATIC, SINGULAR, UENUM, rx_match_sync_word, 10 )                 \
-    X( a, STATIC, SINGULAR, BOOL, pld_is_fix, 11 )                          \
-    X( a, STATIC, SINGULAR, UENUM, crc_type, 12 )                           \
-    X( a, STATIC, SINGULAR, INT32, tx_power_in_dbm, 13 )                    \
-    X( a, STATIC, SINGULAR, UINT32, interframe_delay_us, 14 )               \
-    X( a, STATIC, SINGULAR, UINT32, start_burst_delay_us, 15 )              \
-    X( a, STATIC, SINGULAR, UINT32, start_ack_delay_us, 16 )                \
-    X( a, STATIC, SINGULAR, UINT32, adaptive_link_interframe_delay_us, 17 ) \
-    X( a, STATIC, SINGULAR, UINT32, burst_target_per, 18 )                  \
-    X( a, STATIC, SINGULAR, UINT32, crc_seed, 19 )                          \
-    X( a, STATIC, SINGULAR, UINT32, crc_polynomial, 20 )                    \
-    X( a, STATIC, SINGULAR, BYTES, sync_word_1, 21 )                        \
-    X( a, STATIC, SINGULAR, BYTES, sync_word_2, 22 )                        \
-    X( a, STATIC, SINGULAR, BYTES, sync_word_3, 23 )
-#define flrc_protocol_radio_config_pb_t_CALLBACK NULL
-#define flrc_protocol_radio_config_pb_t_DEFAULT NULL
-
 #define flrp_flrc_advanced_radio_config_pb_t_FIELDLIST( X, a ) \
     X( a, STATIC, SINGULAR, UENUM, cr, 1 )                     \
     X( a, STATIC, SINGULAR, UENUM, pulse_shape, 2 )            \
@@ -1561,7 +1448,8 @@ extern "C" {
     X( a, STATIC, SINGULAR, UINT32, crc_polynomial, 10 )       \
     X( a, STATIC, SINGULAR, BYTES, sync_word_1, 11 )           \
     X( a, STATIC, SINGULAR, BYTES, sync_word_2, 12 )           \
-    X( a, STATIC, SINGULAR, BYTES, sync_word_3, 13 )
+    X( a, STATIC, SINGULAR, BYTES, sync_word_3, 13 )           \
+    X( a, STATIC, SINGULAR, BOOL, frequency_offset_enabled, 14 )
 #define flrp_flrc_advanced_radio_config_pb_t_CALLBACK NULL
 #define flrp_flrc_advanced_radio_config_pb_t_DEFAULT NULL
 
@@ -1612,15 +1500,12 @@ extern "C" {
 #define flrp_initiate_transmission_pb_t_DEFAULT NULL
 #define flrp_initiate_transmission_pb_t_com_config_MSGTYPE flrp_com_config_pb_t
 
-#define flrc_burst_stats_pb_t_FIELDLIST( X, a )               \
-    X( a, STATIC, SINGULAR, UINT32, rx_data_size, 1 )         \
-    X( a, STATIC, SINGULAR, UINT32, nb_packets_received, 2 )  \
-    X( a, STATIC, SINGULAR, UINT32, nb_packets_crc_error, 3 ) \
-    X( a, STATIC, SINGULAR, INT32, rssi_mean, 4 )             \
-    X( a, STATIC, SINGULAR, UINT32, radio_access_id, 5 )      \
-    X( a, STATIC, SINGULAR, UINT32, exchange_phase_success_mask, 6 )
-#define flrc_burst_stats_pb_t_CALLBACK NULL
-#define flrc_burst_stats_pb_t_DEFAULT NULL
+#define flrp_initiate_reception_pb_t_FIELDLIST( X, a ) \
+    X( a, STATIC, OPTIONAL, MESSAGE, com_config, 1 )   \
+    X( a, STATIC, SINGULAR, UINT32, payload_size, 2 )
+#define flrp_initiate_reception_pb_t_CALLBACK NULL
+#define flrp_initiate_reception_pb_t_DEFAULT NULL
+#define flrp_initiate_reception_pb_t_com_config_MSGTYPE flrp_com_config_pb_t
 
 extern const pb_msgdesc_t rttof_params_pb_t_msg;
 extern const pb_msgdesc_t ranging_result_pb_t_msg;
@@ -1637,18 +1522,18 @@ extern const pb_msgdesc_t smtc_rac_request_pb_t_msg;
 extern const pb_msgdesc_t rac_get_results_request_pb_t_msg;
 extern const pb_msgdesc_t rac_results_pb_t_msg;
 extern const pb_msgdesc_t flrp_rx_payload_stats_pb_t_msg;
+extern const pb_msgdesc_t flrp_tx_payload_stats_pb_t_msg;
 extern const pb_msgdesc_t flrp_stats_tx_pb_t_msg;
 extern const pb_msgdesc_t flrp_stats_rx_pb_t_msg;
 extern const pb_msgdesc_t flrp_stats_pb_t_msg;
 extern const pb_msgdesc_t flrp_api_config_pb_t_msg;
-extern const pb_msgdesc_t flrc_protocol_radio_config_pb_t_msg;
 extern const pb_msgdesc_t flrp_flrc_advanced_radio_config_pb_t_msg;
 extern const pb_msgdesc_t flrp_flrc_radio_config_pb_t_msg;
 extern const pb_msgdesc_t flrp_wor_radio_config_pb_t_msg;
 extern const pb_msgdesc_t flrp_radio_config_pb_t_msg;
 extern const pb_msgdesc_t flrp_com_config_pb_t_msg;
 extern const pb_msgdesc_t flrp_initiate_transmission_pb_t_msg;
-extern const pb_msgdesc_t flrc_burst_stats_pb_t_msg;
+extern const pb_msgdesc_t flrp_initiate_reception_pb_t_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define rttof_params_pb_t_fields &rttof_params_pb_t_msg
@@ -1666,33 +1551,33 @@ extern const pb_msgdesc_t flrc_burst_stats_pb_t_msg;
 #define rac_get_results_request_pb_t_fields &rac_get_results_request_pb_t_msg
 #define rac_results_pb_t_fields &rac_results_pb_t_msg
 #define flrp_rx_payload_stats_pb_t_fields &flrp_rx_payload_stats_pb_t_msg
+#define flrp_tx_payload_stats_pb_t_fields &flrp_tx_payload_stats_pb_t_msg
 #define flrp_stats_tx_pb_t_fields &flrp_stats_tx_pb_t_msg
 #define flrp_stats_rx_pb_t_fields &flrp_stats_rx_pb_t_msg
 #define flrp_stats_pb_t_fields &flrp_stats_pb_t_msg
 #define flrp_api_config_pb_t_fields &flrp_api_config_pb_t_msg
-#define flrc_protocol_radio_config_pb_t_fields &flrc_protocol_radio_config_pb_t_msg
 #define flrp_flrc_advanced_radio_config_pb_t_fields &flrp_flrc_advanced_radio_config_pb_t_msg
 #define flrp_flrc_radio_config_pb_t_fields &flrp_flrc_radio_config_pb_t_msg
 #define flrp_wor_radio_config_pb_t_fields &flrp_wor_radio_config_pb_t_msg
 #define flrp_radio_config_pb_t_fields &flrp_radio_config_pb_t_msg
 #define flrp_com_config_pb_t_fields &flrp_com_config_pb_t_msg
 #define flrp_initiate_transmission_pb_t_fields &flrp_initiate_transmission_pb_t_msg
-#define flrc_burst_stats_pb_t_fields &flrc_burst_stats_pb_t_msg
+#define flrp_initiate_reception_pb_t_fields &flrp_initiate_reception_pb_t_msg
 
 /* Maximum encoded size of messages (where known) */
 #define SMTC_RAC_CONTEXT_PB_H_MAX_SIZE smtc_rac_request_pb_t_size
-#define flrc_burst_stats_pb_t_size 41
-#define flrc_protocol_radio_config_pb_t_size 205
 #define flrp_api_config_pb_t_size 20
 #define flrp_com_config_pb_t_size 20
-#define flrp_flrc_advanced_radio_config_pb_t_size 46
+#define flrp_flrc_advanced_radio_config_pb_t_size 48
 #define flrp_flrc_radio_config_pb_t_size 151
+#define flrp_initiate_reception_pb_t_size 28
 #define flrp_initiate_transmission_pb_t_size 28
 #define flrp_radio_config_pb_t_size 200
-#define flrp_rx_payload_stats_pb_t_size 81
-#define flrp_stats_pb_t_size 141
-#define flrp_stats_rx_pb_t_size 123
-#define flrp_stats_tx_pb_t_size 14
+#define flrp_rx_payload_stats_pb_t_size 98
+#define flrp_stats_pb_t_size 212
+#define flrp_stats_rx_pb_t_size 140
+#define flrp_stats_tx_pb_t_size 67
+#define flrp_tx_payload_stats_pb_t_size 29
 #define flrp_wor_radio_config_pb_t_size 21
 #define rac_get_results_request_pb_t_size 6
 #define rac_radio_flrc_params_pb_t_size 102

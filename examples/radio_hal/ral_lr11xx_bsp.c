@@ -44,7 +44,7 @@
 #include "lr11xx_pa_pwr_cfg.h"
 #include "smtc_hal_mcu.h"
 #include "radio_utilities.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 #include "lr11xx_radio.h"
 
 /*

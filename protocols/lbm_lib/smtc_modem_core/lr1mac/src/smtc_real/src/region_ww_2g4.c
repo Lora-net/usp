@@ -41,7 +41,7 @@
 #include "smtc_modem_hal.h"
 #include "region_ww_2g4_defs.h"
 #include "region_ww_2g4.h"
-#include "smtc_modem_hal_dbg_trace.h"
+#include "smtc_core_hal_trace.h"
 
 /*
  * -----------------------------------------------------------------------------
@@ -50,15 +50,15 @@
 #define real_ctx real->real_ctx
 #define real_const real->real_const
 
-#define tx_frequency_channel real->region.ww_2g4.tx_frequency_channel
-#define rx1_frequency_channel real->region.ww_2g4.rx1_frequency_channel
-#define dr_bitfield_tx_channel real->region.ww_2g4.dr_bitfield_tx_channel
-#define channel_index_enabled real->region.ww_2g4.channel_index_enabled
-#define dr_distribution_init real->region.ww_2g4.dr_distribution_init
-#define dr_distribution real->region.ww_2g4.dr_distribution
-#define join_dr_distribution real->region.ww_2g4.join_dr_distribution
-#define custom_dr_distribution_init real->region.ww_2g4.custom_dr_distribution_init
-#define unwrapped_channel_mask real->region.ww_2g4.unwrapped_channel_mask
+#define tx_frequency_channel real->region.ww2g4.tx_frequency_channel
+#define rx1_frequency_channel real->region.ww2g4.rx1_frequency_channel
+#define dr_bitfield_tx_channel real->region.ww2g4.dr_bitfield_tx_channel
+#define tx_channel_index_enabled real->region.ww2g4.tx_channel_index_enabled
+#define dr_distribution_init real->region.ww2g4.dr_distribution_init
+#define dr_distribution real->region.ww2g4.dr_distribution
+#define join_dr_distribution real->region.ww2g4.join_dr_distribution
+#define custom_dr_distribution_init real->region.ww2g4.custom_dr_distribution_init
+#define unwrapped_channel_mask real->region.ww2g4.unwrapped_channel_mask
 
 /*
  * -----------------------------------------------------------------------------
@@ -87,41 +87,43 @@
 
 void region_ww_2g4_init( smtc_real_t* real )
 {
-    real_const.const_number_of_tx_channel         = NUMBER_OF_CHANNEL_WW_2G4;
-    real_const.const_number_of_rx_channel         = NUMBER_OF_CHANNEL_WW_2G4;
-    real_const.const_number_of_boot_tx_channel    = NUMBER_OF_BOOT_TX_CHANNEL_WW_2G4;
-    real_const.const_number_of_channel_bank       = BANK_MAX_WW_2G4;
-    real_const.const_join_accept_delay1           = JOIN_ACCEPT_DELAY1_WW_2G4;
-    real_const.const_received_delay1              = RECEIVE_DELAY1_WW_2G4;
-    real_const.const_tx_power_dbm                 = TX_POWER_EIRP_WW_2G4 - 2;  // EIRP to ERP
-    real_const.const_max_tx_power_idx             = MAX_TX_POWER_IDX_WW_2G4;
-    real_const.const_adr_ack_limit                = ADR_ACK_LIMIT_WW_2G4;
-    real_const.const_adr_ack_delay                = ADR_ACK_DELAY_WW_2G4;
-    real_const.const_datarate_offsets             = &datarate_offsets_ww_2g4[0][0];
-    real_const.const_datarate_backoff             = &datarate_backoff_ww_2g4[0];
-    real_const.const_ack_timeout                  = ACK_TIMEOUT_WW_2G4;
-    real_const.const_freq_min                     = FREQMIN_WW_2G4;
-    real_const.const_freq_max                     = FREQMAX_WW_2G4;
-    real_const.const_rx2_freq                     = RX2_FREQ_WW_2G4;
-    real_const.const_frequency_factor             = FREQUENCY_FACTOR_WW_2G4;
-    real_const.const_rx2_dr_init                  = RX2DR_INIT_WW_2G4;
-    real_const.const_sync_word_private            = SYNC_WORD_PRIVATE_WW_2G4;
-    real_const.const_sync_word_public             = SYNC_WORD_PUBLIC_WW_2G4;
-    real_const.const_min_tx_dr                    = MIN_DR_WW_2G4;
-    real_const.const_max_tx_dr                    = MAX_DR_WW_2G4;
-    real_const.const_min_tx_dr_limit              = MIN_TX_DR_LIMIT_WW_2G4;
-    real_const.const_min_rx_dr                    = MIN_DR_WW_2G4;
-    real_const.const_max_rx_dr                    = MAX_DR_WW_2G4;
-    real_const.const_number_rx1_dr_offset         = NUMBER_RX1_DR_OFFSET_WW_2G4;
-    real_const.const_dr_bitfield                  = DR_BITFIELD_SUPPORTED_WW_2G4;
-    real_const.const_default_tx_dr_bit_field      = DEFAULT_TX_DR_BIT_FIELD_WW_2G4;
-    real_const.const_number_of_tx_dr              = NUMBER_OF_TX_DR_WW_2G4;
-    real_const.const_tx_param_setup_req_supported = TX_PARAM_SETUP_REQ_SUPPORTED_WW_2G4;
-    real_const.const_new_channel_req_supported    = NEW_CHANNEL_REQ_SUPPORTED_WW_2G4;
-    real_const.const_dtc_supported                = DTC_SUPPORTED_WW_2G4;
-    real_const.const_lbt_supported                = LBT_SUPPORTED_WW_2G4;
-    real_const.const_max_payload_m                = &M_ww_2g4[0];
-    real_const.const_coding_rate                  = RAL_LORA_CR_LI_4_8;
+    real_const.const_number_of_tx_channel            = NUMBER_OF_CHANNEL_WW_2G4;
+    real_const.const_number_of_rx_channel            = NUMBER_OF_CHANNEL_WW_2G4;
+    real_const.const_number_of_boot_tx_channel       = NUMBER_OF_BOOT_TX_CHANNEL_WW_2G4;
+    real_const.const_number_of_channel_banks         = BANK_MAX_WW2G4;
+    real_const.const_join_accept_delay1              = JOIN_ACCEPT_DELAY1_WW_2G4;
+    real_const.const_received_delay1                 = RECEIVE_DELAY1_WW_2G4;
+    real_const.const_tx_power_dbm                    = TX_POWER_EIRP_WW_2G4 - 2;  // EIRP to ERP
+    real_const.const_max_tx_power_idx                = MAX_TX_POWER_IDX_WW_2G4;
+    real_const.const_adr_ack_limit                   = ADR_ACK_LIMIT_WW_2G4;
+    real_const.const_adr_ack_delay                   = ADR_ACK_DELAY_WW_2G4;
+    real_const.const_datarate_offsets                = &datarate_offsets_ww_2g4[0][0];
+    real_const.const_datarate_backoff                = &datarate_backoff_ww_2g4[0];
+    real_const.const_ack_timeout                     = ACK_TIMEOUT_WW_2G4;
+    real_const.const_freq_min                        = FREQMIN_WW_2G4;
+    real_const.const_freq_max                        = FREQMAX_WW_2G4;
+    real_const.const_rx2_freq                        = RX2_FREQ_WW_2G4;
+    real_const.const_frequency_factor                = FREQUENCY_FACTOR_WW_2G4;
+    real_const.const_rx2_dr_init                     = RX2DR_INIT_WW_2G4;
+    real_const.const_sync_word_private               = SYNC_WORD_PRIVATE_WW_2G4;
+    real_const.const_sync_word_public                = SYNC_WORD_PUBLIC_WW_2G4;
+    real_const.const_min_tx_dr                       = MIN_DR_WW_2G4;
+    real_const.const_max_tx_dr                       = MAX_DR_WW_2G4;
+    real_const.const_min_tx_dr_limit                 = MIN_TX_DR_LIMIT_WW_2G4;
+    real_const.const_min_rx_dr                       = MIN_DR_WW_2G4;
+    real_const.const_max_rx_dr                       = MAX_DR_WW_2G4;
+    real_const.const_number_rx1_dr_offset            = NUMBER_RX1_DR_OFFSET_WW_2G4;
+    real_const.const_tx_dr_bitfield                  = DR_BITFIELD_SUPPORTED_WW_2G4;
+    real_const.const_rx_dr_bitfield                  = DR_BITFIELD_SUPPORTED_WW_2G4;
+    real_const.const_default_tx_dr_bit_field         = DEFAULT_TX_DR_BIT_FIELD_WW_2G4;
+    real_const.const_number_of_tx_dr                 = NUMBER_OF_TX_DR_WW_2G4;
+    real_const.const_tx_param_setup_req_supported    = TX_PARAM_SETUP_REQ_SUPPORTED_WW_2G4;
+    real_const.const_new_channel_req_supported       = NEW_CHANNEL_REQ_SUPPORTED_WW_2G4;
+    real_const.const_dtc_supported                   = DTC_SUPPORTED_WW_2G4;
+    real_const.const_lbt_supported                   = LBT_SUPPORTED_WW_2G4;
+    real_const.const_tx_max_payload_m_dwell_time_off = &M_ww_2g4[0];
+    real_const.const_rx_max_payload_m_dwell_time_off = &M_ww_2g4[0];
+    real_const.const_coding_rate                     = RAL_LORA_CR_LI_4_8;
 #if defined( WW_2G4_SINGLE_DATARATE )
     real_const.const_mobile_lowpower_dr_distri  = &DEFAULT_DR_DISTRIBUTION_WW_2G4[0];
     real_const.const_mobile_longrange_dr_distri = &DEFAULT_DR_DISTRIBUTION_WW_2G4[0];
@@ -137,7 +139,7 @@ void region_ww_2g4_init( smtc_real_t* real )
 
     real_ctx.tx_frequency_channel_ctx        = &tx_frequency_channel[0];
     real_ctx.rx1_frequency_channel_ctx       = &rx1_frequency_channel[0];
-    real_ctx.channel_index_enabled_ctx       = &channel_index_enabled[0];
+    real_ctx.tx_channel_index_enabled_ctx    = &tx_channel_index_enabled[0];
     real_ctx.unwrapped_channel_mask_ctx      = &unwrapped_channel_mask[0];
     real_ctx.dr_bitfield_tx_channel_ctx      = &dr_bitfield_tx_channel[0];
     real_ctx.dr_distribution_init_ctx        = &dr_distribution_init[0];
@@ -161,7 +163,7 @@ void region_ww_2g4_config( smtc_real_t* real )
     {
         tx_frequency_channel[i]  = 0;
         rx1_frequency_channel[i] = 0;
-        SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_DISABLED );
+        SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_DISABLED );
 
         // Enable default datarate for all channels
         dr_bitfield_tx_channel[i] = real_const.const_default_tx_dr_bit_field;
@@ -172,29 +174,29 @@ void region_ww_2g4_config( smtc_real_t* real )
     {
         tx_frequency_channel[i]  = default_freq_ww_2g4[i];
         rx1_frequency_channel[i] = default_freq_ww_2g4[i];
-        SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_ENABLED );
+        SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_ENABLED );
     }
 
     // Enable all unwrapped channels
-    memset( &unwrapped_channel_mask[0], 0xFF, BANK_MAX_WW_2G4 );
+    memset( &unwrapped_channel_mask[0], 0xFF, BANK_MAX_WW2G4 );
 }
 
 status_lorawan_t region_ww_2g4_get_join_next_channel( smtc_real_t* real, uint8_t tx_data_rate,
-                                                     uint32_t* out_tx_frequency, uint32_t* out_rx1_frequency,
-                                                     uint8_t* active_channel_nb )
+                                                      uint32_t* out_tx_frequency, uint32_t* out_rx1_frequency,
+                                                      uint8_t* active_channel_nb )
 {
     return region_ww_2g4_get_next_channel( real, tx_data_rate, out_tx_frequency, out_rx1_frequency, active_channel_nb );
 }
 
 status_lorawan_t region_ww_2g4_get_next_channel( smtc_real_t* real, uint8_t tx_data_rate, uint32_t* out_tx_frequency,
-                                                uint32_t* out_rx1_frequency, uint8_t* active_channel_nb )
+                                                 uint32_t* out_rx1_frequency, uint8_t* active_channel_nb )
 {
     *active_channel_nb = 0;
     uint8_t active_channel_index[NUMBER_OF_CHANNEL_WW_2G4];
 
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( SMTC_GET_BIT8( channel_index_enabled, i ) == CHANNEL_ENABLED )
+        if( SMTC_GET_BIT8( tx_channel_index_enabled, i ) == CHANNEL_ENABLED )
         {
             if( SMTC_GET_BIT16( &dr_bitfield_tx_channel[i], tx_data_rate ) == 1 )
             {
@@ -243,14 +245,14 @@ status_channel_t region_ww_2g4_build_channel_mask( smtc_real_t* real, uint8_t ch
         }
 
         SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( "UnwrappedChannelMask = 0x" );
-        for( uint8_t i = 0; i < BANK_MAX_WW_2G4; i++ )
+        for( uint8_t i = 0; i < BANK_MAX_WW2G4; i++ )
         {
             SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( "%x ", unwrapped_channel_mask[i] );
         }
         SMTC_MODEM_HAL_TRACE_PRINTF_DEBUG( ", ChMask = 0x%x\n", channel_mask );
         break;
     case 6:
-        memset( unwrapped_channel_mask, 0x00, BANK_MAX_WW_2G4 );
+        memset( unwrapped_channel_mask, 0x00, BANK_MAX_WW2G4 );
         for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
         {
             if( tx_frequency_channel[i] > 0 )
@@ -265,7 +267,7 @@ status_channel_t region_ww_2g4_build_channel_mask( smtc_real_t* real, uint8_t ch
     }
 
     // check if all channels are disabled, return ERROR_CHANNEL_MASK
-    if( SMTC_ARE_CLR_BYTE8( unwrapped_channel_mask, BANK_MAX_WW_2G4 ) == true )
+    if( SMTC_ARE_CLR_BYTE8( unwrapped_channel_mask, BANK_MAX_WW2G4 ) == true )
     {
         status = ERROR_CHANNEL_MASK;
     }
@@ -276,9 +278,9 @@ void region_ww_2g4_enable_all_channels_with_valid_freq( smtc_real_t* real )
 {
     for( uint8_t i = 0; i < real_const.const_number_of_tx_channel; i++ )
     {
-        if( ( tx_frequency_channel[i] != 0 ) && ( SMTC_GET_BIT8( channel_index_enabled, i ) == CHANNEL_DISABLED ) )
+        if( ( tx_frequency_channel[i] != 0 ) && ( SMTC_GET_BIT8( tx_channel_index_enabled, i ) == CHANNEL_DISABLED ) )
         {
-            SMTC_PUT_BIT8( channel_index_enabled, i, CHANNEL_ENABLED );
+            SMTC_PUT_BIT8( tx_channel_index_enabled, i, CHANNEL_ENABLED );
             dr_bitfield_tx_channel[i] = real_const.const_default_tx_dr_bit_field;
         }
     }

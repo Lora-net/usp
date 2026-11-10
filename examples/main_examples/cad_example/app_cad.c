@@ -43,7 +43,7 @@
 #include "smtc_rac_api.h"
 #include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 // Use unified logging system
 #define RAC_LOG_APP_PREFIX "CAD"
@@ -204,29 +204,34 @@ static void post_cad_callback( rp_status_t status )
     case RP_STATUS_CAD_POSITIVE:
         cad_positive_count++;
         last_cad_positive = cad_count;
-        CAD_PRINT( ">>> CAD #%" PRIu32 ": POSITIVE ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
-                   cad_positive_count, cad_negative_count, last_cad_positive );
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": POSITIVE ( %" PRIu32 " positive, %" PRIu32
+                   " negative, Last positive: #%" PRIu32 ")\n",
+                   cad_count, cad_positive_count, cad_negative_count, last_cad_positive );
         break;
 
     case RP_STATUS_CAD_NEGATIVE:
         cad_negative_count++;
-        CAD_PRINT( ">>> CAD #%" PRIu32 ": NEGATIVE ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
-                   cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": NEGATIVE ( %" PRIu32 " positive, %" PRIu32
+                   " negative, Last positive: #%" PRIu32 ")\n",
+                   cad_count, cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         break;
 
     case RP_STATUS_TASK_ABORTED:
-        CAD_PRINT( ">>> CAD #%" PRIu32 ": ABORTED ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
-                   cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": ABORTED ( %" PRIu32 " positive, %" PRIu32
+                   " negative, Last positive: #%" PRIu32 ")\n",
+                   cad_count, cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         break;
     case RP_STATUS_TX_DONE:  // when activate CAD_TO_TX feature
         cad_negative_count++;
-        CAD_PRINT( ">>> CAD #%" PRIu32 ": TX DONE ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
-                   cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": TX DONE ( %" PRIu32 " positive, %" PRIu32
+                   " negative, Last positive: #%" PRIu32 ")\n",
+                   cad_count, cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         break;
     case RP_STATUS_RX_PACKET:  // when activate CAD_TO_RX feature
         cad_positive_count++;
-        CAD_PRINT( ">>> CAD #%" PRIu32 ": RX PACKET ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
-                   cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": RX PACKET ( %" PRIu32 " positive, %" PRIu32
+                   " negative, Last positive: #%" PRIu32 ")\n",
+                   cad_count, cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         CAD_PRINT( "Rssi: %d, Snr: %d\n", cad.transaction->smtc_rac_data_result.rssi_result,
                    cad.transaction->smtc_rac_data_result.snr_result );
         SMTC_HAL_TRACE_ARRAY( "INFO: RX payload: ", cad_buffer, cad.transaction->smtc_rac_data_result.rx_size );
@@ -237,18 +242,23 @@ static void post_cad_callback( rp_status_t status )
         // go in RP_STATUS_RX_TIMEOUT same if he is Tx.
         if( TYPE_OF_CAD == RAL_LORA_CAD_LBT )
         {
-            CAD_PRINT( ">>> CAD #%" PRIu32 ": TX TIMEOUT ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
-                       cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+            CAD_PRINT( ">>> CAD #%" PRIu32 ": TX TIMEOUT ( %" PRIu32 " positive, %" PRIu32
+                       " negative, Last positive: #%" PRIu32 ")\n",
+                       cad_count, cad_positive_count, cad_negative_count,
+                       last_cad_positive > 0 ? last_cad_positive : 0 );
         }
         else
         {
-            CAD_PRINT( ">>> CAD #%" PRIu32 ": RX TIMEOUT ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
-                       cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+            CAD_PRINT( ">>> CAD #%" PRIu32 ": RX TIMEOUT ( %" PRIu32 " positive, %" PRIu32
+                       " negative, Last positive: #%" PRIu32 ")\n",
+                       cad_count, cad_positive_count, cad_negative_count,
+                       last_cad_positive > 0 ? last_cad_positive : 0 );
         }
         break;
     default:
-        CAD_PRINT( ">>> CAD #%" PRIu32 ": ERROR ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32 ")\n", cad_count,
-                   cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
+        CAD_PRINT( ">>> CAD #%" PRIu32 ": ERROR ( %" PRIu32 " positive, %" PRIu32 " negative, Last positive: #%" PRIu32
+                   ")\n",
+                   cad_count, cad_positive_count, cad_negative_count, last_cad_positive > 0 ? last_cad_positive : 0 );
         break;
     }
 

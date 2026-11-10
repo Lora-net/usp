@@ -151,6 +151,8 @@ typedef struct smtc_flrp_mac_radio_config_s
 
     uint8_t burst_target_per; /*!<  the maximal PER to consider a burst valid (in %) */
 
+    bool frequency_offset_enabled; /*!< Enable applying the frequency offset computed for FLRC exchanges*/
+
 } smtc_flrp_mac_radio_config_t;
 
 #endif  // FLRP_DEFS_H

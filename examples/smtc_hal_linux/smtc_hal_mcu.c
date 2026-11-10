@@ -48,8 +48,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>   // for memset
 #include <unistd.h>
-#include <time.h>  // for timespec, nanosleep
+#include <time.h>     // for timespec, nanosleep
+#include <pthread.h>  // for pthread_self, pthread_kill
+#include <signal.h>   // for sigaction, SIGUSR2
 
 /*
  * -----------------------------------------------------------------------------
@@ -76,10 +79,16 @@ static bool hal_mcu_initialized = false;
 jmp_buf       hal_reset_jmp_buf;
 volatile bool hal_reset_jmp_set = false;
 
+/* Main thread TID, captured in hal_mcu_init(). hal_mcu_wake_main_thread() uses
+ * it to interrupt nanosleep() via SIGUSR2 - see hal_mcu_set_sleep_for_ms(). */
+static pthread_t hal_mcu_main_thread_tid = 0;
+
 /*
  * -----------------------------------------------------------------------------
  * --- PRIVATE FUNCTIONS DECLARATION -------------------------------------------
  */
+
+static void hal_mcu_sigusr2_handler( int sig );
 
 /*
  * -----------------------------------------------------------------------------
@@ -120,6 +129,22 @@ void hal_mcu_init( void )
 
     printf( "MCU: Initializing Linux HAL\n" );
 
+    // Capture this (main) thread's TID and install a real SIGUSR2 handler - not
+    // SIG_IGN/SIG_DFL, and without SA_RESTART - so hal_mcu_wake_main_thread() can
+    // interrupt nanosleep() with EINTR instead of letting it run to completion.
+    hal_mcu_main_thread_tid = pthread_self( );
+
+    struct sigaction sa;
+    memset( &sa, 0, sizeof( sa ) );
+    sa.sa_handler = hal_mcu_sigusr2_handler;
+    sigemptyset( &sa.sa_mask );
+    // no SA_RESTART
+    if( sigaction( SIGUSR2, &sa, NULL ) != 0 )
+    {
+        printf( "MCU: WARNING - failed to register SIGUSR2 handler, HAL delivery-thread wake-up disabled\n" );
+        hal_mcu_main_thread_tid = 0;
+    }
+
     // Initialize RTC
     hal_rtc_init( );
 
@@ -139,6 +164,13 @@ void hal_mcu_init( void )
                       NULL );  // DIOX pin as input with rising edge detection
                                // Note: IRQ callback will be attached later by
                                // smtc_modem_hal_irq_config_radio_irq()
+
+#if defined( LR11XX_TRANSCEIVER ) && defined( ENABLE_MODEM_GNSS_FEATURE )
+    hal_gpio_init_out( RADIO_LNA_CTRL, 0 );  // GNSS LNA control
+#elif defined( SX126X )
+    // If the sx126x drives the rf switch with dio2, just put the SX126X_RADIO_RF_SWITCH_CTRL in pull up
+    hal_gpio_init_in( SX126X_RADIO_RF_SWITCH_CTRL, BSP_GPIO_PULL_MODE_UP, BSP_GPIO_IRQ_MODE_OFF, NULL );
+#endif
 
     // Initialize Low Power Timer
     hal_lp_timer_init( HAL_LP_TIMER_ID_1 );
@@ -184,15 +216,29 @@ void hal_mcu_set_sleep_for_ms( const int32_t milliseconds )
     }
 
     // MCU __WFI()-equivalent: sleep for the requested duration, but return early
-    // as soon as a signal (radio DIO via SIGUSR2, lp_timer via SIGRTMIN, button
-    // via SIGUSR1) arrives so the main loop can service the IRQ flag. SA_RESTART
-    // is intentionally not set on those handlers (see smtc_hal_gpio.c /
-    // smtc_hal_lp_timer.c) precisely so nanosleep() returns EINTR here.
+    // if hal_mcu_wake_main_thread() sends SIGUSR2 (no SA_RESTART, so nanosleep()
+    // returns EINTR) so the main loop can service a pending IRQ flag without delay.
     struct timespec ts = {
         .tv_sec  = milliseconds / 1000,
         .tv_nsec = ( milliseconds % 1000 ) * 1000000L,
     };
     nanosleep( &ts, NULL );
+}
+
+void hal_mcu_wake_main_thread( void )
+{
+    if( hal_mcu_main_thread_tid != 0 )
+    {
+        pthread_kill( hal_mcu_main_thread_tid, SIGUSR2 );
+    }
+}
+
+static void hal_mcu_sigusr2_handler( int sig )
+{
+    ( void ) sig;
+    // Intentionally empty. The sole purpose of this handler is to exist as a
+    // non-SIG_IGN, non-SIG_DFL disposition so that nanosleep() returns EINTR
+    // when SIGUSR2 is delivered to the main thread by a HAL delivery thread.
 }
 
 void hal_mcu_disable_low_power_wait( void )

@@ -19,13 +19,15 @@ set(ENABLE_FULL_LBM_FEATURES ON CACHE BOOL "")
 set(LBM_GEOLOCATION ON CACHE BOOL "")
 set(LBM_ALMANAC OFF CACHE BOOL "")
 
+# LBM is used in this sample
+set(INCLUDE_LBM ON CACHE BOOL "")
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../../common.cmake)
 
 ################################################################################
 # Radio compatibility check
 
-if(NOT RAC_RADIO IN_LIST lr11xx_radios)
-    message(STATUS "Skipping geolocation example (requires LR11XX radio, got ${RAC_RADIO})")
+if(NOT RAC_RADIO IN_LIST geoloc_radios)
+    message(STATUS "Skipping geolocation example (requires a geolocation-capable radio lr1110/lr1120, got ${RAC_RADIO})")
     return()
 endif()
 

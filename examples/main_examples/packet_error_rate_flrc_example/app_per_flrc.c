@@ -42,7 +42,7 @@
 #include "smtc_rac_api.h"
 #include "smtc_hal_led.h"
 #include "smtc_sw_platform_helper.h"
-#include "smtc_modem_hal.h"
+#include "smtc_core_hal.h"
 
 #define RAC_LOG_APP_PREFIX "PER-FLRC"
 #include "smtc_rac_log.h"
@@ -62,9 +62,9 @@
 #define SEPARATOR_OFFSET ( HEADER_OFFSET + HEADER_SIZE )
 #define COUNTER_OFFSET ( SEPARATOR_OFFSET + SEPARATOR_SIZE )
 
-#if( ROLE == RECEIVER )
+#if ( ROLE == RECEIVER )
 static const bool IS_TRANSMITTER = false;
-#elif( ROLE == TRANSMITTER )
+#elif ( ROLE == TRANSMITTER )
 static const bool IS_TRANSMITTER = true;
 #else
 #error "Please define ROLE as either RECEIVER or TRANSMITTER"

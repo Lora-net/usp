@@ -54,8 +54,26 @@ extern "C" {
  * --- PUBLIC MACROS -----------------------------------------------------------
  */
 
-/* clang-format off */
-#define NUMBER_OF_CHANNEL_EU_868            (16)
+// clang-format off
+#if (defined ( RP2_104 ) || defined( RP2_105 ) )
+#define DEFAULT_NUMBER_OF_CHANNEL_EU_868    (24)
+#else
+#define DEFAULT_NUMBER_OF_CHANNEL_EU_868    (16)
+#endif
+
+#if (defined ( RP2_104 ) || defined( RP2_105 ) )
+    #ifndef USER_ADDED_CHANNELS_EU_868          //If not defined from environment
+        #define USER_ADDED_CHANNELS_EU_868 0    //The number of ADDED channels
+    #endif
+#else // Before RP2_1.0.4, no user RX/TX channels def were possible
+    #define USER_ADDED_CHANNELS_EU_868 0
+#endif
+
+#define NUMBER_OF_CHANNEL_EU_868            (DEFAULT_NUMBER_OF_CHANNEL_EU_868 + \
+                                            USER_ADDED_CHANNELS_EU_868) // Min is 24, end-user can provide a number to add up to 56 to have up to 80 channels
+#if (NUMBER_OF_CHANNEL_EU_868 > 80)
+#error "Channel number for EU868 can't be > 80. Please reduce USER_ADDED_CHANNELS_EU_868"
+#endif
 #define NUMBER_OF_BOOT_TX_CHANNEL_EU_868    (3)             // define the number of channel at boot
 #define JOIN_ACCEPT_DELAY1_EU_868           (5)             // define in seconds
 #define JOIN_ACCEPT_DELAY2_EU_868           (6)             // define in seconds
@@ -73,29 +91,56 @@ extern "C" {
 #define SYNC_WORD_PRIVATE_EU_868            (0x12)
 #define SYNC_WORD_PUBLIC_EU_868             (0x34)
 #define MIN_TX_DR_EU_868                    (0)
-#define MAX_TX_DR_EU_868                    (11)
 #define MIN_TX_DR_LIMIT_EU_868              (0)
+#if defined( RP2_105 )
+#define MAX_TX_DR_EU_868                    (13)
+#else
+#define MAX_TX_DR_EU_868                    (11)
+#endif
+#if defined( RP2_105 )
+#define NUMBER_OF_TX_DR_EU_868              (14)            // All TX DRs, including ones potentielly dwell-time-limited
+#else
 #define NUMBER_OF_TX_DR_EU_868              (12)
-#define MIN_RX_DR_EU_868                    (0)
-#define MAX_RX_DR_EU_868                    (7)
+#endif
+// #define MIN_RX_DR_EU_868                    (0)
+// #define MAX_RX_DR_EU_868                    (7)
 
 #if defined( RP2_101 )
-#define DR_BITFIELD_SUPPORTED_EU_868        (uint16_t)( ( 1 << DR7 ) | ( 1 << DR6 ) | \
-                                                        ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
-#elif defined( RP2_103 )
-#define DR_BITFIELD_SUPPORTED_EU_868        (uint16_t)( ( 1 << DR11 ) | ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR8 ) | ( 1 << DR7 ) | ( 1 << DR6 ) | \
-                                                        ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#define TX_DR_BITFIELD_SUPPORTED_EU_868        (uint16_t)( ( 1 << DR7 ) | ( 1 << DR6 ) | \
+                                                           ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#define RX_DR_BITFIELD_SUPPORTED_EU_868        (uint16_t)( ( 1 << DR7 ) | ( 1 << DR6 ) | \
+                                                           ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#elif (defined( RP2_103 ) || defined( RP2_104 ) )
+#define TX_DR_BITFIELD_SUPPORTED_EU_868        (uint16_t)( ( 1 << DR11 ) | ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR8 ) | ( 1 << DR7 ) | ( 1 << DR6 ) | \
+                                                           ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#define RX_DR_BITFIELD_SUPPORTED_EU_868        (uint16_t)( ( 1 << DR7 ) | ( 1 << DR6 ) | \
+                                                           ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#elif defined( RP2_105 )
+#define TX_DR_BITFIELD_SUPPORTED_EU_868        (uint16_t)( ( 1 << DR13 ) | ( 1 << DR12 ) | ( 1 << DR11 ) | ( 1 << DR10 ) | ( 1 << DR9 ) | ( 1 << DR8 ) | ( 1 << DR7 ) | \
+                                                           ( 1 << DR6 ) | ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#define RX_DR_BITFIELD_SUPPORTED_EU_868        (uint16_t)( ( 1 << DR13 ) | ( 1 << DR12 ) | ( 1 << DR7 ) | \
+                                                           ( 1 << DR6 ) | ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
 #endif
 
+#if defined( RP2_105 )
 #define DEFAULT_TX_DR_BIT_FIELD_EU_868      (uint16_t)( ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#else
+#define DEFAULT_TX_DR_BIT_FIELD_EU_868      (uint16_t)( ( 1 << DR5 ) | ( 1 << DR4 ) | ( 1 << DR3 ) | ( 1 << DR2 ) | ( 1 << DR1 ) | ( 1 << DR0 ) )
+#endif
+
 #define TX_PARAM_SETUP_REQ_SUPPORTED_EU_868 (false)         // This mac command is NOT required for EU868
 #define NEW_CHANNEL_REQ_SUPPORTED_EU_868    (true)
 #define DTC_SUPPORTED_EU_868                (true)
-#define LBT_SUPPORTED_EU_868                (false)
+#define LBT_SUPPORTED_EU_868                (false)         //Listen Before Talk
 #define LBT_SNIFF_DURATION_MS_EU_868        (5)
 #define LBT_THRESHOLD_DBM_EU_868            (int16_t)(-80)
 #define LBT_BW_HZ_EU_868                    (200000)
-#define CF_LIST_SUPPORTED_EU_868            (CF_LIST_FREQ)
+
+#if ( defined( RP2_104 ) || defined( RP2_105 ))
+#define CF_LIST_SUPPORTED_EU_868            (uint8_t)(( 1 << CF_LIST_FREQ ) | ( 1 << CF_LIST_CH_MASK ))
+#else
+#define CF_LIST_SUPPORTED_EU_868            (uint8_t)( 1 << CF_LIST_FREQ )
+#endif
 
 // Class B
 #define BEACON_DR_EU_868                    (3)
@@ -114,12 +159,11 @@ extern "C" {
 /**
  * Bank contains 8 channels
  */
-typedef enum eu_868_channels_bank_e
-{
-    BANK_0_EU868 = 0,  // 0 to 7 channels
-    BANK_1_EU868 = 1,  // 8 to 15 channels
-    BANK_MAX_EU868
-} eu_868_channels_bank_t;
+#if ( ( NUMBER_OF_CHANNEL_EU_868 % 8 ) != 0 )
+#define BANK_MAX_EU868 ( ( NUMBER_OF_CHANNEL_EU_868 / 8 ) + 1 )
+#else
+#define BANK_MAX_EU868 ( NUMBER_OF_CHANNEL_EU_868 / 8 )
+#endif
 
 /**
  * Bands enumeration
@@ -145,8 +189,8 @@ typedef struct region_eu868_context_s
     uint8_t  dr_distribution[NUMBER_OF_TX_DR_EU_868];
     uint8_t  join_dr_distribution[NUMBER_OF_TX_DR_EU_868];
     uint8_t  custom_dr_distribution_init[NUMBER_OF_TX_DR_EU_868];
-    uint8_t  channel_index_enabled[BANK_MAX_EU868];   // Enable by Network
-    uint8_t  unwrapped_channel_mask[BANK_MAX_EU868];  // Temp conf send by Network
+    uint8_t  tx_channel_index_enabled[BANK_MAX_EU868];  // Enable by Network
+    uint8_t  unwrapped_channel_mask[BANK_MAX_EU868];    // Temp conf send by Network
 } region_eu868_context_t;
 
 /*
@@ -165,7 +209,7 @@ static const uint32_t default_freq_eu_868[] = { 868100000, 868300000, 868500000 
 /**
  * Up/Down link data rates offset definition
  */
-static const uint8_t datarate_offsets_eu_868[12][6] = {
+static const uint8_t datarate_offsets_eu_868[NUMBER_OF_TX_DR_EU_868][6] = {
     { 0, 0, 0, 0, 0, 0 },  // DR 0
     { 1, 0, 0, 0, 0, 0 },  // DR 1
     { 2, 1, 0, 0, 0, 0 },  // DR 2
@@ -178,39 +222,60 @@ static const uint8_t datarate_offsets_eu_868[12][6] = {
     { 2, 1, 0, 0, 0, 0 },  // DR 9
     { 1, 0, 0, 0, 0, 0 },  // DR 10
     { 2, 1, 0, 0, 0, 0 },  // DR 11
-};
-
-/**
- * @brief uplink datarate backoff
- *
- */
-static const uint8_t datarate_backoff_eu_868[] = {
-    0,  // DR0 -> DR0
-    0,  // DR1 -> DR0
-    1,  // DR2 -> DR1
-    2,  // DR3 -> DR2
-    3,  // DR4 -> DR3
-    4,  // DR5 -> DR4
-    5,  // DR6 -> DR5
-    6,  // DR7 -> DR6
-    0,  // DR8 -> DR0
-    8,  // DR9 -> DR8
-    0,  // DR10 -> DR0
-    10  // DR11 -> DR10
+#if defined( RP2_105 )
+    { 12, 5, 4, 3, 2, 1 },   // DR 12
+    { 13, 12, 5, 4, 3, 2 },  // DR 13
+#endif
 };
 
 static const uint8_t NUMBER_RX1_DR_OFFSET_EU_868 =
     sizeof( datarate_offsets_eu_868[0] ) / sizeof( datarate_offsets_eu_868[0][0] );
 
 /**
+ * @brief uplink datarate backoff
+ *
+ */
+static const uint8_t datarate_backoff_eu_868[NUMBER_OF_TX_DR_EU_868] = {
+    0,   // DR0 -> DR0
+    0,   // DR1 -> DR0
+    1,   // DR2 -> DR1
+    2,   // DR3 -> DR2
+    3,   // DR4 -> DR3
+    4,   // DR5 -> DR4
+    5,   // DR6 -> DR5
+    6,   // DR7 -> DR6
+    0,   // DR8 -> DR0
+    8,   // DR9 -> DR8
+    0,   // DR10 -> DR0
+    10,  // DR11 -> DR10
+#if defined( RP2_105 )
+    5,   // DR12 -> DR5
+    12,  // DR13 -> DR12
+#endif
+};
+
+/**
  * Data rates table definition
  */
-static const uint8_t datarates_to_sf_eu_868[] = { 12, 11, 10, 9, 8, 7, 7 };
+#if defined( RP2_105 )
+static const uint8_t datarates_to_sf_eu_868[] = { 12, 11, 10, 9, 8, 7, 7, 0, 0, 0, 0, 0, 6, 5, 0, 0 };
+#else
+static const uint8_t datarates_to_sf_eu_868[] = { 12, 11, 10, 9, 8, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#endif
 
 /**
  * Bandwidths table definition in KHz
  */
-static const uint32_t datarates_to_bandwidths_eu_868[] = { BW125, BW125, BW125, BW125, BW125, BW125, BW250 };
+#if defined( RP2_105 )
+static const uint32_t datarates_to_bandwidths_eu_868[] = {
+    BW125,  BW125,  BW125,  BW125,  BW125, BW125, BW250,  BW_RFU,
+    BW_RFU, BW_RFU, BW_RFU, BW_RFU, BW125, BW125, BW_RFU, BW_RFU
+};
+#else
+static const uint32_t datarates_to_bandwidths_eu_868[] = { BW125,  BW125,  BW125,  BW125,  BW125,  BW125,
+                                                           BW250,  BW_RFU, BW_RFU, BW_RFU, BW_RFU, BW_RFU,
+                                                           BW_RFU, BW_RFU, BW_RFU, BW_RFU };
+#endif
 
 /**
  * LR-FHSS Bandwidths table definition in Hz depending on DR
@@ -239,7 +304,11 @@ static const uint32_t datarates_to_lr_fhss_cr_eu_868[NUMBER_OF_TX_DR_EU_868] = {
 /**
  * Payload max size table definition in bytes with FHDROFFSET
  */
-static const uint8_t M_eu_868[12] = { 59, 59, 59, 123, 250, 250, 250, 250, 58, 123, 58, 123 };
+#if defined( RP2_105 )
+static const uint8_t M_eu_868[] = { 59, 59, 59, 123, 250, 250, 250, 250, 58, 123, 58, 123, 250, 250 };
+#else
+static const uint8_t M_eu_868[] = { 59, 59, 59, 123, 250, 250, 250, 250, 58, 123, 58, 123 };
+#endif
 
 /**
  * Mobile long range datarate distribution
@@ -252,8 +321,7 @@ static const uint8_t M_eu_868[12] = { 59, 59, 59, 123, 250, 250, 250, 250, 58, 1
  * DR6:  0%,
  * DR7:  0%
  */
-static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_EU_868[] = { 2, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0 };
-
+static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_EU_868[16] = { 2, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 /**
  * Mobile low power datarate distribution
  * DR0:  0%,
@@ -265,7 +333,7 @@ static const uint8_t MOBILE_LONGRANGE_DR_DISTRIBUTION_EU_868[] = { 2, 2, 3, 3, 0
  * DR6:  0%,
  * DR7:  0%
  */
-static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_EU_868[] = { 0, 0, 1, 3, 3, 3, 0, 0, 0, 0, 0, 0 };
+static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_EU_868[16] = { 0, 0, 1, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 /**
  * Join datarate distribution
@@ -278,7 +346,7 @@ static const uint8_t MOBILE_LOWPER_DR_DISTRIBUTION_EU_868[] = { 0, 0, 1, 3, 3, 3
  * DR6:  0%,
  * DR7:  0%
  */
-static const uint8_t JOIN_DR_DISTRIBUTION_EU_868[] = { 1, 2, 3, 4, 4, 6, 0, 0, 0, 0, 0, 0 };
+static const uint8_t JOIN_DR_DISTRIBUTION_EU_868[] = { 1, 2, 3, 4, 4, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 /**
  * Default datarate distribution
@@ -291,7 +359,7 @@ static const uint8_t JOIN_DR_DISTRIBUTION_EU_868[] = { 1, 2, 3, 4, 4, 6, 0, 0, 0
  * DR6:   0%,
  * DR7:   0%
  */
-static const uint8_t DEFAULT_DR_DISTRIBUTION_EU_868[] = { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const uint8_t DEFAULT_DR_DISTRIBUTION_EU_868[] = { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 /**
  * Duty Cycle table definition by bands
