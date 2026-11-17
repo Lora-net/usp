@@ -65,7 +65,7 @@ extern "C" {
 // [0-9A-Za-z-]
 #define USP_RAC_VERSION_PRE_RELEASE ""
 // Metadata may be denoted by appending a plus sign must comprise only ASCII alphanumerics and hyphens [0-9A-Za-z-].
-#define USP_RAC_VERSION_METADATA ""
+#define USP_RAC_VERSION_METADATA "+1"
 
 /*
  * -----------------------------------------------------------------------------
